@@ -144,8 +144,6 @@ with col2:
             delivering_tag = ""
     
     with tab5:
-        st.subheader("Advanced Settings")
-        
         # Global settings
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)

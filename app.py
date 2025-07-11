@@ -61,43 +61,49 @@ with col2:
     with tab2:
         st.subheader("Schedule Settings")
         
-        schedule_type = st.checkbox("Custom schedule per day/period")
+        schedule_type = st.checkbox("Custom schedule per period")
         
         if not schedule_type:
             schedule_simple = st.text_input("Schedule", value="", placeholder="e.g. Mon-Fri 9-17")
-            if schedule_simple:
-                schedule_suffix = schedule_simple
+            schedule_suffix = schedule_simple if schedule_simple else ""
         else:
-            st.info("Enter schedule periods (e.g., Mon-Thu 9-17, Fri 9-16, Sat 8-12)")
+            st.info("📅 Enter schedule periods (e.g., Mon-Thu 9-17, Fri 9-16, Sat 8-12)")
             
             # Allow up to 5 schedule periods
             schedule_parts = []
-            for i in range(5):
+            num_periods = st.number_input("Number of periods", min_value=1, max_value=5, value=2)
+            
+            for i in range(num_periods):
+                st.markdown(f"**Period {i+1}**")
                 col1, col2 = st.columns([2, 1])
                 with col1:
                     period = st.text_input(
-                        f"Period {i+1} (days)", 
+                        f"Days", 
                         value="", 
                         placeholder="e.g. Mon-Thu or Fri or Sat-Sun",
-                        key=f"period_{i}"
+                        key=f"schedule_period_{i}",
+                        label_visibility="collapsed"
                     )
                 with col2:
                     hours = st.text_input(
                         f"Hours", 
                         value="", 
                         placeholder="e.g. 9-17",
-                        key=f"hours_{i}"
+                        key=f"schedule_hours_{i}",
+                        label_visibility="collapsed"
                     )
                 
                 if period and hours:
                     schedule_parts.append(f"{period} {hours}")
             
             # Join all non-empty schedule parts
-            if schedule_parts:
-                schedule_suffix = " ".join(schedule_parts)
-            else:
-                schedule_suffix = ""
+            schedule_suffix = " ".join(schedule_parts) if schedule_parts else ""
+            
+            # Show preview
+            if schedule_suffix:
+                st.success(f"📋 Schedule: **{schedule_suffix}**")
         
+        st.markdown("---")
         col_rsp, col_rsl = st.columns(2)
         with col_rsp:
             rsp_duration = st.text_input("RSP Duration", value="")

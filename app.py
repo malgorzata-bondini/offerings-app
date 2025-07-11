@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 import shutil
 import tempfile
-from generator_core import run_generator, NAMING_CONVENTIONS
+from generator_core import run_generator
 
 st.set_page_config(page_title="Service Offerings Generator", layout="wide")
 
@@ -29,22 +29,28 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["Basic", "Schedule", "Advanced", "Naming"])
+    tab1, tab2, tab3 = st.tabs(["Basic", "Schedule", "Advanced"])
     
     with tab1:
         st.subheader("Basic Settings")
         
+        st.info("""
+        **Keywords filtering:**
+        - First keyword filters the Parent Offering column
+        - Subsequent keywords filter the Name (Child Service Offering lvl 1) column
+        """)
+        
         keywords = st.text_area(
             "Keywords (one per line)",
             value="",
-            help="Enter keywords to filter service offerings"
+            help="First keyword filters Parent Offering, others filter Child Service Offering name"
         ).strip().split('\n')
         keywords = [k.strip() for k in keywords if k.strip()]
         
         new_apps = st.text_area(
-            "Applications (one per line)",
+            "Applications (one per line or comma-separated)",
             value="",
-            help="Enter application names to generate offerings for"
+            help="Enter application names - can use newlines or commas to separate"
         ).strip().split('\n')
         new_apps = [a.strip() for a in new_apps if a.strip()]
         
@@ -55,29 +61,40 @@ with col2:
     with tab2:
         st.subheader("Schedule Settings")
         
-        schedule_type = st.checkbox("Custom schedule per day")
+        schedule_type = st.checkbox("Custom schedule per day/period")
         
         if not schedule_type:
             schedule_simple = st.text_input("Schedule", value="", placeholder="e.g. Mon-Fri 9-17")
             if schedule_simple:
                 schedule_suffix = schedule_simple
         else:
-            col_day, col_hour = st.columns(2)
-            with col_day:
-                days = st.multiselect(
-                    "Days",
-                    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-                    default=[]
-                )
+            st.info("Enter schedule periods (e.g., Mon-Thu 9-17, Fri 9-16, Sat 8-12)")
             
-            with col_hour:
-                hours = []
-                for day in days:
-                    hour = st.text_input(f"Hours for {day}", value="", key=f"hour_{day}")
-                    hours.append(hour)
+            # Allow up to 5 schedule periods
+            schedule_parts = []
+            for i in range(5):
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    period = st.text_input(
+                        f"Period {i+1} (days)", 
+                        value="", 
+                        placeholder="e.g. Mon-Thu or Fri or Sat-Sun",
+                        key=f"period_{i}"
+                    )
+                with col2:
+                    hours = st.text_input(
+                        f"Hours", 
+                        value="", 
+                        placeholder="e.g. 9-17",
+                        key=f"hours_{i}"
+                    )
+                
+                if period and hours:
+                    schedule_parts.append(f"{period} {hours}")
             
-            if days and all(hours):
-                schedule_suffix = " ".join(f"{d} {h}" for d, h in zip(days, hours) if h)
+            # Join all non-empty schedule parts
+            if schedule_parts:
+                schedule_suffix = " ".join(schedule_parts)
             else:
                 schedule_suffix = ""
         
@@ -90,48 +107,70 @@ with col2:
     with tab3:
         st.subheader("Advanced Settings")
         
-        require_corp = st.checkbox("CORP in Child Service Offerings?")
+        # Special naming options
+        st.markdown("### Naming Options")
         
-        if require_corp:
-            delivering_tag = st.text_input(
-                "If CORP, who delivers the service (e.g. HS PL)", 
-                value="",
-                help="Enter the division and country that delivers the service, e.g. HS PL, DS DE, IT, Finance, etc."
+        col_corp, col_dept = st.columns(2)
+        
+        with col_corp:
+            require_corp = st.checkbox("CORP in Child Service Offerings?")
+            
+            if require_corp:
+                delivering_tag = st.text_input(
+                    "Who delivers the service", 
+                    value="",
+                    help="E.g. HS PL, DS DE, IT, Finance, etc."
+                )
+            else:
+                delivering_tag = ""
+        
+        with col_dept:
+            special_dept = st.selectbox(
+                "Special Department",
+                ["None", "IT", "HR"],
+                help="Select IT or HR for special naming convention"
             )
-        else:
-            delivering_tag = ""
+            special_dept = None if special_dept == "None" else special_dept
         
+        # Global prod option
         global_prod = st.checkbox("Global Prod", value=False)
         
+        # Support groups
+        st.markdown("### Support Groups")
         support_group = st.text_input("Support Group", value="")
-        managed_by_group = st.text_input("Managed by Group", value="")
-        
-        aliases_on = st.checkbox("Enable Aliases", value=True)
-    
-    with tab4:
-        st.subheader("Naming Convention")
-        
-        naming_convention = st.selectbox(
-            "Select Naming Convention:",
-            options=list(NAMING_CONVENTIONS.keys()),
-            format_func=lambda x: NAMING_CONVENTIONS[x],
-            index=3
+        managed_by_group = st.text_input(
+            "Managed by Group", 
+            value="",
+            help="Optional - if empty, will use Support Group value"
         )
         
-        st.info(f"Selected: {NAMING_CONVENTIONS[naming_convention]}")
+        # Aliases
+        st.markdown("### Aliases")
+        aliases_on = st.checkbox("Enable Aliases", value=False)  # Default to False
         
-        st.markdown("### Example outputs:")
-        examples = {
-            "child_lvl1_software": "[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17",
-            "child_lvl1_hardware": "[SR DS PL IT] Hardware configuration Mon-Fri 7-16:30",
-            "child_lvl1_other": "[SR HS PL IT] Mailbox management Mon-Fri 8-16",
-            "parent_sam": "[SR HS PL IT] Parent Microsoft Software Request Office 365 Mon-Fri 6-21"
-        }
-        
-        if naming_convention in examples:
-            st.code(examples[naming_convention])
+        if aliases_on:
+            aliases_value = st.text_input(
+                "Alias Value",
+                value="",
+                help="Enter the value to use for aliases"
+            )
+        else:
+            aliases_value = ""
 
 st.markdown("---")
+
+# Show naming examples based on selections
+with st.expander("📋 Naming Convention Examples"):
+    if 'require_corp' in locals() and require_corp:
+        st.markdown("**CORP Example:**")
+        st.code("[SR HS PL CORP DS DE IT] Software assistance Outlook Prod Mon-Fri 8-17")
+    elif 'special_dept' in locals() and special_dept:
+        st.markdown(f"**{special_dept} Department Example:**")
+        st.code(f"[SR HS PL {special_dept}] Software assistance Outlook Prod Mon-Fri 8-17")
+    else:
+        st.markdown("**Standard Example:**")
+        st.code("[SR HS PL Permissions] Granting permissions to application Outlook Prod Mon-Fri 9-17")
+        st.markdown("From parent: `[Parent HS PL Permissions] Granting permissions to application`")
 
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
     if not uploaded_files:
@@ -169,9 +208,10 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         support_group=support_group,
                         managed_by_group=managed_by_group,
                         aliases_on=aliases_on,
+                        aliases_value=aliases_value,
                         src_dir=src_dir,
                         out_dir=out_dir,
-                        naming_convention=naming_convention
+                        special_dept=special_dept
                     )
                 
                 st.success("✅ Service offerings generated successfully!")
@@ -195,7 +235,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v2.0 | With Naming Conventions Support
+        Service Offerings Generator v3.0 | With Enhanced Naming Logic
     </div>
     """,
     unsafe_allow_html=True

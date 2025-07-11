@@ -7,19 +7,6 @@ from openpyxl.styles import Alignment
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
-NAMING_CONVENTIONS = {
-    "parent_non_software": "Parent Service Offering (does not apply to Service Offerings related to software model)",
-    "parent_sam": "Parent Service Offering (Service Offerings related to software model - SAM)",
-    "child_lvl1_parent": "Child Offering LVL1 PARENT (applicable only for Software & Permissions, if there is a Child Offering Lvl2)",
-    "child_lvl1_software": "Child Offering LVL1 SOFTWARE & PERMISSIONS (applicable only if there is no Child Offering Lvl2)",
-    "child_lvl1_hardware": "Child Offering LVL1 HARDWARE or NETWORK",
-    "child_lvl1_other": "Child Offering LVL1 OTHER (i.e. MAILBOX, DEDICATED SERVICES etc.)",
-    "child_lvl2_non_software": "Child Offering LVL2 (does not apply to Service Offerings related to software model)",
-    "child_lvl2_sam": "Child Offering LVL2 (Service Offerings related to software model - SAM)",
-    "exception": "EXCEPTION Child Offering LVL1 / LVL2",
-    "child_lvl3": "Child Offering LVL 3 (application functionality)",
-}
-
 need_cols = [
     "Name (Child Service Offering lvl 1)", "Parent Offering",
     "Service Offerings | Depend On (Application Service)", "Service Commitments",
@@ -28,189 +15,121 @@ need_cols = [
     "Subscribed by Company",
 ]
 
-skip_hs_for = {"MD", "UA", "PL"}
 discard_lc  = {"retired", "retiring", "end of life", "end of support"}
 
-def extract_info_from_parent(parent_offering):
-    info = {
-        "country": "",
-        "division": "",
-        "topic": "",
-        "catalog_name": "",
-        "parent_inner": ""
-    }
-    
+def extract_parent_info(parent_offering):
+    """Extract the content between [Parent ...] from parent offering"""
     match = re.search(r'\[Parent\s+(.*?)\]', str(parent_offering), re.I)
     if match:
-        inner = match.group(1).strip()
-        info["parent_inner"] = inner
-        
-        parts = inner.split()
-        for part in parts:
-            if part in ["HS", "DS"]:
-                info["division"] = part
-            elif len(part) == 2 and part.isupper():
-                info["country"] = part
-            elif part not in ["Parent", "RecP"]:
-                info["topic"] = part
-    
+        return match.group(1).strip()
+    return ""
+
+def extract_catalog_name(parent_offering):
+    """Extract the catalog name after the brackets"""
     parts = str(parent_offering).split(']', 1)
     if len(parts) > 1:
-        info["catalog_name"] = parts[1].strip()
-    
-    return info
+        return parts[1].strip()
+    return ""
 
-def build_name_parent_non_software(info, sr_or_im):
-    parts = ["Parent"]
-    if info["division"]:
-        parts.append(info["division"])
-    parts.extend([info["country"], info["topic"]])
+def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None):
+    """Build standard name when not CORP"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
     
-    return f"[{' '.join(parts)}] {info['catalog_name']}"
+    if special_dept:  # IT or HR case
+        # Extract division and country from parent content
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+        
+        # Build the name with special department
+        prefix_parts = [sr_or_im]
+        if division:
+            prefix_parts.append(division)
+        if country:
+            prefix_parts.append(country)
+        prefix_parts.append(special_dept)
+        
+        # Extract the topic from parent content (what's after division and country)
+        topic_parts = []
+        skip_next = False
+        for i, part in enumerate(parts):
+            if part in ["HS", "DS"] or (len(part) == 2 and part.isupper() and part not in ["IT", "HR"]):
+                skip_next = True
+                continue
+            if skip_next:
+                skip_next = False
+                continue
+            topic_parts.append(part)
+        
+        topic = " ".join(topic_parts) if topic_parts else "Software"
+        
+        return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} Prod {schedule_suffix}"
+    else:
+        # Standard case - just replace Parent with SR/IM
+        return f"[{sr_or_im} {parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
 
-def build_name_parent_sam(info, sr_or_im, app, schedule_suffix):
-    parts = [sr_or_im]
-    if info["division"]:
-        parts.append(info["division"])
-    parts.extend([info["country"], info["topic"]])
+def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
+    """Build name for CORP offerings"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
     
-    return f"[{' '.join(parts)}] Parent {info['catalog_name']} {app} {schedule_suffix}"
-
-def build_name_child_lvl1_parent(info, sr_or_im, app):
-    parts = [sr_or_im]
-    if info["division"]:
-        parts.append(info["division"])
-    parts.extend([info["country"], info["topic"]])
+    # Extract parts from parent content
+    parts = parent_content.split()
+    country = ""
+    topic = ""
+    
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS"]:
+            country = part
+        elif part not in ["HS", "DS", "Parent", "RecP"]:
+            topic = part
+    
+    # Build CORP name
+    prefix_parts = [sr_or_im]
+    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
+    prefix_parts.extend(delivering_parts[:2])  # Take division and country from delivering tag
+    prefix_parts.extend(["CORP", receiver, topic or "IT"])
     
     if sr_or_im == "SR":
-        return f"[{' '.join(parts)}] Parent {info['catalog_name']} {app} Prod"
+        return f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
     else:
-        return f"[{' '.join(parts)}] Parent {info['catalog_name']} solving {app} Prod"
-
-def build_name_child_lvl1_software(info, sr_or_im, app, schedule_suffix, require_corp, receiver, delivering_tag):
-    parts = [sr_or_im]
-    
-    if require_corp:
-        delivering_division = info["division"] or "HS"
-        parts.extend([delivering_division, info["country"], "CORP", receiver, info["topic"] or "IT"])
-    else:
-        if info["division"]:
-            parts.append(info["division"])
-        parts.extend([info["country"], info["topic"] or "IT"])
-    
-    base = f"[{' '.join(parts)}]"
-    
-    if sr_or_im == "SR":
-        return f"{base} {info['catalog_name']} {app} Prod {schedule_suffix}"
-    else:
-        return f"{base} {info['catalog_name']} solving {app} Prod {schedule_suffix}"
-
-def build_name_child_lvl1_hardware(info, sr_or_im, schedule_suffix):
-    parts = [sr_or_im]
-    if info["division"]:
-        parts.append(info["division"])
-    parts.extend([info["country"], info["topic"] or "IT"])
-    
-    base = f"[{' '.join(parts)}]"
-    
-    if sr_or_im == "SR":
-        return f"{base} {info['catalog_name']} {schedule_suffix}"
-    else:
-        return f"{base} {info['catalog_name']} solving {schedule_suffix}"
-
-def build_name_child_lvl1_other(info, sr_or_im, schedule_suffix, service_type=None):
-    parts = [sr_or_im]
-    if info["division"]:
-        parts.append(info["division"])
-    parts.extend([info["country"], info["topic"] or "IT"])
-    
-    base = f"[{' '.join(parts)}]"
-    
-    catalog = info['catalog_name']
-    if service_type:
-        catalog = f"{catalog} {service_type}"
-    
-    if sr_or_im == "SR":
-        return f"{base} {catalog} {schedule_suffix}"
-    else:
-        return f"{base} {catalog} solving {schedule_suffix}"
-
-def build_name_by_convention(naming_convention, **kwargs):
-    info = extract_info_from_parent(kwargs.get("parent_offering", ""))
-    
-    if naming_convention == "parent_non_software":
-        return build_name_parent_non_software(info, kwargs.get("sr_or_im"))
-    
-    elif naming_convention == "parent_sam":
-        return build_name_parent_sam(
-            info, 
-            kwargs.get("sr_or_im"),
-            kwargs.get("app"),
-            kwargs.get("schedule_suffix")
-        )
-    
-    elif naming_convention == "child_lvl1_parent":
-        return build_name_child_lvl1_parent(
-            info,
-            kwargs.get("sr_or_im"),
-            kwargs.get("app")
-        )
-    
-    elif naming_convention == "child_lvl1_software":
-        return build_name_child_lvl1_software(
-            info,
-            kwargs.get("sr_or_im"),
-            kwargs.get("app"),
-            kwargs.get("schedule_suffix"),
-            kwargs.get("require_corp"),
-            kwargs.get("receiver"),
-            kwargs.get("delivering_tag")
-        )
-    
-    elif naming_convention == "child_lvl1_hardware":
-        return build_name_child_lvl1_hardware(
-            info,
-            kwargs.get("sr_or_im"),
-            kwargs.get("schedule_suffix")
-        )
-    
-    elif naming_convention == "child_lvl1_other":
-        return build_name_child_lvl1_other(
-            info,
-            kwargs.get("sr_or_im"),
-            kwargs.get("schedule_suffix"),
-            kwargs.get("service_type")
-        )
-    
-    else:
-        return build_name_child_lvl1_software(
-            info,
-            kwargs.get("sr_or_im"),
-            kwargs.get("app"),
-            kwargs.get("schedule_suffix"),
-            kwargs.get("require_corp"),
-            kwargs.get("receiver"),
-            kwargs.get("delivering_tag")
-        )
+        return f"[{' '.join(prefix_parts)}] {catalog_name} solving {app} Prod {schedule_suffix}"
 
 def run_generator(*,
     keywords, new_apps, schedule_suffix,
     delivery_manager, global_prod,
     rsp_duration, rsl_duration,
     sr_or_im, require_corp, delivering_tag,
-    support_group, managed_by_group, aliases_on,
+    support_group, managed_by_group, aliases_on, aliases_value,
     src_dir: Path, out_dir: Path,
-    naming_convention: str = "child_lvl1_software"):
+    special_dept=None):  # IT or HR
 
-    aliases_value = "" if aliases_on else "-"
     sheets, seen = {}, set()
 
     def row_keywords_ok(row):
-        p = str(row["Parent Offering"]).lower()
-        n = str(row["Name (Child Service Offering lvl 1)"]).lower()
-        hit_p = {k for k in keywords if re.search(rf"\b{re.escape(k)}\b", p)}
-        hit_n = {k for k in keywords if re.search(rf"\b{re.escape(k)}\b", n)}
-        return bool(hit_p) and bool(hit_n) and hit_p | hit_n == set(keywords)
+        if not keywords:
+            return True
+        
+        # First keyword filters Parent Offering
+        if len(keywords) >= 1:
+            p = str(row["Parent Offering"]).lower()
+            if not re.search(rf"\b{re.escape(keywords[0].lower())}\b", p):
+                return False
+        
+        # Subsequent keywords filter Name (Child Service Offering lvl 1)
+        if len(keywords) > 1:
+            n = str(row["Name (Child Service Offering lvl 1)"]).lower()
+            for k in keywords[1:]:
+                if not re.search(rf"\b{re.escape(k.lower())}\b", n):
+                    return False
+        
+        return True
 
     def lc_ok(row):
         return all(str(row[c]).strip().lower() not in discard_lc
@@ -239,6 +158,15 @@ def run_generator(*,
         ]
         return "\n".join(lines)
 
+    # Process apps - support both newline and comma separation
+    all_apps = []
+    for app_line in new_apps:
+        # Split by comma and add non-empty values
+        for app in app_line.split(','):
+            app = app.strip()
+            if app:
+                all_apps.append(app)
+
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         df=pd.read_excel(wb,sheet_name="Child SO lvl1")
         if any(c not in df.columns for c in need_cols):
@@ -248,6 +176,7 @@ def run_generator(*,
               & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
               & df.apply(lc_ok,axis=1)
               & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
+        
         if require_corp:
             mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
             mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)
@@ -262,30 +191,37 @@ def run_generator(*,
         country=wb.stem.split("_")[-1].upper()
         tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
+        # Determine receivers based on country and CORP setting
         if require_corp:
-            if country=="DE":         receivers=["DS DE","HS DE"]
-            elif country in {"UA","MD"}: receivers=[f"DS {country}"]
-            elif country=="PL":         receivers=["DS PL"] if "DS PL" in base_pool["Name (Child Service Offering lvl 1)"].str.cat(sep=" ") else ["HS PL"]
-            elif country=="CY":         receivers=["DS CY","HS CY"]
-            else:                       receivers=[f"DS {country}"]
+            if country=="DE":         
+                receivers=["DS DE","HS DE"]
+            elif country in {"UA","MD"}: 
+                receivers=[f"DS {country}"]
+            elif country=="PL":         
+                # Check if DS PL exists in the data
+                if "DS PL" in base_pool["Name (Child Service Offering lvl 1)"].str.cat(sep=" "):
+                    receivers=["DS PL"]
+                else:
+                    receivers=["HS PL"]
+            elif country=="CY":         
+                receivers=["DS CY","HS CY"]
+            else:                       
+                receivers=[f"DS {country}"]
         else:
             receivers=[""]
 
         parent_full=str(base_row.iloc[0]["Parent Offering"])
 
-        for app in new_apps:
+        for app in all_apps:
             for recv in receivers:
-                new_name = build_name_by_convention(
-                    naming_convention=naming_convention,
-                    parent_offering=parent_full,
-                    sr_or_im=sr_or_im,
-                    app=app,
-                    schedule_suffix=schedule_suffix,
-                    require_corp=require_corp,
-                    receiver=recv,
-                    delivering_tag=delivering_tag,
-                    country=country
-                )
+                if require_corp:
+                    new_name = build_corp_name(
+                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                    )
+                else:
+                    new_name = build_standard_name(
+                        parent_full, sr_or_im, app, schedule_suffix, special_dept
+                    )
                 
                 if new_name in seen:
                     continue
@@ -295,10 +231,12 @@ def run_generator(*,
                 row["Name (Child Service Offering lvl 1)"]=new_name
                 row["Delivery Manager"]=delivery_manager
                 row["Support group"]=support_group
-                row["Managed by Group"]=managed_by_group
+                # If Managed by Group is empty but Support Group is filled, copy Support Group
+                row["Managed by Group"]=managed_by_group if managed_by_group else support_group
                 
+                # Handle aliases
                 for c in [c for c in row.columns if "Aliases" in c]:
-                    row[c]="-"
+                    row[c]=aliases_value if aliases_on else "-"
                     
                 if country=="DE":
                     row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
@@ -322,12 +260,13 @@ def run_generator(*,
                 sheets[country]=pd.concat([sheets[country],row],ignore_index=True)
 
     if not sheets:
-        raise ValueError("No matching rows.")
+        raise ValueError("No matching rows found with the specified keywords.")
 
     out_dir.mkdir(parents=True,exist_ok=True)
     outfile=out_dir / f"Offerings_NEW_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
     with pd.ExcelWriter(outfile,engine="openpyxl") as w:
         for cc,dfc in sheets.items():
+            # Ensure unique names per country
             df_final = dfc.drop_duplicates(subset=["Name (Child Service Offering lvl 1)"])
             
             if "Number" in df_final.columns:

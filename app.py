@@ -37,7 +37,7 @@ with col2:
         st.info("""
         **Keywords filtering:**
         - First keyword filters the Parent Offering column
-        - Subsequent keywords filter the Name (Child Service Offering lvl 1) column
+        - Subsequent keywords filter the Name (Child Service Offering lvl 1) column (OR logic - any match)
         """)
         
         keywords = st.text_area(
@@ -116,27 +116,25 @@ with col2:
         # Special naming options
         st.markdown("### Naming Options")
         
-        col_corp, col_dept = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         
-        with col_corp:
+        with col1:
             require_corp = st.checkbox("CORP in Child Service Offerings?")
             
-            if require_corp:
-                delivering_tag = st.text_input(
-                    "Who delivers the service", 
-                    value="",
-                    help="E.g. HS PL, DS DE, IT, Finance, etc."
-                )
-            else:
-                delivering_tag = ""
+        with col2:
+            special_it = st.checkbox("IT Department", disabled=require_corp)
+            
+        with col3:
+            special_hr = st.checkbox("HR Department", disabled=require_corp)
         
-        with col_dept:
-            special_dept = st.selectbox(
-                "Special Department",
-                ["None", "IT", "HR"],
-                help="Select IT or HR for special naming convention"
+        if require_corp:
+            delivering_tag = st.text_input(
+                "Who delivers the service", 
+                value="",
+                help="E.g. HS PL, DS DE, IT, Finance, etc."
             )
-            special_dept = None if special_dept == "None" else special_dept
+        else:
+            delivering_tag = ""
         
         # Global prod option
         global_prod = st.checkbox("Global Prod", value=False)
@@ -169,10 +167,13 @@ st.markdown("---")
 with st.expander("📋 Naming Convention Examples"):
     if 'require_corp' in locals() and require_corp:
         st.markdown("**CORP Example:**")
-        st.code("[SR HS PL CORP DS DE IT] Software assistance Outlook Prod Mon-Fri 8-17")
-    elif 'special_dept' in locals() and special_dept:
-        st.markdown(f"**{special_dept} Department Example:**")
-        st.code(f"[SR HS PL {special_dept}] Software assistance Outlook Prod Mon-Fri 8-17")
+        st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
+    elif 'special_it' in locals() and special_it:
+        st.markdown("**IT Department Example:**")
+        st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17")
+    elif 'special_hr' in locals() and special_hr:
+        st.markdown("**HR Department Example:**")
+        st.code("[SR HS PL HR] Software assistance Outlook Prod Mon-Fri 8-17")
     else:
         st.markdown("**Standard Example:**")
         st.code("[SR HS PL Permissions] Granting permissions to application Outlook Prod Mon-Fri 9-17")
@@ -217,7 +218,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         aliases_value=aliases_value,
                         src_dir=src_dir,
                         out_dir=out_dir,
-                        special_dept=special_dept
+                        special_it=special_it if 'special_it' in locals() else False,
+                        special_hr=special_hr if 'special_hr' in locals() else False
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

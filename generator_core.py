@@ -94,7 +94,10 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     prefix_parts = [sr_or_im]
     delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
     prefix_parts.extend(delivering_parts[:2])  # Take division and country from delivering tag
-    prefix_parts.extend(["CORP", receiver, topic or "IT"])
+    prefix_parts.extend(["CORP", receiver])
+    # Only add topic if it exists, don't default to IT for CORP
+    if topic:
+        prefix_parts.append(topic)
     
     if sr_or_im == "SR":
         return f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
@@ -108,7 +111,7 @@ def run_generator(*,
     sr_or_im, require_corp, delivering_tag,
     support_group, managed_by_group, aliases_on, aliases_value,
     src_dir: Path, out_dir: Path,
-    special_dept=None):  # IT or HR
+    special_it=False, special_hr=False):  # IT and HR as separate flags
 
     sheets, seen = {}, set()
 
@@ -122,12 +125,17 @@ def run_generator(*,
             if not re.search(rf"\b{re.escape(keywords[0].lower())}\b", p):
                 return False
         
-        # Subsequent keywords filter Name (Child Service Offering lvl 1)
+        # Subsequent keywords filter Name (Child Service Offering lvl 1) - ANY match (OR logic)
         if len(keywords) > 1:
             n = str(row["Name (Child Service Offering lvl 1)"]).lower()
+            # Check if ANY of the subsequent keywords match
+            matches = False
             for k in keywords[1:]:
-                if not re.search(rf"\b{re.escape(k.lower())}\b", n):
-                    return False
+                if re.search(rf"\b{re.escape(k.lower())}\b", n):
+                    matches = True
+                    break
+            if not matches:
+                return False
         
         return True
 
@@ -166,6 +174,13 @@ def run_generator(*,
             app = app.strip()
             if app:
                 all_apps.append(app)
+
+    # Determine special department
+    special_dept = None
+    if special_it and not require_corp:
+        special_dept = "IT"
+    elif special_hr and not require_corp:
+        special_dept = "HR"
 
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         df=pd.read_excel(wb,sheet_name="Child SO lvl1")

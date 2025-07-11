@@ -29,7 +29,7 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3 = st.tabs(["Basic", "Schedule", "Advanced"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Basic", "Schedule", "Groups", "Naming", "Advanced"])
     
     with tab1:
         st.subheader("Basic Settings")
@@ -111,10 +111,17 @@ with col2:
             rsl_duration = st.text_input("RSL Duration", value="")
     
     with tab3:
-        st.subheader("Advanced Settings")
+        st.subheader("Support Groups")
         
-        # Special naming options
-        st.markdown("### Naming Options")
+        support_group = st.text_input("Support Group", value="")
+        managed_by_group = st.text_input(
+            "Managed by Group", 
+            value="",
+            help="Optional - if empty, will use Support Group value"
+        )
+    
+    with tab4:
+        st.subheader("Naming Options")
         
         col1, col2, col3 = st.columns(3)
         
@@ -135,18 +142,13 @@ with col2:
             )
         else:
             delivering_tag = ""
+    
+    with tab5:
+        st.subheader("Advanced Settings")
         
-        # Global prod option
+        # Global settings
+        st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)
-        
-        # Support groups
-        st.markdown("### Support Groups")
-        support_group = st.text_input("Support Group", value="")
-        managed_by_group = st.text_input(
-            "Managed by Group", 
-            value="",
-            help="Optional - if empty, will use Support Group value"
-        )
         
         # Aliases
         st.markdown("### Aliases")

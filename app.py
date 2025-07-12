@@ -148,10 +148,8 @@ with col2:
         )
     
     with tab4:
-        st.subheader("Naming Options")
-        
-        st.markdown("### Special Naming Types")
-        st.markdown("Select one of the following:")
+        st.subheader("Select one of the following:")
+
         
         # Create a column to ensure vertical layout
         col = st.container()

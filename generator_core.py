@@ -400,15 +400,21 @@ def run_generator(*,
                         # Normalize the name for comparison (remove extra spaces)
                         new_name_normalized = ' '.join(new_name.split())
                         
-                        # Check for duplicates - exact match only
+                        # Check for duplicates within this generation run
                         if new_name_normalized in seen:
-                            raise ValueError(f"Duplicate within generation: {new_name}")
+                            # Skip this one instead of raising error - it's already being created
+                            continue
                         
-                        # Check against existing offerings
+                        # Check against existing offerings in source files
+                        found_in_existing = False
                         for existing in existing_offerings:
                             existing_normalized = ' '.join(str(existing).split())
                             if existing_normalized == new_name_normalized:
-                                raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
+                                found_in_existing = True
+                                break
+                        
+                        if found_in_existing:
+                            raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
                         
                         seen.add(new_name_normalized)
 

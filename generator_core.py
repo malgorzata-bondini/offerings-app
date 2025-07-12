@@ -36,7 +36,55 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
-    if special_dept:  # IT or HR case
+    if special_dept == "Medical":
+        # Extract division and country from parent content
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        topic = ""
+        
+        for i, part in enumerate(parts):
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+            elif part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
+                topic = part
+                break
+        
+        # Build Medical name
+        prefix_parts = [sr_or_im]
+        if division:
+            prefix_parts.append(division)
+        if country:
+            prefix_parts.append(country)
+        prefix_parts.append("Medical")
+        
+        # Use topic from parent and lowercase catalog name
+        return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+    
+    elif special_dept == "DAK":
+        # Replace DAK with Business Services
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR", "DAK"]:
+                country = part
+        
+        prefix_parts = [sr_or_im]
+        if division:
+            prefix_parts.append(division)
+        if country:
+            prefix_parts.append(country)
+        prefix_parts.append("Business Services")
+        
+        return f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
+    
+    elif special_dept in ["IT", "HR"]:
         # Extract division and country from parent content
         parts = parent_content.split()
         division = ""
@@ -104,16 +152,80 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     else:
         return f"[{' '.join(prefix_parts)}] {catalog_name} solving {app} Prod {schedule_suffix}"
 
+def update_commitments(orig, sched, rsp, rsl):
+    """Update existing commitments and ensure OLA is present"""
+    out = []
+    has_ola = False
+    country_code = None
+    
+    for line in str(orig).splitlines():
+        line = line.strip()
+        if not line:
+            continue
+            
+        if "RSP" in line:
+            # Extract country code from line like [PL] SLA SR RSP...
+            match = re.search(r'\[(\w+)\]', line)
+            if match:
+                country_code = match.group(1)
+            # Extract P values (P1-P4, P1-P3, etc)
+            p_match = re.search(r'(P\d+-P\d+)', line)
+            p_values = p_match.group(1) if p_match else "P1-P4"
+            # Update schedule and duration
+            line = re.sub(r"RSP\s+[^P]+", f"RSP {sched} ", line)
+            line = re.sub(r"(P\d+-P\d+)\s+.*$", f"{p_values} {rsp}", line)
+        elif "RSL" in line:
+            # Extract P values
+            p_match = re.search(r'(P\d+-P\d+)', line)
+            p_values = p_match.group(1) if p_match else "P1-P4"
+            # Update schedule and duration
+            line = re.sub(r"RSL\s+[^P]+", f"RSL {sched} ", line)
+            line = re.sub(r"(P\d+-P\d+)\s+.*$", f"{p_values} {rsl}", line)
+        elif "OLA" in line:
+            has_ola = True
+            # Extract P values
+            p_match = re.search(r'(P\d+-P\d+)', line)
+            p_values = p_match.group(1) if p_match else "P1-P4"
+            # Update schedule and duration
+            line = re.sub(r"RSL\s+[^P]+", f"RSL {sched} ", line)
+            line = re.sub(r"(P\d+-P\d+)\s+.*$", f"{p_values} {rsl}", line)
+        out.append(line)
+    
+    # If no OLA found, create it from the last RSL line
+    if not has_ola and country_code:
+        # Find the last RSL line to copy its format
+        rsl_line = None
+        for line in out:
+            if "RSL" in line and "SLA" in line:
+                rsl_line = line
+        
+        if rsl_line:
+            # Create OLA by replacing SLA with OLA in the RSL line
+            ola_line = rsl_line.replace("SLA", "OLA")
+            out.append(ola_line)
+    
+    return "\n".join(out)
+
+def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration):
+    """Create commitment block with OLA for all countries"""
+    lines=[
+        f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
+        f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
+        f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
+    ]
+    return "\n".join(lines)
+
 def run_generator(*,
-    keywords_parent, keywords_child, new_apps, schedule_suffix,
+    keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
     rsp_duration, rsl_duration,
     sr_or_im, require_corp, delivering_tag,
     support_group, managed_by_group, aliases_on, aliases_value,
     src_dir: Path, out_dir: Path,
-    special_it=False, special_hr=False):  # IT and HR as separate flags
+    special_it=False, special_hr=False, special_medical=False, special_dak=False):
 
     sheets, seen = {}, set()
+    existing_offerings = set()  # Track existing offerings to detect duplicates
 
     def parse_keywords(keyword_string):
         """Parse keywords - returns (keywords_list, use_and_logic)"""
@@ -169,44 +281,6 @@ def run_generator(*,
     def name_prefix_ok(name):
         return name.lower().startswith(f"[{sr_or_im.lower()} ")
 
-    def update_commitments(orig, sched, rsp, rsl):
-        """Update existing commitments and ensure OLA is present"""
-        out = []
-        has_ola = False
-        country_code = None
-        
-        for line in str(orig).splitlines():
-            if "RSP" in line:
-                # Extract country code from line like [PL] SLA SR RSP...
-                match = re.search(r'\[(\w+)\]', line)
-                if match:
-                    country_code = match.group(1)
-                line = re.sub(r"RSP .*? P1-P4", f"RSP {sched} P1-P4", line)
-                line = re.sub(r"P1-P4 .*?$", f"P1-P4 {rsp}", line)
-            elif "RSL" in line:
-                line = re.sub(r"RSL .*? P1-P4", f"RSL {sched} P1-P4", line)
-                line = re.sub(r"P1-P4 .*?$", f"P1-P4 {rsl}", line)
-            elif "OLA" in line:
-                has_ola = True
-                line = re.sub(r"RSL .*? P1-P4", f"RSL {sched} P1-P4", line)
-                line = re.sub(r"P1-P4 .*?$", f"P1-P4 {rsl}", line)
-            out.append(line)
-        
-        # If no OLA found, add it after the last line
-        if not has_ola and country_code:
-            out.append(f"[{country_code}] OLA SR RSL {sched} P1-P4 {rsl}")
-        
-        return "\n".join(out)
-
-    def commit_block(cc):
-        """Create commitment block with OLA for all countries"""
-        lines=[
-            f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
-            f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
-            f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
-        ]
-        return "\n".join(lines)
-
     # Process apps - support both newline and comma separation
     all_apps = []
     for app_line in new_apps:
@@ -222,17 +296,25 @@ def run_generator(*,
         special_dept = "IT"
     elif special_hr and not require_corp:
         special_dept = "HR"
+    elif special_medical and not require_corp:
+        special_dept = "Medical"
+    elif special_dak and not require_corp:
+        special_dept = "DAK"
 
+    # First, collect all existing offerings from the source files
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
-        df=pd.read_excel(wb,sheet_name="Child SO lvl1")
-        if any(c not in df.columns for c in need_cols):
-            # If Visibility group is missing, add it as empty column
-            if "Visibility group" not in df.columns:
-                df["Visibility group"] = ""
-            # Skip if other critical columns are missing
-            critical_cols = [c for c in need_cols if c != "Visibility group"]
-            if any(c not in df.columns for c in critical_cols):
-                continue
+        df = pd.read_excel(wb, sheet_name="Child SO lvl1")
+        if "Name (Child Service Offering lvl 1)" in df.columns:
+            existing_offerings.update(df["Name (Child Service Offering lvl 1)"].dropna().astype(str))
+
+    # Now process the files
+    for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
+        df = pd.read_excel(wb, sheet_name="Child SO lvl1")
+        
+        # Add missing columns as empty
+        for col in need_cols:
+            if col not in df.columns:
+                df[col] = ""
 
         mask=(df.apply(row_keywords_ok,axis=1)
               & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
@@ -278,62 +360,60 @@ def run_generator(*,
 
             for app in all_apps:
                 for recv in receivers:
-                    if require_corp:
-                        new_name = build_corp_name(
-                            parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                        )
-                    else:
-                        new_name = build_standard_name(
-                            parent_full, sr_or_im, app, schedule_suffix, special_dept
-                        )
-                    
-                    if new_name in seen:
-                        continue
-                    seen.add(new_name)
+                    for schedule_suffix in schedule_suffixes:
+                        if require_corp:
+                            new_name = build_corp_name(
+                                parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                            )
+                        else:
+                            new_name = build_standard_name(
+                                parent_full, sr_or_im, app, schedule_suffix, special_dept
+                            )
+                        
+                        # Check for duplicates - both in what we're creating and existing
+                        if new_name in seen or new_name in existing_offerings:
+                            raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
+                        seen.add(new_name)
 
-                    row=base_row_df.copy()
-                    row["Name (Child Service Offering lvl 1)"]=new_name
-                    row["Delivery Manager"]=delivery_manager
-                    row["Support group"]=support_group
-                    # If Managed by Group is empty but Support Group is filled, copy Support Group
-                    row["Managed by Group"]=managed_by_group if managed_by_group else support_group
-                    
-                    # Handle aliases
-                    for c in [c for c in row.columns if "Aliases" in c]:
-                        row[c]=aliases_value if aliases_on else "-"
-                    
-                    # Handle Visibility group - keep empty if empty
-                    if "Visibility group" in row.columns:
-                        vis_val = str(row.iloc[0]["Visibility group"]).strip()
-                        if vis_val in ["nan", "None", ""]:
-                            row["Visibility group"] = ""
+                        row=base_row_df.copy()
+                        row["Name (Child Service Offering lvl 1)"]=new_name
+                        row["Delivery Manager"]=delivery_manager
+                        row["Support group"]=support_group
+                        # If Managed by Group is empty but Support Group is filled, copy Support Group
+                        row["Managed by Group"]=managed_by_group if managed_by_group else support_group
                         
-                    if country=="DE":
-                        row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
-                    elif country=="UA":
-                        row["Subscribed by Company"]="Сiнево Україна"
-                    elif country=="CY":
-                        row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
-                    else:
-                        row["Subscribed by Company"]=recv or tag_hs
+                        # Handle aliases
+                        for c in [c for c in row.columns if "Aliases" in c]:
+                            row[c]=aliases_value if aliases_on else "-"
                         
-                    orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
-                    row["Service Commitments"]=commit_block(country) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration)
-                    
-                    if global_prod:
-                        row["Service Offerings | Depend On (Application Service)"]=f"[Global Prod] {app}"
-                    else:
-                        depend_tag = f"{delivering_tag} Prod" if require_corp else f"{recv or tag_hs} Prod"
-                        row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
-                    
-                    sheets.setdefault(country,pd.DataFrame())
-                    sheets[country]=pd.concat([sheets[country],row],ignore_index=True)
+                        if country=="DE":
+                            row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
+                        elif country=="UA":
+                            row["Subscribed by Company"]="Сiнево Україна"
+                        elif country=="CY":
+                            row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
+                        else:
+                            row["Subscribed by Company"]=recv or tag_hs
+                            
+                        orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
+                        row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration)
+                        
+                        if global_prod:
+                            row["Service Offerings | Depend On (Application Service)"]=f"[Global Prod] {app}"
+                        else:
+                            depend_tag = f"{delivering_tag} Prod" if require_corp else f"{recv or tag_hs} Prod"
+                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                        
+                        sheets.setdefault(country,pd.DataFrame())
+                        sheets[country]=pd.concat([sheets[country],row],ignore_index=True)
 
     if not sheets:
         raise ValueError("No matching rows found with the specified keywords.")
 
     out_dir.mkdir(parents=True,exist_ok=True)
     outfile=out_dir / f"Offerings_NEW_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    
+    # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile,engine="openpyxl") as w:
         for cc,dfc in sheets.items():
             # Ensure unique names per country
@@ -342,18 +422,31 @@ def run_generator(*,
             if "Number" in df_final.columns:
                 df_final = df_final.drop(columns=["Number"])
             
+            # Replace all forms of empty/null values with empty string
+            df_final = df_final.fillna('')
+            
             for col in df_final.columns:
                 if df_final[col].dtype == 'bool':
                     df_final[col] = df_final[col].map({True: 'true', False: 'false'})
                 elif df_final[col].dtype == 'object':
-                    df_final[col] = df_final[col].astype(str).replace({'True': 'true', 'False': 'false'})
-                
-                # Special handling for Visibility group to ensure empty stays empty
-                if col == "Visibility group":
-                    df_final[col] = df_final[col].replace({'nan': '', 'None': ''})
+                    # Replace all variants of empty values
+                    df_final[col] = df_final[col].astype(str).replace({
+                        'nan': '', 
+                        'NaN': '', 
+                        'None': '', 
+                        'none': '',
+                        'NULL': '',
+                        'null': '',
+                        '<NA>': '',
+                        'True': 'true', 
+                        'False': 'false'
+                    })
+                    # Also handle when the string is literally "nan"
+                    df_final[col] = df_final[col].apply(lambda x: '' if str(x).lower() == 'nan' else x)
             
             df_final.to_excel(w,sheet_name=cc,index=False)
     
+    # Apply formatting
     wb=load_workbook(outfile)
     for ws in wb.worksheets:
         ws.auto_filter.ref=ws.dimensions
@@ -361,5 +454,8 @@ def run_generator(*,
             ws.column_dimensions[col[0].column_letter].width=max(len(str(c.value)) if c.value else 0 for c in col)+2
             for c in col:
                 c.alignment=Alignment(wrap_text=True)
+                # Ensure empty cells stay empty in Excel
+                if c.value in ['nan', 'NaN', 'None', None, 'none', 'NULL', 'null', '<NA>']:
+                    c.value = None
     wb.save(outfile)
     return outfile

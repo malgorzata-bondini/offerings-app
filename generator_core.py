@@ -12,7 +12,7 @@ need_cols = [
     "Service Offerings | Depend On (Application Service)", "Service Commitments",
     "Delivery Manager", "Subscribed by Location", "Phase", "Status",
     "Life Cycle Stage", "Life Cycle Status", "Support group", "Managed by Group",
-    "Subscribed by Company",
+    "Subscribed by Company", "Visibility group",
 ]
 
 discard_lc  = {"retired", "retiring", "end of life", "end of support"}
@@ -170,15 +170,32 @@ def run_generator(*,
         return name.lower().startswith(f"[{sr_or_im.lower()} ")
 
     def update_commitments(orig, sched, rsp, rsl):
-        out=[]
+        """Update existing commitments and ensure OLA is present"""
+        out = []
+        has_ola = False
+        country_code = None
+        
         for line in str(orig).splitlines():
             if "RSP" in line:
-                line=re.sub(r"RSP .*? P1-P4",f"RSP {sched} P1-P4",line)
-                line=re.sub(r"P1-P4 .*?$",f"P1-P4 {rsp}",line)
+                # Extract country code from line like [PL] SLA SR RSP...
+                match = re.search(r'\[(\w+)\]', line)
+                if match:
+                    country_code = match.group(1)
+                line = re.sub(r"RSP .*? P1-P4", f"RSP {sched} P1-P4", line)
+                line = re.sub(r"P1-P4 .*?$", f"P1-P4 {rsp}", line)
             elif "RSL" in line:
-                line=re.sub(r"RSL .*? P1-P4",f"RSL {sched} P1-P4",line)
-                line=re.sub(r"P1-P4 .*?$",f"P1-P4 {rsl}",line)
+                line = re.sub(r"RSL .*? P1-P4", f"RSL {sched} P1-P4", line)
+                line = re.sub(r"P1-P4 .*?$", f"P1-P4 {rsl}", line)
+            elif "OLA" in line:
+                has_ola = True
+                line = re.sub(r"RSL .*? P1-P4", f"RSL {sched} P1-P4", line)
+                line = re.sub(r"P1-P4 .*?$", f"P1-P4 {rsl}", line)
             out.append(line)
+        
+        # If no OLA found, add it after the last line
+        if not has_ola and country_code:
+            out.append(f"[{country_code}] OLA SR RSL {sched} P1-P4 {rsl}")
+        
         return "\n".join(out)
 
     def commit_block(cc):
@@ -209,7 +226,13 @@ def run_generator(*,
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         df=pd.read_excel(wb,sheet_name="Child SO lvl1")
         if any(c not in df.columns for c in need_cols):
-            continue
+            # If Visibility group is missing, add it as empty column
+            if "Visibility group" not in df.columns:
+                df["Visibility group"] = ""
+            # Skip if other critical columns are missing
+            critical_cols = [c for c in need_cols if c != "Visibility group"]
+            if any(c not in df.columns for c in critical_cols):
+                continue
 
         mask=(df.apply(row_keywords_ok,axis=1)
               & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
@@ -225,78 +248,86 @@ def run_generator(*,
         base_pool=df.loc[mask]
         if base_pool.empty:
             continue
-        base_row=base_pool.iloc[0].to_frame().T.copy()
+        
+        # Process ALL matching rows, not just the first one
+        for idx, base_row in base_pool.iterrows():
+            base_row_df = base_row.to_frame().T.copy()
+            country=wb.stem.split("_")[-1].upper()
+            tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
-        country=wb.stem.split("_")[-1].upper()
-        tag_hs, tag_ds = f"HS {country}", f"DS {country}"
+            # Determine receivers based on country and CORP setting
+            if require_corp:
+                if country=="DE":         
+                    receivers=["DS DE","HS DE"]
+                elif country in {"UA","MD"}: 
+                    receivers=[f"DS {country}"]
+                elif country=="PL":         
+                    # Check if DS PL exists in the data
+                    if "DS PL" in base_pool["Name (Child Service Offering lvl 1)"].str.cat(sep=" "):
+                        receivers=["DS PL"]
+                    else:
+                        receivers=["HS PL"]
+                elif country=="CY":         
+                    receivers=["DS CY","HS CY"]
+                else:                       
+                    receivers=[f"DS {country}"]
+            else:
+                receivers=[""]
 
-        # Determine receivers based on country and CORP setting
-        if require_corp:
-            if country=="DE":         
-                receivers=["DS DE","HS DE"]
-            elif country in {"UA","MD"}: 
-                receivers=[f"DS {country}"]
-            elif country=="PL":         
-                # Check if DS PL exists in the data
-                if "DS PL" in base_pool["Name (Child Service Offering lvl 1)"].str.cat(sep=" "):
-                    receivers=["DS PL"]
-                else:
-                    receivers=["HS PL"]
-            elif country=="CY":         
-                receivers=["DS CY","HS CY"]
-            else:                       
-                receivers=[f"DS {country}"]
-        else:
-            receivers=[""]
+            parent_full=str(base_row["Parent Offering"])
 
-        parent_full=str(base_row.iloc[0]["Parent Offering"])
-
-        for app in all_apps:
-            for recv in receivers:
-                if require_corp:
-                    new_name = build_corp_name(
-                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                    )
-                else:
-                    new_name = build_standard_name(
-                        parent_full, sr_or_im, app, schedule_suffix, special_dept
-                    )
-                
-                if new_name in seen:
-                    continue
-                seen.add(new_name)
-
-                row=base_row.copy()
-                row["Name (Child Service Offering lvl 1)"]=new_name
-                row["Delivery Manager"]=delivery_manager
-                row["Support group"]=support_group
-                # If Managed by Group is empty but Support Group is filled, copy Support Group
-                row["Managed by Group"]=managed_by_group if managed_by_group else support_group
-                
-                # Handle aliases
-                for c in [c for c in row.columns if "Aliases" in c]:
-                    row[c]=aliases_value if aliases_on else "-"
+            for app in all_apps:
+                for recv in receivers:
+                    if require_corp:
+                        new_name = build_corp_name(
+                            parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                        )
+                    else:
+                        new_name = build_standard_name(
+                            parent_full, sr_or_im, app, schedule_suffix, special_dept
+                        )
                     
-                if country=="DE":
-                    row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
-                elif country=="UA":
-                    row["Subscribed by Company"]="Сiнево Україна"
-                elif country=="CY":
-                    row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
-                else:
-                    row["Subscribed by Company"]=recv or tag_hs
+                    if new_name in seen:
+                        continue
+                    seen.add(new_name)
+
+                    row=base_row_df.copy()
+                    row["Name (Child Service Offering lvl 1)"]=new_name
+                    row["Delivery Manager"]=delivery_manager
+                    row["Support group"]=support_group
+                    # If Managed by Group is empty but Support Group is filled, copy Support Group
+                    row["Managed by Group"]=managed_by_group if managed_by_group else support_group
                     
-                orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
-                row["Service Commitments"]=commit_block(country) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration)
-                
-                if global_prod:
-                    row["Service Offerings | Depend On (Application Service)"]=f"[Global Prod] {app}"
-                else:
-                    depend_tag = f"{delivering_tag} Prod" if require_corp else f"{recv or tag_hs} Prod"
-                    row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
-                
-                sheets.setdefault(country,pd.DataFrame())
-                sheets[country]=pd.concat([sheets[country],row],ignore_index=True)
+                    # Handle aliases
+                    for c in [c for c in row.columns if "Aliases" in c]:
+                        row[c]=aliases_value if aliases_on else "-"
+                    
+                    # Handle Visibility group - keep empty if empty
+                    if "Visibility group" in row.columns:
+                        vis_val = str(row.iloc[0]["Visibility group"]).strip()
+                        if vis_val in ["nan", "None", ""]:
+                            row["Visibility group"] = ""
+                        
+                    if country=="DE":
+                        row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
+                    elif country=="UA":
+                        row["Subscribed by Company"]="Сiнево Україна"
+                    elif country=="CY":
+                        row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
+                    else:
+                        row["Subscribed by Company"]=recv or tag_hs
+                        
+                    orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
+                    row["Service Commitments"]=commit_block(country) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration)
+                    
+                    if global_prod:
+                        row["Service Offerings | Depend On (Application Service)"]=f"[Global Prod] {app}"
+                    else:
+                        depend_tag = f"{delivering_tag} Prod" if require_corp else f"{recv or tag_hs} Prod"
+                        row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                    
+                    sheets.setdefault(country,pd.DataFrame())
+                    sheets[country]=pd.concat([sheets[country],row],ignore_index=True)
 
     if not sheets:
         raise ValueError("No matching rows found with the specified keywords.")
@@ -316,6 +347,10 @@ def run_generator(*,
                     df_final[col] = df_final[col].map({True: 'true', False: 'false'})
                 elif df_final[col].dtype == 'object':
                     df_final[col] = df_final[col].astype(str).replace({'True': 'true', 'False': 'false'})
+                
+                # Special handling for Visibility group to ensure empty stays empty
+                if col == "Visibility group":
+                    df_final[col] = df_final[col].replace({'nan': '', 'None': ''})
             
             df_final.to_excel(w,sheet_name=cc,index=False)
     

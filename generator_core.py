@@ -105,7 +105,7 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
         return f"[{' '.join(prefix_parts)}] {catalog_name} solving {app} Prod {schedule_suffix}"
 
 def run_generator(*,
-    keywords, new_apps, schedule_suffix,
+    keywords_parent, keywords_child, new_apps, schedule_suffix,
     delivery_manager, global_prod,
     rsp_duration, rsl_duration,
     sr_or_im, require_corp, delivering_tag,
@@ -115,27 +115,50 @@ def run_generator(*,
 
     sheets, seen = {}, set()
 
+    def parse_keywords(keyword_string):
+        """Parse keywords - returns (keywords_list, use_and_logic)"""
+        if not keyword_string.strip():
+            return [], False
+        
+        # Check if it contains commas (AND logic)
+        if ',' in keyword_string:
+            keywords = [k.strip() for k in keyword_string.split(',') if k.strip()]
+            return keywords, True
+        else:
+            # Line separated (OR logic)
+            keywords = [k.strip() for k in keyword_string.split('\n') if k.strip()]
+            return keywords, False
+
     def row_keywords_ok(row):
-        if not keywords:
-            return True
+        # Parse parent keywords
+        parent_keywords, parent_use_and = parse_keywords(keywords_parent)
         
-        # First keyword filters Parent Offering
-        if len(keywords) >= 1:
+        # Check parent offering
+        if parent_keywords:
             p = str(row["Parent Offering"]).lower()
-            if not re.search(rf"\b{re.escape(keywords[0].lower())}\b", p):
-                return False
+            if parent_use_and:
+                # AND logic - all keywords must match
+                if not all(re.search(rf"\b{re.escape(k.lower())}\b", p) for k in parent_keywords):
+                    return False
+            else:
+                # OR logic - any keyword must match
+                if not any(re.search(rf"\b{re.escape(k.lower())}\b", p) for k in parent_keywords):
+                    return False
         
-        # Subsequent keywords filter Name (Child Service Offering lvl 1) - ANY match (OR logic)
-        if len(keywords) > 1:
+        # Parse child keywords
+        child_keywords, child_use_and = parse_keywords(keywords_child)
+        
+        # Check child name
+        if child_keywords:
             n = str(row["Name (Child Service Offering lvl 1)"]).lower()
-            # Check if ANY of the subsequent keywords match
-            matches = False
-            for k in keywords[1:]:
-                if re.search(rf"\b{re.escape(k.lower())}\b", n):
-                    matches = True
-                    break
-            if not matches:
-                return False
+            if child_use_and:
+                # AND logic - all keywords must match
+                if not all(re.search(rf"\b{re.escape(k.lower())}\b", n) for k in child_keywords):
+                    return False
+            else:
+                # OR logic - any keyword must match
+                if not any(re.search(rf"\b{re.escape(k.lower())}\b", n) for k in child_keywords):
+                    return False
         
         return True
 
@@ -159,6 +182,7 @@ def run_generator(*,
         return "\n".join(out)
 
     def commit_block(cc):
+        """Create commitment block with OLA for all countries"""
         lines=[
             f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
             f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",

@@ -69,11 +69,26 @@ with col2:
         st.subheader("Schedule Settings")
         
         schedule_type = st.checkbox("Custom schedule per period")
+        create_multiple_schedules = st.checkbox("Create multiple schedules")
         
         if not schedule_type:
-            schedule_simple = st.text_input("Schedule", value="", placeholder="e.g. Mon-Fri 9-17")
-            schedule_suffix = schedule_simple if schedule_simple else ""
+            if create_multiple_schedules:
+                st.info("📅 Enter multiple schedules (one per line)")
+                schedule_simple = st.text_area(
+                    "Schedules", 
+                    value="", 
+                    placeholder="Mon-Fri 9-17\nMon-Fri 8-16\nMon-Sun 24/7",
+                    height=100
+                )
+                schedule_suffixes = [s.strip() for s in schedule_simple.split('\n') if s.strip()]
+            else:
+                schedule_simple = st.text_input("Schedule", value="", placeholder="e.g. Mon-Fri 9-17")
+                schedule_suffixes = [schedule_simple] if schedule_simple else []
         else:
+            if create_multiple_schedules:
+                st.error("⚠️ Multiple schedules not supported with custom schedule periods")
+                create_multiple_schedules = False
+            
             st.info("📅 Enter schedule periods (e.g., Mon-Thu 9-17, Fri 9-16, Sat 8-12)")
             
             # Allow up to 5 schedule periods
@@ -105,6 +120,7 @@ with col2:
             
             # Join all non-empty schedule parts
             schedule_suffix = " ".join(schedule_parts) if schedule_parts else ""
+            schedule_suffixes = [schedule_suffix] if schedule_suffix else []
             
             # Show preview
             if schedule_suffix:
@@ -130,16 +146,19 @@ with col2:
     with tab4:
         st.subheader("Naming Options")
         
-        col1, col2, col3 = st.columns(3)
+        st.markdown("### Special Naming Types")
+        st.markdown("Select one of the following:")
         
-        with col1:
-            require_corp = st.checkbox("CORP in Child Service Offerings?")
-            
-        with col2:
-            special_it = st.checkbox("IT Department", disabled=require_corp)
-            
-        with col3:
-            special_hr = st.checkbox("HR Department", disabled=require_corp)
+        require_corp = st.checkbox("CORP")
+        special_it = st.checkbox("IT", disabled=require_corp)
+        special_hr = st.checkbox("HR", disabled=require_corp)
+        special_medical = st.checkbox("Medical", disabled=require_corp)
+        special_dak = st.checkbox("DAK (Business Services)", disabled=require_corp)
+        
+        # Ensure only one is selected
+        selected_count = sum([require_corp, special_it, special_hr, special_medical, special_dak])
+        if selected_count > 1:
+            st.error("⚠️ Please select only one naming type")
         
         if require_corp:
             delivering_tag = st.text_input(
@@ -178,11 +197,17 @@ with st.expander("📋 Naming Convention Examples"):
         st.markdown("**CORP Example:**")
         st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
     elif 'special_it' in locals() and special_it:
-        st.markdown("**IT Department Example:**")
+        st.markdown("**IT Example:**")
         st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17")
     elif 'special_hr' in locals() and special_hr:
-        st.markdown("**HR Department Example:**")
+        st.markdown("**HR Example:**")
         st.code("[SR HS PL HR] Software assistance Outlook Prod Mon-Fri 8-17")
+    elif 'special_medical' in locals() and special_medical:
+        st.markdown("**Medical Example:**")
+        st.code("[SR HS PL Medical] TeleCentrum medical procedures and quality of care Mon-Fri 7-20")
+    elif 'special_dak' in locals() and special_dak:
+        st.markdown("**DAK (Business Services) Example:**")
+        st.code("[SR HS PL Business Services] Product modifications Service removal Mon-Fri 8-17")
     else:
         st.markdown("**Standard Example:**")
         st.code("[SR HS PL Permissions] Granting permissions to application Outlook Prod Mon-Fri 9-17")
@@ -195,8 +220,10 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
         st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
     elif not new_apps:
         st.error("⚠️ Please enter at least one application")
-    elif 'schedule_suffix' not in locals() or not schedule_suffix:
-        st.error("⚠️ Please configure schedule")
+    elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
+        st.error("⚠️ Please configure at least one schedule")
+    elif selected_count > 1:
+        st.error("⚠️ Please select only one naming type")
     else:
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
@@ -214,7 +241,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         keywords_parent=keywords_parent,
                         keywords_child=keywords_child,
                         new_apps=new_apps,
-                        schedule_suffix=schedule_suffix,
+                        schedule_suffixes=schedule_suffixes,
                         delivery_manager=delivery_manager,
                         global_prod=global_prod,
                         rsp_duration=rsp_duration,
@@ -229,7 +256,9 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         src_dir=src_dir,
                         out_dir=out_dir,
                         special_it=special_it if 'special_it' in locals() else False,
-                        special_hr=special_hr if 'special_hr' in locals() else False
+                        special_hr=special_hr if 'special_hr' in locals() else False,
+                        special_medical=special_medical if 'special_medical' in locals() else False,
+                        special_dak=special_dak if 'special_dak' in locals() else False
                     )
                 
                 st.success("✅ Service offerings generated successfully!")
@@ -245,6 +274,11 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                 
                 st.info(f"Generated file: {result_file.name}")
                 
+        except ValueError as e:
+            if "duplicate offering" in str(e).lower():
+                st.error(f"❌ {str(e)}")
+            else:
+                st.error(f"❌ Error: {str(e)}")
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
             st.exception(e)

@@ -228,7 +228,7 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
         else:
             return f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
 
-def update_commitments(orig, sched, rsp, rsl):
+def update_commitments(orig, sched, rsp, rsl, sr_or_im, country):
     """Update existing commitments and ensure OLA is present"""
     out = []
     has_ola = False
@@ -262,13 +262,14 @@ def update_commitments(orig, sched, rsp, rsl):
             # Extract P values
             p_match = re.search(r'(P\d+-P\d+)', line)
             p_values = p_match.group(1) if p_match else "P1-P4"
-            # Update schedule and duration
+            # Update schedule and duration - OLA uses same pattern as RSL
             line = re.sub(r"RSL\s+[^P]+", f"RSL {sched} ", line)
             line = re.sub(r"(P\d+-P\d+)\s+.*$", f"{p_values} {rsl}", line)
         out.append(line)
     
-    # If no OLA found, create it from the last RSL line
-    if not has_ola and country_code:
+    # For IM, never add OLA
+    # For SR, only add OLA if not PL (HS PL and DS PL already have OLA)
+    if sr_or_im == "SR" and not has_ola and country_code and country != "PL":
         # Find the last RSL line to copy its format
         rsl_line = None
         for line in out:
@@ -282,13 +283,28 @@ def update_commitments(orig, sched, rsp, rsl):
     
     return "\n".join(out)
 
-def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration):
+def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
     """Create commitment block with OLA for all countries"""
-    lines=[
-        f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
-        f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
-        f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
-    ]
+    if sr_or_im == "IM":
+        # For IM, no OLA
+        lines=[
+            f"[{cc}] SLA IM RSP {schedule_suffix} P1-P4 {rsp_duration}",
+            f"[{cc}] SLA IM RSL {schedule_suffix} P1-P4 {rsl_duration}"
+        ]
+    elif cc == "PL":
+        # For SR and PL, include OLA (PL already has OLA in source data)
+        lines=[
+            f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
+            f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
+            f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
+        ]
+    else:
+        # For SR and other countries, include OLA
+        lines=[
+            f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
+            f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
+            f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
+        ]
     return "\n".join(lines)
 
 def run_generator(*,
@@ -498,7 +514,7 @@ def run_generator(*,
                             row["Subscribed by Company"]=recv or tag_hs
                             
                         orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
-                        row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration)
+                        row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
                         
                         if global_prod:
                             if app:

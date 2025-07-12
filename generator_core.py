@@ -36,6 +36,10 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
+    # Check if catalog name contains keywords that exclude "Prod"
+    no_prod_keywords = ["hardware", "mailbox", "network"]
+    exclude_prod = any(keyword in catalog_name.lower() for keyword in no_prod_keywords)
+    
     if special_dept == "Medical":
         # Extract division and country from parent content
         parts = parent_content.split()
@@ -84,9 +88,9 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Add app only if provided
         if app:
-            return f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
+            return f"[{' '.join(prefix_parts)}] {catalog_name} {app} {schedule_suffix}"
         else:
-            return f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
+            return f"[{' '.join(prefix_parts)}] {catalog_name} {schedule_suffix}"
     
     elif special_dept in ["IT", "HR"]:
         # Extract division and country from parent content
@@ -121,11 +125,17 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         topic = " ".join(topic_parts) if topic_parts else "Software"
         
-        # Add app only if provided
+        # Add app and Prod based on keywords
         if app:
-            return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} Prod {schedule_suffix}"
+            if exclude_prod:
+                return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} {schedule_suffix}"
+            else:
+                return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} Prod {schedule_suffix}"
         else:
-            return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} Prod {schedule_suffix}"
+            if exclude_prod:
+                return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+            else:
+                return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} Prod {schedule_suffix}"
     else:
         # Standard case - just replace Parent with SR/IM
         if app:

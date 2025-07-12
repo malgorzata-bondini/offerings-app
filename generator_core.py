@@ -36,9 +36,11 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
-    # Check if catalog name contains keywords that exclude "Prod"
+    # Check if catalog name or parent offering contains keywords that exclude "Prod"
     no_prod_keywords = ["hardware", "mailbox", "network"]
-    exclude_prod = any(keyword in catalog_name.lower() for keyword in no_prod_keywords)
+    parent_lower = parent_offering.lower()
+    catalog_lower = catalog_name.lower()
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower for keyword in no_prod_keywords)
     
     if special_dept == "Medical":
         # Extract division and country from parent content
@@ -56,7 +58,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
                 topic = part
                 break
         
-        # Build Medical name
+        # Build Medical name - NO PROD
         prefix_parts = [sr_or_im]
         if division:
             prefix_parts.append(division)
@@ -68,7 +70,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
     
     elif special_dept == "DAK":
-        # Replace DAK with Business Services
+        # Replace DAK with Business Services - NO PROD
         parts = parent_content.split()
         division = ""
         country = ""
@@ -86,14 +88,14 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             prefix_parts.append(country)
         prefix_parts.append("Business Services")
         
-        # Add app only if provided
+        # Add app only if provided - NO PROD
         if app:
             return f"[{' '.join(prefix_parts)}] {catalog_name} {app} {schedule_suffix}"
         else:
             return f"[{' '.join(prefix_parts)}] {catalog_name} {schedule_suffix}"
     
-    elif special_dept in ["IT", "HR"]:
-        # Extract division and country from parent content
+    elif special_dept == "HR":
+        # HR - NO PROD
         parts = parent_content.split()
         division = ""
         country = ""
@@ -103,39 +105,71 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
                 country = part
         
-        # Build the name with special department
         prefix_parts = [sr_or_im]
         if division:
             prefix_parts.append(division)
         if country:
             prefix_parts.append(country)
-        prefix_parts.append(special_dept)
+        prefix_parts.append("HR")
         
-        # Extract the topic from parent content (what's after division and country)
+        # Extract the topic from parent content
         topic_parts = []
-        skip_next = False
-        for i, part in enumerate(parts):
-            if part in ["HS", "DS"] or (len(part) == 2 and part.isupper() and part not in ["IT", "HR"]):
-                skip_next = True
-                continue
-            if skip_next:
-                skip_next = False
-                continue
-            topic_parts.append(part)
+        for part in parts:
+            if part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
+                topic_parts.append(part)
         
         topic = " ".join(topic_parts) if topic_parts else "Software"
         
-        # Add app and Prod based on keywords
+        # Add app if provided - NO PROD
         if app:
-            if exclude_prod:
-                return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} {schedule_suffix}"
-            else:
-                return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} Prod {schedule_suffix}"
+            return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} {schedule_suffix}"
         else:
-            if exclude_prod:
-                return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
-            else:
-                return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} Prod {schedule_suffix}"
+            return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+    
+    elif special_dept == "IT":
+        # IT - special handling
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        topic = ""
+        
+        # Find division, country and topic
+        for i, part in enumerate(parts):
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+            elif part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
+                # This is the topic (e.g., "Hardware", "Software", etc.)
+                topic = part
+                break
+        
+        prefix_parts = [sr_or_im]
+        if division:
+            prefix_parts.append(division)
+        if country:
+            prefix_parts.append(country)
+        prefix_parts.append("IT")
+        
+        # For IT, use the topic from parent (e.g., "Hardware") and lowercase catalog name
+        name_parts = [f"[{' '.join(prefix_parts)}]", topic, catalog_name.lower()]
+        
+        # Add app if provided
+        if app:
+            name_parts.append(app)
+        
+        # Add "solving" for IM
+        if sr_or_im == "IM":
+            name_parts.append("solving")
+        
+        # Only add Prod if no hardware/mailbox/network keywords
+        if not exclude_prod:
+            name_parts.append("Prod")
+        
+        name_parts.append(schedule_suffix)
+        
+        return " ".join(name_parts)
+    
     else:
         # Standard case - just replace Parent with SR/IM
         if app:

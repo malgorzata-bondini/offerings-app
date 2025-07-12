@@ -173,7 +173,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         if app:
             name_parts.append(app)
         
-        # Add "solving" for IM
+        # Add "solving" for IM - BEFORE checking for Prod
         if sr_or_im == "IM":
             name_parts.append("solving")
         
@@ -417,6 +417,10 @@ def run_generator(*,
         for col in need_cols:
             if col not in df.columns:
                 df[col] = ""
+        
+        # Ensure Visibility group column exists
+        if "Visibility group" not in df.columns:
+            df["Visibility group"] = ""
 
         mask=(df.apply(row_keywords_ok,axis=1)
               & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
@@ -503,6 +507,10 @@ def run_generator(*,
                         # Handle aliases
                         for c in [c for c in row.columns if "Aliases" in c]:
                             row[c]=aliases_value if aliases_on else "-"
+                        
+                        # Handle Visibility group - ensure it exists for PL
+                        if country == "PL" and "Visibility group" not in row.columns:
+                            row["Visibility group"] = ""
                         
                         if country=="DE":
                             row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"

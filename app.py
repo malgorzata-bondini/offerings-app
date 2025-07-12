@@ -150,9 +150,8 @@ with col2:
         )
     
     with tab4:
-        st.subheader("Naming Options")
+        st.subheader("Naming")
         
-        st.markdown("### Special Naming Types")
         st.markdown("Select one of the following:")
         
         # Create a column to ensure vertical layout
@@ -211,10 +210,11 @@ with st.expander("📋 Naming Convention Examples"):
         st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
     elif 'special_it' in locals() and special_it:
         st.markdown("**IT Example:**")
-        st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17")
+        st.code("[SR HS PL IT] Hardware configuration scanner Mon-Fri 6-21 Sat 6-15")
+        st.code("[IM HS PL IT] Hardware incident solving wellhydrated Mon-Fri 8-16")
     elif 'special_hr' in locals() and special_hr:
         st.markdown("**HR Example:**")
-        st.code("[SR HS PL HR] Software assistance Outlook Prod Mon-Fri 8-17")
+        st.code("[SR HS PL HR] Software assistance Outlook Mon-Fri 8-17")
     elif 'special_medical' in locals() and special_medical:
         st.markdown("**Medical Example:**")
         st.code("[SR HS PL Medical] TeleCentrum medical procedures and quality of care Mon-Fri 7-20")

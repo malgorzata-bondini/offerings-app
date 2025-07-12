@@ -69,7 +69,7 @@ with col2:
         st.subheader("Schedule Settings")
         
         schedule_type = st.checkbox("Custom schedule per period")
-        create_multiple_schedules = st.checkbox("Create multiple schedules")
+        create_multiple_schedules = st.checkbox("Create multiple schedules", help="Generate the same offerings with different schedules")
         
         if not schedule_type:
             if create_multiple_schedules:
@@ -78,15 +78,21 @@ with col2:
                     "Schedules", 
                     value="", 
                     placeholder="Mon-Fri 9-17\nMon-Fri 8-16\nMon-Sun 24/7",
-                    height=100
+                    height=150
                 )
                 schedule_suffixes = [s.strip() for s in schedule_simple.split('\n') if s.strip()]
+                
+                # Show preview of all schedules
+                if schedule_suffixes:
+                    st.success(f"📋 Will create {len(schedule_suffixes)} offering(s) with different schedules:")
+                    for i, sched in enumerate(schedule_suffixes, 1):
+                        st.text(f"  {i}. {sched}")
             else:
                 schedule_simple = st.text_input("Schedule", value="", placeholder="e.g. Mon-Fri 9-17")
                 schedule_suffixes = [schedule_simple] if schedule_simple else []
         else:
             if create_multiple_schedules:
-                st.error("⚠️ Multiple schedules not supported with custom schedule periods")
+                st.warning("⚠️ Multiple schedules not supported with custom schedule periods. Please uncheck one option.")
                 create_multiple_schedules = False
             
             st.info("📅 Enter schedule periods (e.g., Mon-Thu 9-17, Fri 9-16, Sat 8-12)")
@@ -149,15 +155,22 @@ with col2:
         st.markdown("### Special Naming Types")
         st.markdown("Select one of the following:")
         
-        require_corp = st.checkbox("CORP")
-        special_it = st.checkbox("IT", disabled=require_corp)
-        special_hr = st.checkbox("HR", disabled=require_corp)
-        special_medical = st.checkbox("Medical", disabled=require_corp)
-        special_dak = st.checkbox("DAK (Business Services)", disabled=require_corp)
+        # Create a column to ensure vertical layout
+        col = st.container()
+        with col:
+            require_corp = st.checkbox("CORP")
+            special_it = st.checkbox("IT", disabled=require_corp)
+            special_hr = st.checkbox("HR", disabled=require_corp)
+            special_medical = st.checkbox("Medical", disabled=require_corp)
+            special_dak = st.checkbox("DAK (Business Services)", disabled=require_corp)
         
-        # Ensure only one is selected
-        selected_count = sum([require_corp, special_it, special_hr, special_medical, special_dak])
-        if selected_count > 1:
+        # Ensure only one is selected (excluding CORP)
+        non_corp_selected = sum([special_it, special_hr, special_medical, special_dak])
+        if require_corp and non_corp_selected > 0:
+            st.error("⚠️ When CORP is selected, other options cannot be selected")
+            # Reset the non-CORP options
+            special_it = special_hr = special_medical = special_dak = False
+        elif non_corp_selected > 1:
             st.error("⚠️ Please select only one naming type")
         
         if require_corp:
@@ -222,7 +235,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
         st.error("⚠️ Please enter at least one application")
     elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")
-    elif selected_count > 1:
+    elif non_corp_selected > 1:
         st.error("⚠️ Please select only one naming type")
     else:
         try:

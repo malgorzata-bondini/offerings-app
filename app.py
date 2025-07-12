@@ -150,8 +150,6 @@ with col2:
         )
     
     with tab4:
-        st.subheader("Naming")
-        
         st.markdown("Select one of the following:")
         
         # Create a column to ensure vertical layout

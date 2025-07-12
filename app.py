@@ -140,8 +140,6 @@ with col2:
             rsl_duration = st.text_input("RSL Duration", value="")
     
     with tab3:
-        st.subheader("Support Groups")
-        
         support_group = st.text_input("Support Group", value="")
         managed_by_group = st.text_input(
             "Managed by Group", 
@@ -150,6 +148,9 @@ with col2:
         )
     
     with tab4:
+        st.subheader("Naming Options")
+        
+        st.markdown("### Special Naming Types")
         st.markdown("Select one of the following:")
         
         # Create a column to ensure vertical layout
@@ -180,8 +181,6 @@ with col2:
             delivering_tag = ""
     
     with tab5:
-        st.subheader("Advanced Settings")
-        
         # Global settings
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)
@@ -208,11 +207,10 @@ with st.expander("📋 Naming Convention Examples"):
         st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
     elif 'special_it' in locals() and special_it:
         st.markdown("**IT Example:**")
-        st.code("[SR HS PL IT] Hardware configuration scanner Mon-Fri 6-21 Sat 6-15")
-        st.code("[IM HS PL IT] Hardware incident solving wellhydrated Mon-Fri 8-16")
+        st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17")
     elif 'special_hr' in locals() and special_hr:
         st.markdown("**HR Example:**")
-        st.code("[SR HS PL HR] Software assistance Outlook Mon-Fri 8-17")
+        st.code("[SR HS PL HR] Software assistance Outlook Prod Mon-Fri 8-17")
     elif 'special_medical' in locals() and special_medical:
         st.markdown("**Medical Example:**")
         st.code("[SR HS PL Medical] TeleCentrum medical procedures and quality of care Mon-Fri 7-20")

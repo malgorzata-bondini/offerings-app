@@ -36,11 +36,12 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
-    # Check if catalog name or parent offering contains keywords that exclude "Prod"
+    # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
     no_prod_keywords = ["hardware", "mailbox", "network"]
     parent_lower = parent_offering.lower()
     catalog_lower = catalog_name.lower()
-    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower for keyword in no_prod_keywords)
+    parent_content_lower = parent_content.lower()
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower for keyword in no_prod_keywords)
     
     if special_dept == "Medical":
         # Extract division and country from parent content
@@ -139,10 +140,19 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
                 division = part
             elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
                 country = part
-            elif part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
-                # This is the topic (e.g., "Hardware", "Software", etc.)
-                topic = part
-                break
+            else:
+                # Any other word is the topic (e.g., "Hardware", "Software", "Permissions", etc.)
+                if part not in ["HS", "DS", "RecP"] and not (len(part) == 2 and part.isupper()):
+                    topic = part
+                    break
+        
+        # If no topic found, use the first significant word from catalog name
+        if not topic:
+            catalog_words = catalog_name.split()
+            for word in catalog_words:
+                if word.lower() not in ["the", "a", "an", "and", "or", "for", "of", "in", "on", "to"]:
+                    topic = word
+                    break
         
         prefix_parts = [sr_or_im]
         if division:
@@ -152,7 +162,12 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         prefix_parts.append("IT")
         
         # For IT, use the topic from parent (e.g., "Hardware") and lowercase catalog name
-        name_parts = [f"[{' '.join(prefix_parts)}]", topic, catalog_name.lower()]
+        name_parts = [f"[{' '.join(prefix_parts)}]"]
+        
+        if topic:
+            name_parts.append(topic)
+        
+        name_parts.append(catalog_name.lower())
         
         # Add app if provided
         if app:

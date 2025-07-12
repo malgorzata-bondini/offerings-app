@@ -57,7 +57,7 @@ with col2:
         new_apps = st.text_area(
             "Applications (one per line or comma-separated)",
             value="",
-            help="Enter application names - can use newlines or commas to separate"
+            help="Optional - Enter application names. If empty, offerings will be created without application names"
         ).strip().split('\n')
         new_apps = [a.strip() for a in new_apps if a.strip()]
         
@@ -231,8 +231,6 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
         st.error("⚠️ Please upload at least one Excel file")
     elif not keywords_parent and not keywords_child:
         st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
-    elif not new_apps:
-        st.error("⚠️ Please enter at least one application")
     elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")
     elif non_corp_selected > 1:

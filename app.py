@@ -36,16 +36,23 @@ with col2:
         
         st.info("""
         **Keywords filtering:**
-        - First keyword filters the Parent Offering column
-        - Subsequent keywords filter the Name (Child Service Offering lvl 1) column (OR logic - any match)
+        - Line-separated keywords: OR logic (any match)
+        - Comma-separated keywords: AND logic (all must match)
         """)
         
-        keywords = st.text_area(
-            "Keywords (one per line)",
+        keywords_parent = st.text_area(
+            "Keywords in Parent Offering",
             value="",
-            help="First keyword filters Parent Offering, others filter Child Service Offering name"
-        ).strip().split('\n')
-        keywords = [k.strip() for k in keywords if k.strip()]
+            placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
+            help="Filter by Parent Offering column"
+        )
+        
+        keywords_child = st.text_area(
+            "Keywords in Name (Child Service Offering lvl 1)",
+            value="",
+            placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
+            help="Filter by Child Service Offering Name column"
+        )
         
         new_apps = st.text_area(
             "Applications (one per line or comma-separated)",
@@ -144,6 +151,8 @@ with col2:
             delivering_tag = ""
     
     with tab5:
+        st.subheader("Advanced Settings")
+        
         # Global settings
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)
@@ -182,8 +191,8 @@ with st.expander("📋 Naming Convention Examples"):
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
-    elif not keywords:
-        st.error("⚠️ Please enter at least one keyword")
+    elif not keywords_parent and not keywords_child:
+        st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
     elif not new_apps:
         st.error("⚠️ Please enter at least one application")
     elif 'schedule_suffix' not in locals() or not schedule_suffix:
@@ -202,7 +211,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                 
                 with st.spinner("🔄 Generating service offerings..."):
                     result_file = run_generator(
-                        keywords=keywords,
+                        keywords_parent=keywords_parent,
+                        keywords_child=keywords_child,
                         new_apps=new_apps,
                         schedule_suffix=schedule_suffix,
                         delivery_manager=delivery_manager,

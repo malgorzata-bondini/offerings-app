@@ -392,7 +392,7 @@ def run_generator(*,
     support_group, managed_by_group, aliases_on, aliases_value,
     src_dir: Path, out_dir: Path,
     special_it=False, special_hr=False, special_medical=False, special_dak=False,
-    use_custom_commitments=False, custom_commitments_str="", commitment_country=None,
+    use_custom_commitments=False, commitment_country=None,
     rsp_enabled=False, rsl_enabled=False,
     rsp_schedule="", rsl_schedule="",
     rsp_priority="", rsl_priority="",
@@ -613,13 +613,8 @@ def run_generator(*,
                             row["Subscribed by Company"]=recv or tag_hs
                             
                         orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
-                        
-                        # Handle custom commitments - use both approaches
-                        if use_custom_commitments and custom_commitments_str:
-                            # Use the direct string if provided
-                            row["Service Commitments"] = custom_commitments_str
-                        elif use_custom_commitments and commitment_country:
-                            # Use custom_commit_block function if country provided
+                        if use_custom_commitments and commitment_country:
+                            # Use custom commitments if enabled
                             row["Service Commitments"] = custom_commit_block(
                                 commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
                                 rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
@@ -653,11 +648,7 @@ def run_generator(*,
 
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile,engine="openpyxl") as w:
-        # Sort country codes alphabetically
-        sorted_countries = sorted(sheets.keys())
-        
-        for cc in sorted_countries:
-            dfc = sheets[cc]
+        for cc,dfc in sheets.items():
             # Ensure unique names per country
             df_final = dfc.drop_duplicates(subset=["Name (Child Service Offering lvl 1)"])
             

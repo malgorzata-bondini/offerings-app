@@ -29,7 +29,7 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Basic", "Schedule", "Groups", "Naming", "Advanced"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Basic", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
     
     with tab1:
         st.subheader("Basic Settings")
@@ -140,6 +140,58 @@ with col2:
             rsl_duration = st.text_input("RSL Duration", value="")
     
     with tab3:
+        st.subheader("Service Commitments")
+        
+        use_custom_commitments = st.checkbox("Define custom Service Commitments", help="If unchecked, commitments will be copied from source files")
+        
+        if use_custom_commitments:
+            commitment_country = st.selectbox("Country", ["CY", "DE", "MD", "PL", "UA"])
+            
+            st.markdown("### Service Commitments Configuration")
+            
+            # Initialize commitment lines list
+            commitment_lines = []
+            
+            # Create multiple commitment entries
+            num_commitments = st.number_input("Number of commitment lines", min_value=1, max_value=10, value=2)
+            
+            for i in range(num_commitments):
+                st.markdown(f"#### Commitment Line {i+1}")
+                col1, col2, col3, col4 = st.columns([1, 1, 2, 1])
+                
+                with col1:
+                    line_type = st.selectbox(f"Type", ["RSP", "RSL"], key=f"commit_type_{i}")
+                
+                with col2:
+                    priority = st.selectbox(f"Priority", ["P1", "P2", "P3", "P4", "P1-P2", "P3-P4", "P1-P4"], key=f"commit_priority_{i}")
+                
+                with col3:
+                    schedule = st.text_input(f"Schedule", placeholder="e.g. Mon-Fri 6-21", key=f"commit_schedule_{i}")
+                
+                with col4:
+                    time = st.text_input(f"Time", placeholder="e.g. 2h, 1d", key=f"commit_time_{i}")
+                
+                if schedule and time:
+                    line = f"[{commitment_country}] SLA {sr_or_im} {line_type} {schedule} {priority} {time}"
+                    commitment_lines.append(line)
+                    
+                    # Add OLA for SR and RSL
+                    if sr_or_im == "SR" and line_type == "RSL":
+                        ola_line = f"[{commitment_country}] OLA {sr_or_im} RSL {schedule} {priority} {time}"
+                        commitment_lines.append(ola_line)
+            
+            # Show preview
+            if commitment_lines:
+                st.markdown("### Preview")
+                st.code("\n".join(commitment_lines))
+                
+            # Store the custom commitments string
+            custom_commitments_str = "\n".join(commitment_lines) if commitment_lines else ""
+        else:
+            custom_commitments_str = ""
+            commitment_country = None
+    
+    with tab4:
         support_group = st.text_input("Support Group", value="")
         managed_by_group = st.text_input(
             "Managed by Group", 
@@ -147,7 +199,7 @@ with col2:
             help="Optional - if empty, will use Support Group value"
         )
     
-    with tab4:
+    with tab5:
         st.subheader("Select one of the following:")
 
         
@@ -177,7 +229,7 @@ with col2:
         else:
             delivering_tag = ""
     
-    with tab5:
+    with tab6:
         # Global settings
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)
@@ -266,7 +318,10 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         special_it=special_it if 'special_it' in locals() else False,
                         special_hr=special_hr if 'special_hr' in locals() else False,
                         special_medical=special_medical if 'special_medical' in locals() else False,
-                        special_dak=special_dak if 'special_dak' in locals() else False
+                        special_dak=special_dak if 'special_dak' in locals() else False,
+                        use_custom_commitments=use_custom_commitments if 'use_custom_commitments' in locals() else False,
+                        custom_commitments_str=custom_commitments_str if 'custom_commitments_str' in locals() else "",
+                        commitment_country=commitment_country if 'commitment_country' in locals() else None
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

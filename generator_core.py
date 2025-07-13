@@ -31,6 +31,67 @@ def extract_catalog_name(parent_offering):
         return parts[1].strip()
     return ""
 
+def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
+    """Build name for RecP offerings"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
+    
+    # Extract parts from parent content
+    parts = parent_content.split()
+    country = ""
+    topic = ""
+    
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS"]:
+            country = part
+        elif part not in ["HS", "DS", "Parent", "RecP"] and not (len(part) == 2 and part.isupper()):
+            topic = part
+            break
+    
+    # Build RecP name - always ends with IT
+    prefix_parts = [sr_or_im]
+    
+    # Extract division and country from parent
+    parent_division = ""
+    for part in parts:
+        if part in ["HS", "DS"]:
+            parent_division = part
+            break
+    
+    if parent_division:
+        prefix_parts.append(parent_division)
+    if country:
+        prefix_parts.append(country)
+    
+    prefix_parts.append("CORP")
+    
+    # Add delivering tag parts
+    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
+    prefix_parts.extend(delivering_parts)
+    prefix_parts.append("IT")
+    
+    # Build the name with topic from parent
+    name_prefix = f"[{' '.join(prefix_parts)}]"
+    
+    # For RecP, use topic (e.g., "Software") + catalog name in lowercase + "solving" for IM
+    name_parts = [name_prefix]
+    
+    if topic:
+        name_parts.append(topic)
+    
+    name_parts.append(catalog_name.lower())
+    
+    if sr_or_im == "IM":
+        name_parts.append("solving")
+    
+    if app:
+        name_parts.append(app)
+    
+    name_parts.append("Prod")
+    name_parts.append(schedule_suffix)
+    
+    return " ".join(name_parts)
+
 def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None):
     """Build standard name when not CORP"""
     parent_content = extract_parent_info(parent_offering)
@@ -311,7 +372,7 @@ def run_generator(*,
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
     rsp_duration, rsl_duration,
-    sr_or_im, require_corp, delivering_tag,
+    sr_or_im, require_corp, require_recp, delivering_tag,
     support_group, managed_by_group, aliases_on, aliases_value,
     src_dir: Path, out_dir: Path,
     special_it=False, special_hr=False, special_medical=False, special_dak=False):
@@ -388,13 +449,13 @@ def run_generator(*,
 
     # Determine special department
     special_dept = None
-    if special_it and not require_corp:
+    if special_it and not require_corp and not require_recp:
         special_dept = "IT"
-    elif special_hr and not require_corp:
+    elif special_hr and not require_corp and not require_recp:
         special_dept = "HR"
-    elif special_medical and not require_corp:
+    elif special_medical and not require_corp and not require_recp:
         special_dept = "Medical"
-    elif special_dak and not require_corp:
+    elif special_dak and not require_corp and not require_recp:
         special_dept = "DAK"
 
     # First, collect all existing offerings from the source files
@@ -430,8 +491,13 @@ def run_generator(*,
         if require_corp:
             mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
             mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)
+        elif require_recp:
+            # For RecP, filter parent offering that contains RecP
+            mask &= df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
         else:
             mask &= ~df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
+            # Also exclude RecP from standard processing
+            mask &= ~df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
 
         base_pool=df.loc[mask]
         if base_pool.empty:
@@ -443,8 +509,8 @@ def run_generator(*,
             country=wb.stem.split("_")[-1].upper()
             tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
-            # Determine receivers based on country and CORP setting
-            if require_corp:
+            # Determine receivers based on country and CORP/RecP setting
+            if require_corp or require_recp:
                 if country=="DE":         
                     receivers=["DS DE","HS DE"]
                 elif country in {"UA","MD"}: 
@@ -469,6 +535,10 @@ def run_generator(*,
                     for schedule_suffix in schedule_suffixes:
                         if require_corp:
                             new_name = build_corp_name(
+                                parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                            )
+                        elif require_recp:
+                            new_name = build_recp_name(
                                 parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                             )
                         else:
@@ -530,7 +600,7 @@ def run_generator(*,
                             else:
                                 row["Service Offerings | Depend On (Application Service)"]="[Global Prod]"
                         else:
-                            depend_tag = f"{delivering_tag} Prod" if require_corp else f"{recv or tag_hs} Prod"
+                            depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp) else f"{recv or tag_hs} Prod"
                             if app:
                                 row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
                             else:

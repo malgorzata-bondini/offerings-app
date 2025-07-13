@@ -645,6 +645,7 @@ def run_generator(*,
     out_dir.mkdir(parents=True,exist_ok=True)
     outfile=out_dir / f"Offerings_NEW_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
     
+
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile,engine="openpyxl") as w:
         for cc,dfc in sheets.items():

@@ -368,6 +368,22 @@ def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
         ]
     return "\n".join(lines)
 
+def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rsl_schedule, 
+                       rsp_priority, rsl_priority, rsp_time, rsl_time):
+    """Create custom commitment block based on user selections"""
+    lines = []
+    
+    if rsp_enabled and rsp_schedule and rsp_priority and rsp_time:
+        lines.append(f"[{cc}] SLA {sr_or_im} RSP {rsp_schedule} {rsp_priority} {rsp_time}")
+    
+    if rsl_enabled and rsl_schedule and rsl_priority and rsl_time:
+        lines.append(f"[{cc}] SLA {sr_or_im} RSL {rsl_schedule} {rsl_priority} {rsl_time}")
+        # Add OLA for SR only
+        if sr_or_im == "SR":
+            lines.append(f"[{cc}] OLA {sr_or_im} RSL {rsl_schedule} {rsl_priority} {rsl_time}")
+    
+    return "\n".join(lines) if lines else ""
+
 def run_generator(*,
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
@@ -375,7 +391,12 @@ def run_generator(*,
     sr_or_im, require_corp, require_recp, delivering_tag,
     support_group, managed_by_group, aliases_on, aliases_value,
     src_dir: Path, out_dir: Path,
-    special_it=False, special_hr=False, special_medical=False, special_dak=False):
+    special_it=False, special_hr=False, special_medical=False, special_dak=False,
+    use_custom_commitments=False, custom_commitments_str="", commitment_country=None,
+    rsp_enabled=False, rsl_enabled=False,
+    rsp_schedule="", rsl_schedule="",
+    rsp_priority="", rsl_priority="",
+    rsp_time="", rsl_time=""):
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -592,7 +613,21 @@ def run_generator(*,
                             row["Subscribed by Company"]=recv or tag_hs
                             
                         orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
-                        row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
+                        
+                        # Handle custom commitments - use both approaches
+                        if use_custom_commitments and custom_commitments_str:
+                            # Use the direct string if provided
+                            row["Service Commitments"] = custom_commitments_str
+                        elif use_custom_commitments and commitment_country:
+                            # Use custom_commit_block function if country provided
+                            row["Service Commitments"] = custom_commit_block(
+                                commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
+                                rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
+                                rsp_time, rsl_time
+                            )
+                        else:
+                            # Use existing logic
+                            row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
                         
                         if global_prod:
                             if app:
@@ -615,9 +650,14 @@ def run_generator(*,
     out_dir.mkdir(parents=True,exist_ok=True)
     outfile=out_dir / f"Offerings_NEW_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
     
+
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile,engine="openpyxl") as w:
-        for cc,dfc in sheets.items():
+        # Sort country codes alphabetically
+        sorted_countries = sorted(sheets.keys())
+        
+        for cc in sorted_countries:
+            dfc = sheets[cc]
             # Ensure unique names per country
             df_final = dfc.drop_duplicates(subset=["Name (Child Service Offering lvl 1)"])
             

@@ -155,21 +155,20 @@ with col2:
         col = st.container()
         with col:
             require_corp = st.checkbox("CORP")
-            special_it = st.checkbox("IT", disabled=require_corp)
-            special_hr = st.checkbox("HR", disabled=require_corp)
-            special_medical = st.checkbox("Medical", disabled=require_corp)
-            special_dak = st.checkbox("DAK (Business Services)", disabled=require_corp)
+            require_recp = st.checkbox("RecP")
+            special_it = st.checkbox("IT", disabled=(require_corp or require_recp))
+            special_hr = st.checkbox("HR", disabled=(require_corp or require_recp))
+            special_medical = st.checkbox("Medical", disabled=(require_corp or require_recp))
+            special_dak = st.checkbox("DAK (Business Services)", disabled=(require_corp or require_recp))
         
-        # Ensure only one is selected (excluding CORP)
-        non_corp_selected = sum([special_it, special_hr, special_medical, special_dak])
-        if require_corp and non_corp_selected > 0:
-            st.error("⚠️ When CORP is selected, other options cannot be selected")
-            # Reset the non-CORP options
-            special_it = special_hr = special_medical = special_dak = False
-        elif non_corp_selected > 1:
+        # Ensure only one is selected
+        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak])
+        if all_selected > 1:
             st.error("⚠️ Please select only one naming type")
+            # Reset all to handle multiple selection
+            require_corp = require_recp = special_it = special_hr = special_medical = special_dak = False
         
-        if require_corp:
+        if require_corp or require_recp:
             delivering_tag = st.text_input(
                 "Who delivers the service", 
                 value="",
@@ -203,6 +202,9 @@ with st.expander("📋 Naming Convention Examples"):
     if 'require_corp' in locals() and require_corp:
         st.markdown("**CORP Example:**")
         st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
+    elif 'require_recp' in locals() and require_recp:
+        st.markdown("**RecP Example:**")
+        st.code("[IM HS PL CORP HS PL IT] Software incident solving Active Directory Prod Mon-Fri 6-21")
     elif 'special_it' in locals() and special_it:
         st.markdown("**IT Example:**")
         st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17")
@@ -227,7 +229,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
         st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
     elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")
-    elif non_corp_selected > 1:
+    elif all_selected > 1:
         st.error("⚠️ Please select only one naming type")
     else:
         try:
@@ -253,6 +255,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         rsl_duration=rsl_duration,
                         sr_or_im=sr_or_im,
                         require_corp=require_corp,
+                        require_recp=require_recp if 'require_recp' in locals() else False,
                         delivering_tag=delivering_tag,
                         support_group=support_group,
                         managed_by_group=managed_by_group,

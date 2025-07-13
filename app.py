@@ -29,7 +29,7 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Basic", "Schedule", "Groups", "Naming", "Advanced"])
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Basic", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
     
     with tab1:
         st.subheader("Basic Settings")
@@ -140,6 +140,64 @@ with col2:
             rsl_duration = st.text_input("RSL Duration", value="")
     
     with tab3:
+        st.subheader("Service Commitments")
+        
+        use_custom_commitments = st.checkbox("Define custom Service Commitments", help="If unchecked, commitments will be copied from source files")
+        
+        if use_custom_commitments:
+            commitment_country = st.selectbox("Country", ["CY", "DE", "MD", "PL", "UA"])
+            
+            st.markdown("### RSP Configuration")
+            col1, col2 = st.columns(2)
+            with col1:
+                rsp_enabled = st.checkbox("Enable RSP")
+            if rsp_enabled:
+                with col2:
+                    rsp_priority = st.selectbox("RSP Priority", ["P1", "P2", "P3", "P4", "P1-P2", "P3-P4", "P1-P4"], key="rsp_priority")
+                col3, col4 = st.columns(2)
+                with col3:
+                    rsp_schedule = st.text_input("RSP Schedule", placeholder="e.g. Mon-Fri 6-21", key="rsp_schedule")
+                with col4:
+                    rsp_time = st.text_input("RSP Time", placeholder="e.g. 2h", key="rsp_time")
+            
+            st.markdown("### RSL Configuration")
+            col5, col6 = st.columns(2)
+            with col5:
+                rsl_enabled = st.checkbox("Enable RSL")
+            if rsl_enabled:
+                with col6:
+                    rsl_priority = st.selectbox("RSL Priority", ["P1", "P2", "P3", "P4", "P1-P2", "P3-P4", "P1-P4"], key="rsl_priority")
+                col7, col8 = st.columns(2)
+                with col7:
+                    rsl_schedule = st.text_input("RSL Schedule", placeholder="e.g. Mon-Fri 6-21", key="rsl_schedule")
+                with col8:
+                    rsl_time = st.text_input("RSL Time", placeholder="e.g. 1d", key="rsl_time")
+            
+            # Show preview
+            if rsp_enabled or rsl_enabled:
+                st.markdown("### Preview")
+                preview_lines = []
+                if rsp_enabled and rsp_schedule and rsp_time:
+                    preview_lines.append(f"[{commitment_country}] SLA {sr_or_im} RSP {rsp_schedule} {rsp_priority} {rsp_time}")
+                if rsl_enabled and rsl_schedule and rsl_time:
+                    preview_lines.append(f"[{commitment_country}] SLA {sr_or_im} RSL {rsl_schedule} {rsl_priority} {rsl_time}")
+                    if sr_or_im == "SR":
+                        preview_lines.append(f"[{commitment_country}] OLA {sr_or_im} RSL {rsl_schedule} {rsl_priority} {rsl_time}")
+                
+                if preview_lines:
+                    st.code("\n".join(preview_lines))
+        else:
+            commitment_country = None
+            rsp_enabled = False
+            rsl_enabled = False
+            rsp_schedule = ""
+            rsl_schedule = ""
+            rsp_priority = ""
+            rsl_priority = ""
+            rsp_time = ""
+            rsl_time = ""
+    
+    with tab4:
         support_group = st.text_input("Support Group", value="")
         managed_by_group = st.text_input(
             "Managed by Group", 
@@ -148,27 +206,30 @@ with col2:
         )
     
     with tab4:
-        st.subheader("Select one of the following:")
-
+        st.subheader("Naming Options")
+        
+        st.markdown("### Special Naming Types")
+        st.markdown("Select one of the following:")
         
         # Create a column to ensure vertical layout
         col = st.container()
         with col:
             require_corp = st.checkbox("CORP")
-            require_recp = st.checkbox("RecP")
-            special_it = st.checkbox("IT", disabled=(require_corp or require_recp))
-            special_hr = st.checkbox("HR", disabled=(require_corp or require_recp))
-            special_medical = st.checkbox("Medical", disabled=(require_corp or require_recp))
-            special_dak = st.checkbox("DAK (Business Services)", disabled=(require_corp or require_recp))
+            special_it = st.checkbox("IT", disabled=require_corp)
+            special_hr = st.checkbox("HR", disabled=require_corp)
+            special_medical = st.checkbox("Medical", disabled=require_corp)
+            special_dak = st.checkbox("DAK (Business Services)", disabled=require_corp)
         
-        # Ensure only one is selected
-        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak])
-        if all_selected > 1:
+        # Ensure only one is selected (excluding CORP)
+        non_corp_selected = sum([special_it, special_hr, special_medical, special_dak])
+        if require_corp and non_corp_selected > 0:
+            st.error("⚠️ When CORP is selected, other options cannot be selected")
+            # Reset the non-CORP options
+            special_it = special_hr = special_medical = special_dak = False
+        elif non_corp_selected > 1:
             st.error("⚠️ Please select only one naming type")
-            # Reset all to handle multiple selection
-            require_corp = require_recp = special_it = special_hr = special_medical = special_dak = False
         
-        if require_corp or require_recp:
+        if require_corp:
             delivering_tag = st.text_input(
                 "Who delivers the service", 
                 value="",
@@ -202,9 +263,6 @@ with st.expander("📋 Naming Convention Examples"):
     if 'require_corp' in locals() and require_corp:
         st.markdown("**CORP Example:**")
         st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
-    elif 'require_recp' in locals() and require_recp:
-        st.markdown("**RecP Example:**")
-        st.code("[IM HS PL CORP HS PL IT] Software incident solving Active Directory Prod Mon-Fri 6-21")
     elif 'special_it' in locals() and special_it:
         st.markdown("**IT Example:**")
         st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17")
@@ -229,7 +287,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
         st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
     elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")
-    elif all_selected > 1:
+    elif non_corp_selected > 1:
         st.error("⚠️ Please select only one naming type")
     else:
         try:
@@ -255,7 +313,6 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         rsl_duration=rsl_duration,
                         sr_or_im=sr_or_im,
                         require_corp=require_corp,
-                        require_recp=require_recp if 'require_recp' in locals() else False,
                         delivering_tag=delivering_tag,
                         support_group=support_group,
                         managed_by_group=managed_by_group,

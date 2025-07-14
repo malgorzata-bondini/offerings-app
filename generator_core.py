@@ -923,6 +923,11 @@ def run_generator(*,
                             row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
                         elif country=="UA":
                             row["Subscribed by Company"]="Сiнево Україна"
+                        elif country=="MD":
+                            if global_prod:
+                                row["Subscribed by Company"]=recv or tag_hs
+                            else:
+                                row["Subscribed by Company"]="DS MD"
                         elif country=="CY":
                             row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
                         else:

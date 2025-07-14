@@ -51,23 +51,18 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     # Build CORP IT name - always ends with IT
     prefix_parts = [sr_or_im]
     
-    # Extract division and country from parent
-    parent_division = ""
-    for part in parts:
-        if part in ["HS", "DS"]:
-            parent_division = part
-            break
-    
-    if parent_division:
-        prefix_parts.append(parent_division)
-    if country:
-        prefix_parts.append(country)
+    # Add delivering tag parts (who delivers the service - from user input)
+    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
+    prefix_parts.extend(delivering_parts)
     
     prefix_parts.append("CORP")
     
-    # Add delivering tag parts
-    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
-    prefix_parts.extend(delivering_parts)
+    # Add receiver parts (who receives the service - DS DE or HS DE for Germany)
+    if receiver:
+        prefix_parts.append(receiver)
+    else:
+        prefix_parts.extend(delivering_parts)
+    
     prefix_parts.append("IT")
     
     # Build the name
@@ -112,17 +107,9 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     # Build CORP Dedicated Services name
     prefix_parts = [sr_or_im]
     
-    # Extract division and country from parent
-    parent_division = ""
-    for part in parts:
-        if part in ["HS", "DS"]:
-            parent_division = part
-            break
-    
-    if parent_division:
-        prefix_parts.append(parent_division)
-    if country:
-        prefix_parts.append(country)
+    # Add delivering tag parts (who delivers the service - from user input)
+    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
+    prefix_parts.extend(delivering_parts)
     
     prefix_parts.append("CORP")
     
@@ -388,9 +375,12 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     
     # Build CORP name
     prefix_parts = [sr_or_im]
+    
+    # Add delivering tag parts (who delivers the service - from user input)
     delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
     prefix_parts.extend(delivering_parts[:2])  # Take division and country from delivering tag
     prefix_parts.extend(["CORP", receiver])
+    
     # Only add topic if it exists, don't default to IT for CORP
     if topic:
         prefix_parts.append(topic)

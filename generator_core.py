@@ -276,7 +276,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             break
     
     # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
-    no_prod_keywords = ["hardware", "mailbox", "network", "mobile"]
+    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security"]
     parent_lower = parent_offering.lower()
     catalog_lower = catalog_name.lower()
     parent_content_lower = parent_content.lower()

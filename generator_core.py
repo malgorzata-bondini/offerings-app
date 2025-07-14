@@ -649,7 +649,10 @@ def run_generator(*,
             
             # For IT department, filter by IT in parent offering
             if special_dept == "IT":
-                mask &= df["Parent Offering"].str.contains(r"\bIT\b",case=False)
+                mask &= (
+                    df["Parent Offering"].str.contains(r"\bIT\b", case=False) &
+                    df["Name (Child Service Offering lvl 1)"].str.contains(r"\bIT\b", case=False)
+                )
             # For HR department, filter by HR in parent offering
             elif special_dept == "HR":
                 mask &= df["Parent Offering"].str.contains(r"\bHR\b",case=False)

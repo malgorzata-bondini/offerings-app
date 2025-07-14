@@ -31,6 +31,123 @@ def extract_catalog_name(parent_offering):
         return parts[1].strip()
     return ""
 
+def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
+    """Build name for CORP IT offerings"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
+    
+    # Extract parts from parent content
+    parts = parent_content.split()
+    country = ""
+    topic = ""
+    
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS"]:
+            country = part
+        elif part not in ["HS", "DS", "Parent", "RecP"] and not (len(part) == 2 and part.isupper()):
+            topic = part
+            break
+    
+    # Build CORP IT name - always ends with IT
+    prefix_parts = [sr_or_im]
+    
+    # Extract division and country from parent
+    parent_division = ""
+    for part in parts:
+        if part in ["HS", "DS"]:
+            parent_division = part
+            break
+    
+    if parent_division:
+        prefix_parts.append(parent_division)
+    if country:
+        prefix_parts.append(country)
+    
+    prefix_parts.append("CORP")
+    
+    # Add delivering tag parts
+    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
+    prefix_parts.extend(delivering_parts)
+    prefix_parts.append("IT")
+    
+    # Build the name
+    name_prefix = f"[{' '.join(prefix_parts)}]"
+    
+    # Use topic from parent or "Software" as default
+    if not topic:
+        topic = "Software"
+    
+    name_parts = [name_prefix, topic, catalog_name.lower()]
+    
+    # Add app if provided
+    if app:
+        name_parts.append(app)
+    
+    # Add "solving" for IM
+    if sr_or_im == "IM":
+        name_parts.append("solving")
+    
+    name_parts.append("Prod")
+    name_parts.append(schedule_suffix)
+    
+    return " ".join(name_parts)
+
+def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
+    """Build name for CORP Dedicated Services offerings"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
+    
+    # Extract parts from parent content
+    parts = parent_content.split()
+    country = ""
+    topic = ""
+    
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS"]:
+            country = part
+        elif part not in ["HS", "DS", "Parent", "RecP"] and not (len(part) == 2 and part.isupper()):
+            topic = part
+            break
+    
+    # Build CORP Dedicated Services name
+    prefix_parts = [sr_or_im]
+    
+    # Extract division and country from parent
+    parent_division = ""
+    for part in parts:
+        if part in ["HS", "DS"]:
+            parent_division = part
+            break
+    
+    if parent_division:
+        prefix_parts.append(parent_division)
+    if country:
+        prefix_parts.append(country)
+    
+    prefix_parts.append("CORP")
+    
+    # Add receiver (e.g., HS DE)
+    prefix_parts.append(receiver)
+    prefix_parts.append("Dedicated Services")
+    
+    # Build the name
+    name_prefix = f"[{' '.join(prefix_parts)}]"
+    
+    name_parts = [name_prefix, catalog_name]
+    
+    # Add app if provided
+    if app:
+        name_parts.append(app)
+    
+    # Add "solving" for IM
+    if sr_or_im == "IM":
+        name_parts.append("solving")
+    
+    name_parts.append("Prod")
+    name_parts.append(schedule_suffix)
+    
+    return " ".join(name_parts)
+
 def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for RecP offerings"""
     parent_content = extract_parent_info(parent_offering)
@@ -396,7 +513,8 @@ def run_generator(*,
     rsp_enabled=False, rsl_enabled=False,
     rsp_schedule="", rsl_schedule="",
     rsp_priority="", rsl_priority="",
-    rsp_time="", rsl_time=""):
+    rsp_time="", rsl_time="",
+    require_corp_it=False, require_corp_dedicated=False):
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -470,13 +588,13 @@ def run_generator(*,
 
     # Determine special department
     special_dept = None
-    if special_it and not require_corp and not require_recp:
+    if special_it and not require_corp and not require_recp and not require_corp_it and not require_corp_dedicated:
         special_dept = "IT"
-    elif special_hr and not require_corp and not require_recp:
+    elif special_hr and not require_corp and not require_recp and not require_corp_it and not require_corp_dedicated:
         special_dept = "HR"
-    elif special_medical and not require_corp and not require_recp:
+    elif special_medical and not require_corp and not require_recp and not require_corp_it and not require_corp_dedicated:
         special_dept = "Medical"
-    elif special_dak and not require_corp and not require_recp:
+    elif special_dak and not require_corp and not require_recp and not require_corp_it and not require_corp_dedicated:
         special_dept = "DAK"
 
     # First, collect all existing offerings from the source files
@@ -515,6 +633,12 @@ def run_generator(*,
         elif require_recp:
             # For RecP, filter parent offering that contains RecP
             mask &= df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
+        elif require_corp_it:
+            # For CORP IT, look for both CORP and IT in parent offering
+            mask &= df["Parent Offering"].str.contains(r"\bIT\b",case=False)
+        elif require_corp_dedicated:
+            # For CORP Dedicated Services, look for Dedicated in parent offering
+            mask &= df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
         else:
             mask &= ~df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
             # Also exclude RecP from standard processing
@@ -530,8 +654,8 @@ def run_generator(*,
             country=wb.stem.split("_")[-1].upper()
             tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
-            # Determine receivers based on country and CORP/RecP setting
-            if require_corp or require_recp:
+            # Determine receivers based on country and CORP/RecP/CORP IT/CORP Dedicated setting
+            if require_corp or require_recp or require_corp_it or require_corp_dedicated:
                 if country=="DE":         
                     receivers=["DS DE","HS DE"]
                 elif country in {"UA","MD"}: 
@@ -560,6 +684,14 @@ def run_generator(*,
                             )
                         elif require_recp:
                             new_name = build_recp_name(
+                                parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                            )
+                        elif require_corp_it:
+                            new_name = build_corp_it_name(
+                                parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                            )
+                        elif require_corp_dedicated:
+                            new_name = build_corp_dedicated_name(
                                 parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                             )
                         else:
@@ -595,9 +727,14 @@ def run_generator(*,
                         # If Managed by Group is empty but Support Group is filled, copy Support Group
                         row["Managed by Group"]=managed_by_group if managed_by_group else support_group
                         
-                        # Handle aliases
-                        for c in [c for c in row.columns if "Aliases" in c]:
-                            row[c]=aliases_value if aliases_on else "-"
+                        # Handle aliases - copy from original row if aliases_on is False
+                        if not aliases_on:
+                            # Keep original aliases values
+                            pass
+                        else:
+                            # Apply new alias value
+                            for c in [c for c in row.columns if "Aliases" in c]:
+                                row[c]=aliases_value if aliases_value else "-"
                         
                         # Handle Visibility group - ensure it exists for PL
                         if country == "PL" and "Visibility group" not in row.columns:
@@ -618,21 +755,29 @@ def run_generator(*,
                         if use_custom_commitments and custom_commitments_str:
                            # Use the direct string if provided
                            row["Service Commitments"] = custom_commitments_str
+                        elif use_custom_commitments and commitment_country:
+                            # Use custom_commit_block function if country provided
+                            row["Service Commitments"] = custom_commit_block(
+                                commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
+                                rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
+                                rsp_time, rsl_time
+                            )
                         else:
                            # Use existing logic
                            row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
                         
-                        if global_prod:
-                            if app:
-                                row["Service Offerings | Depend On (Application Service)"]=f"[Global Prod] {app}"
-                            else:
-                                row["Service Offerings | Depend On (Application Service)"]="[Global Prod]"
+                        # Special handling for IT with UA/MD - always use DS
+                        if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
+                            depend_tag = f"DS {country} Prod"
+                        elif global_prod:
+                            depend_tag = "Global Prod"
                         else:
-                            depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp) else f"{recv or tag_hs} Prod"
-                            if app:
-                                row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
-                            else:
-                                row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
+                            depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{recv or tag_hs} Prod"
+                        
+                        if app:
+                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                        else:
+                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
                         
                         sheets.setdefault(country,pd.DataFrame())
                         sheets[country]=pd.concat([sheets[country],row],ignore_index=True)

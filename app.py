@@ -235,7 +235,7 @@ with col2:
         st.subheader("Select one of the following:")
 
         
-        # Create a column to ensure vertical layout
+        # Create a column to ensure vertical layout - ALPHABETICAL ORDER
         col = st.container()
         with col:
             # List in alphabetical order

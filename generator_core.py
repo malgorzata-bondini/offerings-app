@@ -648,6 +648,7 @@ def run_generator(*,
         if base_pool.empty:
             continue
         
+        
         # Process ALL matching rows, not just the first one
         for idx, base_row in base_pool.iterrows():
             base_row_df = base_row.to_frame().T.copy()
@@ -674,6 +675,9 @@ def run_generator(*,
                 receivers=[""]
 
             parent_full=str(base_row["Parent Offering"])
+            
+            # Store original depend on value
+            original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
 
             for app in all_apps:
                 for recv in receivers:

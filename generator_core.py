@@ -630,24 +630,46 @@ def run_generator(*,
         if require_corp:
             mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
             mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)
+            # Exclude IT entries when looking for regular CORP
+            mask &= ~df["Parent Offering"].str.contains(r"\bIT\b",case=False)
+            # Exclude Dedicated Services entries
+            mask &= ~df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
         elif require_recp:
             # For RecP, filter parent offering that contains RecP
             mask &= df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
         elif require_corp_it:
             # For CORP IT, look for both CORP and IT in parent offering
             mask &= df["Parent Offering"].str.contains(r"\bIT\b",case=False)
+            # Also ensure it's CORP related
+            mask &= (df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False) | 
+                     df["Parent Offering"].str.contains(r"\bCORP\b",case=False))
         elif require_corp_dedicated:
             # For CORP Dedicated Services, look for Dedicated in parent offering
             mask &= df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
+            # Also ensure it's CORP related
+            mask &= (df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False) | 
+                     df["Parent Offering"].str.contains(r"\bCORP\b",case=False))
         else:
             mask &= ~df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
             # Also exclude RecP from standard processing
             mask &= ~df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
+            
+            # For IT department, filter by IT in parent offering
+            if special_dept == "IT":
+                mask &= df["Parent Offering"].str.contains(r"\bIT\b",case=False)
+            # For HR department, filter by HR in parent offering
+            elif special_dept == "HR":
+                mask &= df["Parent Offering"].str.contains(r"\bHR\b",case=False)
+            # For Medical department, filter by Medical in parent offering
+            elif special_dept == "Medical":
+                mask &= df["Parent Offering"].str.contains(r"\bMedical\b",case=False)
+            # For DAK department, filter by DAK in parent offering
+            elif special_dept == "DAK":
+                mask &= df["Parent Offering"].str.contains(r"\bDAK\b",case=False)
 
         base_pool=df.loc[mask]
         if base_pool.empty:
             continue
-        
         
         # Process ALL matching rows, not just the first one
         for idx, base_row in base_pool.iterrows():
@@ -681,6 +703,18 @@ def run_generator(*,
 
             for app in all_apps:
                 for recv in receivers:
+                    # For DE, find the matching row (DS DE or HS DE) in the original data
+                    if country == "DE" and (require_corp or require_recp or require_corp_it or require_corp_dedicated):
+                        # Search for the specific receiver in the base pool
+                        recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(recv)}\b", case=False)
+                        matching_rows = base_pool[recv_mask]
+                        
+                        if not matching_rows.empty:
+                            # Use the first matching row as base
+                            base_row = matching_rows.iloc[0]
+                            base_row_df = base_row.to_frame().T.copy()
+                            original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
+                    
                     for schedule_suffix in schedule_suffixes:
                         if require_corp:
                             new_name = build_corp_name(
@@ -778,10 +812,19 @@ def run_generator(*,
                         else:
                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{recv or tag_hs} Prod"
                         
-                        if app:
-                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                        # Handle Service Offerings | Depend On - preserve original values
+                        if original_depend_on in ["-", "", "nan", "NaN", None]:
+                            # Preserve the original empty/dash value
+                            if original_depend_on == "-":
+                                row["Service Offerings | Depend On (Application Service)"] = "-"
+                            else:
+                                row["Service Offerings | Depend On (Application Service)"] = ""
                         else:
-                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
+                            # Only update if original had a real value
+                            if app:
+                                row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                            else:
+                                row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
                         
                         sheets.setdefault(country,pd.DataFrame())
                         sheets[country]=pd.concat([sheets[country],row],ignore_index=True)

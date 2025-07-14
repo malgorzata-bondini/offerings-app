@@ -638,12 +638,10 @@ def run_generator(*,
             # For RecP, filter parent offering that contains RecP
             mask &= df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
         elif require_corp_it:
-            # For CORP IT, look for existing CORP entries that can be delivered by IT
-            # These are CORP entries that we want to transform into CORP IT format
-            mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
-            # Optionally check if delivering_tag is provided and matches
-            if delivering_tag:
-                mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)
+            # For CORP IT, we don't require CORP to already be in the name
+            # We're creating new CORP IT entries from regular entries
+            # Just apply the standard filtering without additional CORP requirements
+            pass  # No additional filtering needed
         elif require_corp_dedicated:
             # For CORP Dedicated Services, look for Dedicated in parent offering
             mask &= df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
@@ -651,7 +649,11 @@ def run_generator(*,
             mask &= (df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False) | 
                      df["Parent Offering"].str.contains(r"\bCORP\b",case=False))
         else:
-            mask &= ~df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
+            # For standard processing, exclude CORP entries
+            # But don't apply this exclusion for special departments
+            if not (special_dept in ["IT", "HR", "Medical", "DAK"]):
+                mask &= ~df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
+            
             # Also exclude RecP from standard processing
             mask &= ~df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
             

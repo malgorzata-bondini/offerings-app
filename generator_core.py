@@ -616,18 +616,11 @@ def run_generator(*,
                         
                         # Handle custom commitments - use both approaches
                         if use_custom_commitments and custom_commitments_str:
-                            # Use the direct string if provided
-                            row["Service Commitments"] = custom_commitments_str
-                        elif use_custom_commitments and commitment_country:
-                            # Use custom_commit_block function if country provided
-                            row["Service Commitments"] = custom_commit_block(
-                                commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
-                                rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
-                                rsp_time, rsl_time
-                            )
+                           # Use the direct string if provided
+                           row["Service Commitments"] = custom_commitments_str
                         else:
-                            # Use existing logic
-                            row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
+                           # Use existing logic
+                           row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
                         
                         if global_prod:
                             if app:
@@ -663,9 +656,12 @@ def run_generator(*,
             
             if "Number" in df_final.columns:
                 df_final = df_final.drop(columns=["Number"])
-            
+            # Remove Visibility group column for PL
+            if cc == "PL" and "Visibility group" in df_final.columns:
+               df_final = df_final.drop(columns=["Visibility group"])
             # Replace all forms of empty/null values with empty string
             df_final = df_final.fillna('')
+            
             
             for col in df_final.columns:
                 if df_final[col].dtype == 'bool':

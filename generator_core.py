@@ -695,20 +695,20 @@ def run_generator(*,
             original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
 
             for app in all_apps:
-                for recv in receivers:
+                for schedule_suffix in schedule_suffixes:
+                    for recv in receivers:
                     # For DE, find the matching row (DS DE or HS DE) in the original data
-                    if country == "DE" and (require_corp or require_recp or require_corp_it or require_corp_dedicated):
+                        if country == "DE" and (require_corp or require_recp or require_corp_it or require_corp_dedicated):
                         # Search for the specific receiver in the base pool
-                        recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(recv)}\b", case=False)
-                        matching_rows = base_pool[recv_mask]
+                            recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(recv)}\b", case=False)
+                            matching_rows = base_pool[recv_mask]
                         
-                        if not matching_rows.empty:
+                            if not matching_rows.empty:
                             # Use the first matching row as base
-                            base_row = matching_rows.iloc[0]
-                            base_row_df = base_row.to_frame().T.copy()
-                            original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
-                    
-                    for schedule_suffix in schedule_suffixes:
+                                base_row = matching_rows.iloc[0]
+                                base_row_df = base_row.to_frame().T.copy()
+                                original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
+                
                         if require_corp:
                             new_name = build_corp_name(
                                 parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag

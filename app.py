@@ -71,22 +71,30 @@ with col2:
         schedule_type = st.checkbox("Custom schedule per period")
         create_multiple_schedules = st.checkbox("Create multiple schedules", help="Generate the same offerings with different schedules")
         
-        if not schedule_type and create_multiple_schedules:
-            st.info("📅 Enter multiple schedules (one per line)")
-            schedule_simple = st.text_area(
-                "Schedules", 
-                value="", 
-                placeholder="Mon-Fri 9-17\nMon-Fri 8-16\nMon-Sun 24/7",
-                height=150
-            )
-            schedule_suffixes = [s.strip() for s in schedule_simple.split('\n') if s.strip()]
+        if not schedule_type:
+            if create_multiple_schedules:
+                st.info("📅 Enter multiple schedules (one per line)")
+                schedule_simple = st.text_area(
+                    "Schedules", 
+                    value="", 
+                    placeholder="Mon-Fri 9-17\nMon-Fri 8-16\nMon-Sun 24/7",
+                    height=150
+                )
+                schedule_suffixes = [s.strip() for s in schedule_simple.split('\n') if s.strip()]
+                
+                # Show preview of all schedules
+                if schedule_suffixes:
+                    st.success(f"📋 Will create {len(schedule_suffixes)} offering(s) with different schedules:")
+                    for i, sched in enumerate(schedule_suffixes, 1):
+                        st.text(f"  {i}. {sched}")
+            else:
+                schedule_simple = st.text_input("Schedule", value="", placeholder="e.g. Mon-Fri 9-17")
+                schedule_suffixes = [schedule_simple] if schedule_simple else []
+        else:
+            if create_multiple_schedules:
+                st.warning("⚠️ Multiple schedules not supported with custom schedule periods. Please uncheck one option.")
+                create_multiple_schedules = False
             
-            # Show preview of all schedules
-            if schedule_suffixes:
-                st.success(f"📋 Will create {len(schedule_suffixes)} offering(s) with different schedules:")
-                for i, sched in enumerate(schedule_suffixes, 1):
-                    st.text(f"  {i}. {sched}")
-        elif schedule_type and not create_multiple_schedules:
             st.info("📅 Enter schedule periods (e.g., Mon-Thu 9-17, Fri 9-16, Sat 8-12)")
             
             # Allow up to 5 schedule periods
@@ -123,46 +131,6 @@ with col2:
             # Show preview
             if schedule_suffix:
                 st.success(f"📋 Schedule: **{schedule_suffix}**")
-        elif schedule_type and create_multiple_schedules:
-            st.info("📅 Enter multiple custom schedule periods")
-            num_schedules = st.number_input("Number of schedules", min_value=1, max_value=5, value=2)
-            schedule_suffixes = []
-            
-            for sched_idx in range(num_schedules):
-                st.markdown(f"### Schedule {sched_idx + 1}")
-                schedule_parts = []
-                num_periods = st.number_input(f"Number of periods for schedule {sched_idx + 1}", min_value=1, max_value=5, value=2, key=f"num_periods_{sched_idx}")
-                
-                for i in range(num_periods):
-                    st.markdown(f"**Period {i+1}**")
-                    col1, col2 = st.columns([2, 1])
-                    with col1:
-                        period = st.text_input(
-                            f"Days", 
-                            value="", 
-                            placeholder="e.g. Mon-Thu or Fri or Sat-Sun",
-                            key=f"schedule_period_{sched_idx}_{i}",
-                            label_visibility="collapsed"
-                        )
-                    with col2:
-                        hours = st.text_input(
-                            f"Hours", 
-                            value="", 
-                            placeholder="e.g. 9-17",
-                            key=f"schedule_hours_{sched_idx}_{i}",
-                            label_visibility="collapsed"
-                        )
-                    
-                    if period and hours:
-                        schedule_parts.append(f"{period} {hours}")
-                
-                if schedule_parts:
-                    schedule_suffix = " ".join(schedule_parts)
-                    schedule_suffixes.append(schedule_suffix)
-                    st.success(f"📋 Schedule {sched_idx + 1}: **{schedule_suffix}**")
-        else:
-            schedule_simple = st.text_input("Schedule", value="", placeholder="e.g. Mon-Fri 9-17")
-            schedule_suffixes = [schedule_simple] if schedule_simple else []
         
         st.markdown("---")
         col_rsp, col_rsl = st.columns(2)
@@ -238,24 +206,21 @@ with col2:
         # Create a column to ensure vertical layout
         col = st.container()
         with col:
-            # List in alphabetical order
             require_corp = st.checkbox("CORP")
-            require_corp_dedicated = st.checkbox("CORP Dedicated Services")
-            require_corp_it = st.checkbox("CORP IT")
-            special_dak = st.checkbox("DAK (Business Services)", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
-            special_hr = st.checkbox("HR", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
-            special_it = st.checkbox("IT", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
-            special_medical = st.checkbox("Medical", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
             require_recp = st.checkbox("RecP")
+            special_it = st.checkbox("IT", disabled=(require_corp or require_recp))
+            special_hr = st.checkbox("HR", disabled=(require_corp or require_recp))
+            special_medical = st.checkbox("Medical", disabled=(require_corp or require_recp))
+            special_dak = st.checkbox("DAK (Business Services)", disabled=(require_corp or require_recp))
         
         # Ensure only one is selected
-        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated])
+        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak])
         if all_selected > 1:
             st.error("⚠️ Please select only one naming type")
             # Reset all to handle multiple selection
-            require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = False
+            require_corp = require_recp = special_it = special_hr = special_medical = special_dak = False
         
-        if require_corp or require_recp or require_corp_it or require_corp_dedicated:
+        if require_corp or require_recp:
             delivering_tag = st.text_input(
                 "Who delivers the service", 
                 value="",
@@ -289,12 +254,6 @@ with st.expander("📋 Naming Convention Examples"):
     if 'require_corp' in locals() and require_corp:
         st.markdown("**CORP Example:**")
         st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
-    elif 'require_corp_it' in locals() and require_corp_it:
-        st.markdown("**CORP IT Example:**")
-        st.code("[SR HS PL CORP HS PL IT] Software assistance MS Outlook Prod Mon-Fri 8-17")
-    elif 'require_corp_dedicated' in locals() and require_corp_dedicated:
-        st.markdown("**CORP Dedicated Services Example:**")
-        st.code("[SR HS PL CORP HS DE Dedicated Services] HelpMe announcement creation ServiceNow HelpMe Prod Mon-Fri 9-17")
     elif 'require_recp' in locals() and require_recp:
         st.markdown("**RecP Example:**")
         st.code("[IM HS PL CORP HS PL IT] Software incident solving Active Directory Prod Mon-Fri 6-21")
@@ -362,9 +321,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         special_dak=special_dak if 'special_dak' in locals() else False,
                         use_custom_commitments=use_custom_commitments if 'use_custom_commitments' in locals() else False,
                         custom_commitments_str=custom_commitments_str if 'custom_commitments_str' in locals() else "",
-                        commitment_country=commitment_country if 'commitment_country' in locals() else None,
-                        require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
-                        require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False
+                        commitment_country=commitment_country if 'commitment_country' in locals() else None
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

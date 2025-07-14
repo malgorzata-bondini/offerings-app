@@ -447,8 +447,12 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         if sr_or_im == "IM":
             name_parts.append("solving")
         
-        # Only add Prod if no hardware/mailbox/network keywords
-        if not exclude_prod:
+        # Check if topic contains any no-prod keywords
+        topic_lower = topic.lower() if topic else ""
+        topic_exclude_prod = any(keyword in topic_lower for keyword in no_prod_keywords)
+        
+        # Only add Prod if no hardware/mailbox/network/mobile/security keywords in any source
+        if not exclude_prod and not topic_exclude_prod:
             name_parts.append("Prod")
         
         name_parts.append(schedule_suffix)

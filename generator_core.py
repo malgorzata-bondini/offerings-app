@@ -638,11 +638,12 @@ def run_generator(*,
             # For RecP, filter parent offering that contains RecP
             mask &= df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
         elif require_corp_it:
-            # For CORP IT, look for both CORP and IT in parent offering
-            mask &= df["Parent Offering"].str.contains(r"\bIT\b",case=False)
-            # Also ensure it's CORP related
-            mask &= (df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False) | 
-                     df["Parent Offering"].str.contains(r"\bCORP\b",case=False))
+            # For CORP IT, look for existing CORP entries that can be delivered by IT
+            # These are CORP entries that we want to transform into CORP IT format
+            mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
+            # Optionally check if delivering_tag is provided and matches
+            if delivering_tag:
+                mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)
         elif require_corp_dedicated:
             # For CORP Dedicated Services, look for Dedicated in parent offering
             mask &= df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)

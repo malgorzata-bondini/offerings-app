@@ -326,11 +326,15 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             prefix_parts.append(country)
         prefix_parts.append("IT")
         
-        # For IT, use the topic from parent (e.g., "Hardware") and lowercase catalog name
-        name_parts = [f"[{' '.join(prefix_parts)}]"]
+        # For IT, build the name with topic BEFORE the brackets
+        # Format: [SR DS MD IT] Hardware configuration laptop Mon-Fri 8-16
+        name_parts = []
         
         if topic:
-            name_parts.append(topic)
+            # Topic goes BEFORE the brackets
+            name_parts.append(f"[{' '.join(prefix_parts)}] {topic}")
+        else:
+            name_parts.append(f"[{' '.join(prefix_parts)}]")
         
         name_parts.append(catalog_name.lower())
         

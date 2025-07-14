@@ -320,8 +320,13 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
                     break
         
         prefix_parts = [sr_or_im]
-        if division:
+        
+        # Special handling for UA and MD - always use DS
+        if country in ["UA", "MD"]:
+            prefix_parts.append("DS")
+        elif division:
             prefix_parts.append(division)
+        
         if country:
             prefix_parts.append(country)
         prefix_parts.append("IT")

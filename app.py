@@ -243,10 +243,10 @@ with col2:
             require_recp = st.checkbox("RecP")
             require_corp_dedicated = st.checkbox("CORP Dedicated Services")
             require_corp_it = st.checkbox("CORP IT")
-            special_dak = st.checkbox("DAK (Business Services)", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
-            special_hr = st.checkbox("HR", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
-            special_it = st.checkbox("IT", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
-            special_medical = st.checkbox("Medical", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
+            special_dak = st.checkbox("DAK (Business Services)")
+            special_hr = st.checkbox("HR")
+            special_it = st.checkbox("IT")
+            special_medical = st.checkbox("Medical")
 
         
         # Ensure only one is selected

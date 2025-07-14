@@ -201,6 +201,14 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
+    # Extract country from parent content to check for MD/UA
+    parts = parent_content.split()
+    country = ""
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
+            country = part
+            break
+    
     # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
     no_prod_keywords = ["hardware", "mailbox", "network", "mobile"]
     parent_lower = parent_offering.lower()
@@ -226,8 +234,13 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Build Medical name - NO PROD
         prefix_parts = [sr_or_im]
-        if division:
+        
+        # For MD and UA, always use DS
+        if country in ["MD", "UA"]:
+            prefix_parts.append("DS")
+        elif division:
             prefix_parts.append(division)
+        
         if country:
             prefix_parts.append(country)
         prefix_parts.append("Medical")
@@ -248,8 +261,13 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
                 country = part
         
         prefix_parts = [sr_or_im]
-        if division:
+        
+        # For MD and UA, always use DS
+        if country in ["MD", "UA"]:
+            prefix_parts.append("DS")
+        elif division:
             prefix_parts.append(division)
+            
         if country:
             prefix_parts.append(country)
         prefix_parts.append("Business Services")
@@ -272,8 +290,13 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
                 country = part
         
         prefix_parts = [sr_or_im]
-        if division:
+        
+        # For MD and UA, always use DS
+        if country in ["MD", "UA"]:
+            prefix_parts.append("DS")
+        elif division:
             prefix_parts.append(division)
+            
         if country:
             prefix_parts.append(country)
         prefix_parts.append("HR")
@@ -361,10 +384,17 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     
     else:
         # Standard case - just replace Parent with SR/IM
-        if app:
-            return f"[{sr_or_im} {parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
+        # For MD and UA, ensure DS is used
+        if country in ["MD", "UA"]:
+            # Replace any HS with DS in parent content
+            parent_content_fixed = parent_content.replace("HS", "DS")
         else:
-            return f"[{sr_or_im} {parent_content}] {catalog_name} Prod {schedule_suffix}"
+            parent_content_fixed = parent_content
+            
+        if app:
+            return f"[{sr_or_im} {parent_content_fixed}] {catalog_name} {app} Prod {schedule_suffix}"
+        else:
+            return f"[{sr_or_im} {parent_content_fixed}] {catalog_name} Prod {schedule_suffix}"
 
 def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP offerings"""
@@ -679,6 +709,10 @@ def run_generator(*,
             base_row_df = base_row.to_frame().T.copy()
             country=wb.stem.split("_")[-1].upper()
             tag_hs, tag_ds = f"HS {country}", f"DS {country}"
+            
+            # IMPORTANT: For MD and UA, always use DS tag regardless of original data
+            if country in ["MD", "UA"]:
+                tag_hs = f"DS {country}"  # Override to always use DS for these countries
 
             # Determine receivers based on country and CORP/RecP/CORP IT/CORP Dedicated setting
             if require_corp or require_recp or require_corp_it or require_corp_dedicated:

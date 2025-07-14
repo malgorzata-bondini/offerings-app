@@ -240,13 +240,14 @@ with col2:
         with col:
             # List in alphabetical order
             require_corp = st.checkbox("CORP")
+            require_recp = st.checkbox("RecP")
             require_corp_dedicated = st.checkbox("CORP Dedicated Services")
             require_corp_it = st.checkbox("CORP IT")
             special_dak = st.checkbox("DAK (Business Services)", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
             special_hr = st.checkbox("HR", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
             special_it = st.checkbox("IT", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
             special_medical = st.checkbox("Medical", disabled=(require_corp or require_recp or require_corp_it or require_corp_dedicated))
-            require_recp = st.checkbox("RecP")
+
         
         # Ensure only one is selected
         all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated])

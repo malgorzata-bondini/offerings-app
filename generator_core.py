@@ -82,7 +82,7 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    name_parts.append("Prod")
+    #name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
     return " ".join(name_parts)

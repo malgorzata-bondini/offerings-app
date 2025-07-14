@@ -287,7 +287,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         parts = parent_content.split()
         division = ""
         country = ""
-        topic = ""
+        topic_parts = []
         
         for i, part in enumerate(parts):
             if part in ["HS", "DS"]:
@@ -295,8 +295,9 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
                 country = part
             elif part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
-                topic = part
-                break
+                topic_parts.append(part)
+        
+        topic = " ".join(topic_parts) if topic_parts else "Software"
         
         # Build Medical name - NO PROD
         prefix_parts = [sr_or_im]
@@ -392,16 +393,19 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         topic = ""
         
         # Find division, country and topic
+        topic_parts = []
         for i, part in enumerate(parts):
             if part in ["HS", "DS"]:
                 division = part
             elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
                 country = part
             else:
-                # Any other word is the topic (e.g., "Hardware", "Software", "Permissions", etc.)
+                # Collect all remaining words as topic (e.g., "Security & Privacy", "Hardware", etc.)
                 if part not in ["HS", "DS", "RecP"] and not (len(part) == 2 and part.isupper()):
-                    topic = part
-                    break
+                    topic_parts.append(part)
+        
+        # Join all topic parts to get the full topic phrase
+        topic = " ".join(topic_parts) if topic_parts else ""
         
         # If no topic found, use the first significant word from catalog name
         if not topic:

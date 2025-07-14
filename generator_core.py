@@ -31,6 +31,33 @@ def extract_catalog_name(parent_offering):
         return parts[1].strip()
     return ""
 
+def get_division_and_country(parent_content, country, delivering_tag):
+    """Get division and country with special handling for MD and UA"""
+    # Special handling for UA and MD - always use DS
+    if country in ["UA", "MD"]:
+        return "DS", country
+    
+    # Extract parts from parent content
+    parts = parent_content.split()
+    division = ""
+    
+    for part in parts:
+        if part in ["HS", "DS"]:
+            division = part
+            break
+    
+    # If no division found in parent and we have delivering_tag, use it
+    if not division and delivering_tag:
+        delivering_parts = delivering_tag.split()
+        if delivering_parts and delivering_parts[0] in ["HS", "DS"]:
+            division = delivering_parts[0]
+    
+    # Default to HS if still no division
+    if not division:
+        division = "HS"
+    
+    return division, country
+
 def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP IT offerings"""
     parent_content = extract_parent_info(parent_offering)
@@ -51,9 +78,19 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     # Build CORP IT name - always ends with IT
     prefix_parts = [sr_or_im]
     
+    # Get division and country with special handling for MD/UA
+    division, country_code = get_division_and_country(parent_content, country, delivering_tag)
+    
     # Add delivering tag parts (who delivers the service - from user input)
-    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
-    prefix_parts.extend(delivering_parts)
+    if delivering_tag:
+        delivering_parts = delivering_tag.split()
+        # For MD/UA, override with DS
+        if country in ["UA", "MD"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            prefix_parts.extend(delivering_parts)
+    else:
+        prefix_parts.extend([division, country])
     
     prefix_parts.append("CORP")
     
@@ -61,7 +98,7 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     if receiver:
         prefix_parts.append(receiver)
     else:
-        prefix_parts.extend(delivering_parts)
+        prefix_parts.extend([division, country])
     
     prefix_parts.append("IT")
     
@@ -107,9 +144,19 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     # Build CORP Dedicated Services name
     prefix_parts = [sr_or_im]
     
+    # Get division and country with special handling for MD/UA
+    division, country_code = get_division_and_country(parent_content, country, delivering_tag)
+    
     # Add delivering tag parts (who delivers the service - from user input)
-    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
-    prefix_parts.extend(delivering_parts)
+    if delivering_tag:
+        delivering_parts = delivering_tag.split()
+        # For MD/UA, override with DS
+        if country in ["UA", "MD"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            prefix_parts.extend(delivering_parts)
+    else:
+        prefix_parts.extend([division, country])
     
     prefix_parts.append("CORP")
     
@@ -155,6 +202,9 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     # Build RecP name - always ends with IT
     prefix_parts = [sr_or_im]
     
+    # Get division and country with special handling for MD/UA
+    division, country_code = get_division_and_country(parent_content, country, delivering_tag)
+    
     # Extract division and country from parent
     parent_division = ""
     for part in parts:
@@ -162,16 +212,32 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
             parent_division = part
             break
     
-    if parent_division:
-        prefix_parts.append(parent_division)
-    if country:
-        prefix_parts.append(country)
+    # For MD/UA, always use DS
+    if country in ["UA", "MD"]:
+        prefix_parts.extend(["DS", country])
+    else:
+        if parent_division:
+            prefix_parts.append(parent_division)
+        if country:
+            prefix_parts.append(country)
     
     prefix_parts.append("CORP")
     
     # Add delivering tag parts
-    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
-    prefix_parts.extend(delivering_parts)
+    if delivering_tag:
+        delivering_parts = delivering_tag.split()
+        # For MD/UA, override with DS
+        if country in ["UA", "MD"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            prefix_parts.extend(delivering_parts)
+    else:
+        # For MD/UA, use DS
+        if country in ["UA", "MD"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            prefix_parts.extend([division, country])
+    
     prefix_parts.append("IT")
     
     # Build the name with topic from parent
@@ -201,7 +267,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
-    # Extract country from parent content to check for MD/UA
+    # Extract country from parent content
     parts = parent_content.split()
     country = ""
     for part in parts:
@@ -235,14 +301,15 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         # Build Medical name - NO PROD
         prefix_parts = [sr_or_im]
         
-        # For MD and UA, always use DS
-        if country in ["MD", "UA"]:
-            prefix_parts.append("DS")
-        elif division:
-            prefix_parts.append(division)
+        # Special handling for UA and MD - always use DS
+        if country in ["UA", "MD"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
         
-        if country:
-            prefix_parts.append(country)
         prefix_parts.append("Medical")
         
         # Use topic from parent and lowercase catalog name
@@ -262,14 +329,15 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         prefix_parts = [sr_or_im]
         
-        # For MD and UA, always use DS
-        if country in ["MD", "UA"]:
-            prefix_parts.append("DS")
-        elif division:
-            prefix_parts.append(division)
-            
-        if country:
-            prefix_parts.append(country)
+        # Special handling for UA and MD - always use DS
+        if country in ["UA", "MD"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
+        
         prefix_parts.append("Business Services")
         
         # Add app only if provided - NO PROD
@@ -291,14 +359,15 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         prefix_parts = [sr_or_im]
         
-        # For MD and UA, always use DS
-        if country in ["MD", "UA"]:
-            prefix_parts.append("DS")
-        elif division:
-            prefix_parts.append(division)
-            
-        if country:
-            prefix_parts.append(country)
+        # Special handling for UA and MD - always use DS
+        if country in ["UA", "MD"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
+        
         prefix_parts.append("HR")
         
         # Extract the topic from parent content
@@ -384,17 +453,24 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     
     else:
         # Standard case - just replace Parent with SR/IM
-        # For MD and UA, ensure DS is used
-        if country in ["MD", "UA"]:
-            # Replace any HS with DS in parent content
-            parent_content_fixed = parent_content.replace("HS", "DS")
-        else:
-            parent_content_fixed = parent_content
+        # Special handling for UA and MD - always use DS
+        if country in ["UA", "MD"]:
+            # Replace HS/MD or HS/UA with DS/MD or DS/UA
+            updated_parent_content = parent_content
+            if country == "MD":
+                updated_parent_content = re.sub(r'\bHS\s+MD\b', 'DS MD', parent_content)
+            elif country == "UA":
+                updated_parent_content = re.sub(r'\bHS\s+UA\b', 'DS UA', parent_content)
             
-        if app:
-            return f"[{sr_or_im} {parent_content_fixed}] {catalog_name} {app} Prod {schedule_suffix}"
+            if app:
+                return f"[{sr_or_im} {updated_parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
+            else:
+                return f"[{sr_or_im} {updated_parent_content}] {catalog_name} Prod {schedule_suffix}"
         else:
-            return f"[{sr_or_im} {parent_content_fixed}] {catalog_name} Prod {schedule_suffix}"
+            if app:
+                return f"[{sr_or_im} {parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
+            else:
+                return f"[{sr_or_im} {parent_content}] {catalog_name} Prod {schedule_suffix}"
 
 def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP offerings"""
@@ -415,9 +491,20 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     # Build CORP name
     prefix_parts = [sr_or_im]
     
+    # Get division and country with special handling for MD/UA
+    division, country_code = get_division_and_country(parent_content, country, delivering_tag)
+    
     # Add delivering tag parts (who delivers the service - from user input)
-    delivering_parts = delivering_tag.split() if delivering_tag else ["HS", country]
-    prefix_parts.extend(delivering_parts[:2])  # Take division and country from delivering tag
+    if delivering_tag:
+        delivering_parts = delivering_tag.split()
+        # For MD/UA, override with DS
+        if country in ["UA", "MD"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            prefix_parts.extend(delivering_parts[:2])  # Take division and country from delivering tag
+    else:
+        prefix_parts.extend([division, country])
+    
     prefix_parts.extend(["CORP", receiver])
     
     # Only add topic if it exists, don't default to IT for CORP
@@ -709,10 +796,6 @@ def run_generator(*,
             base_row_df = base_row.to_frame().T.copy()
             country=wb.stem.split("_")[-1].upper()
             tag_hs, tag_ds = f"HS {country}", f"DS {country}"
-            
-            # IMPORTANT: For MD and UA, always use DS tag regardless of original data
-            if country in ["MD", "UA"]:
-                tag_hs = f"DS {country}"  # Override to always use DS for these countries
 
             # Determine receivers based on country and CORP/RecP/CORP IT/CORP Dedicated setting
             if require_corp or require_recp or require_corp_it or require_corp_dedicated:

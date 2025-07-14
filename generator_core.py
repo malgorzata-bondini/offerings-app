@@ -647,12 +647,10 @@ def run_generator(*,
             # Also exclude RecP from standard processing
             mask &= ~df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
             
-            # For IT department, filter by IT in parent offering
+            # For IT department, filter by IT in either parent offering OR child name
             if special_dept == "IT":
-                mask &= (
-                    df["Parent Offering"].str.contains(r"\bIT\b", case=False) &
-                    df["Name (Child Service Offering lvl 1)"].str.contains(r"\bIT\b", case=False)
-                )
+                mask &= (df["Parent Offering"].str.contains(r"\bIT\b",case=False) | 
+                         df["Name (Child Service Offering lvl 1)"].str.contains(r"\bIT\b",case=False))
             # For HR department, filter by HR in parent offering
             elif special_dept == "HR":
                 mask &= df["Parent Offering"].str.contains(r"\bHR\b",case=False)

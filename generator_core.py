@@ -864,6 +864,11 @@ def run_generator(*,
                         'True': 'true', 
                         'False': 'false'
                     })
+                    # normalize any True/False (any case) to lowercase
+                    df_final[col] = df_final[col].replace({
+                       'True': 'true',  'TRUE': 'true',
+                    'False': 'false','FALSE': 'false'
+                    })
                     # Also handle when the string is literally "nan"
                     df_final[col] = df_final[col].apply(lambda x: '' if str(x).lower() == 'nan' else x)
             

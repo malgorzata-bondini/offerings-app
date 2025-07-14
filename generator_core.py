@@ -455,12 +455,25 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         # Standard case - just replace Parent with SR/IM
         # Special handling for UA and MD - always use DS
         if country in ["UA", "MD"]:
-            # Replace HS/MD or HS/UA with DS/MD or DS/UA
+            # Ensure DS is present for MD and UA
             updated_parent_content = parent_content
+            
             if country == "MD":
-                updated_parent_content = re.sub(r'\bHS\s+MD\b', 'DS MD', parent_content)
+                # Handle various cases: "HS MD", "MD", "DS MD" should all become "DS MD"
+                if re.search(r'\bHS\s+MD\b', parent_content):
+                    updated_parent_content = re.sub(r'\bHS\s+MD\b', 'DS MD', parent_content)
+                elif re.search(r'^MD\b', parent_content) and not re.search(r'\bDS\s+MD\b', parent_content):
+                    updated_parent_content = f"DS {parent_content}"
+                elif not re.search(r'\b(HS|DS)\s+MD\b', parent_content):
+                    updated_parent_content = f"DS MD {parent_content.replace('MD', '').strip()}"
             elif country == "UA":
-                updated_parent_content = re.sub(r'\bHS\s+UA\b', 'DS UA', parent_content)
+                # Handle various cases: "HS UA", "UA", "DS UA" should all become "DS UA"
+                if re.search(r'\bHS\s+UA\b', parent_content):
+                    updated_parent_content = re.sub(r'\bHS\s+UA\b', 'DS UA', parent_content)
+                elif re.search(r'^UA\b', parent_content) and not re.search(r'\bDS\s+UA\b', parent_content):
+                    updated_parent_content = f"DS {parent_content}"
+                elif not re.search(r'\b(HS|DS)\s+UA\b', parent_content):
+                    updated_parent_content = f"DS UA {parent_content.replace('UA', '').strip()}"
             
             if app:
                 return f"[{sr_or_im} {updated_parent_content}] {catalog_name} {app} Prod {schedule_suffix}"

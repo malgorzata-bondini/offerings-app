@@ -248,6 +248,11 @@ with col2:
             special_it = st.checkbox("IT")
             special_medical = st.checkbox("Medical")
 
+        
+        # Ensure only one is selected
+        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated])
+        if all_selected > 1:
+            st.error("⚠️ Please select only one naming type")
             # Reset all to handle multiple selection
             require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = False
         

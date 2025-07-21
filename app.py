@@ -29,7 +29,7 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "New Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "Create Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
     
     with tab1:
         st.subheader("Basic Settings")

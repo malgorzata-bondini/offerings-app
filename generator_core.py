@@ -747,7 +747,8 @@ def run_generator(*,
                    for c in ("Phase","Status","Life Cycle Stage","Life Cycle Status"))
 
     def name_prefix_ok(name):
-        return name.lower().startswith(f"[{sr_or_im.lower()} ")
+        # Make prefix check case-insensitive
+        return name.strip().upper().startswith(f"[{sr_or_im.upper()} ")
 
     # Process apps - support both newline and comma separation
     all_apps = []

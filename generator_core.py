@@ -950,9 +950,10 @@ def run_generator(*,
                         row=base_row_df.copy()
                         row["Name (Child Service Offering lvl 1)"]=new_name
                         row["Delivery Manager"]=delivery_manager
-                        row["Support group"]=support_group
+                        # Leave Support group empty if not provided
+                        row["Support group"] = support_group if support_group else ""
                         # If Managed by Group is empty but Support Group is filled, copy Support Group
-                        row["Managed by Group"]=managed_by_group if managed_by_group else support_group
+                        row["Managed by Group"] = managed_by_group if managed_by_group else (support_group if support_group else "")
                         
                         # Handle aliases - copy from original row if aliases_on is False
                         if not aliases_on:

@@ -34,25 +34,68 @@ with col2:
     with tab1:
         st.subheader("Basic Settings")
         
-        st.info("""
-        **Keywords filtering:**
-        - Line-separated keywords: OR logic (any match)
-        - Comma-separated keywords: AND logic (all must match)
-        """)
+        # ADD THIS SECTION - Direct Parent Offering Selection
+        st.markdown("### Direct Parent Offering Selection")
         
-        keywords_parent = st.text_area(
-            "Keywords in Parent Offering",
-            value="",
-            placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
-            help="Filter by Parent Offering column"
+        use_new_parent = st.checkbox(
+            "Use specific parent offering (instead of parent keyword search)",
+            help="When checked, you can enter a completely new Parent Offering and Parent name"
         )
         
-        keywords_child = st.text_area(
-            "Keywords in Name (Child Service Offering lvl 1)",
-            value="",
-            placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
-            help="Filter by Child Service Offering Name column"
-        )
+        if use_new_parent:
+            st.info("📝 Enter the exact Parent Offering and Parent values to use")
+            
+            col_parent1, col_parent2 = st.columns(2)
+            with col_parent1:
+                new_parent_offering = st.text_input(
+                    "New Parent Offering",
+                    value="",
+                    placeholder="e.g., [Parent HS PL IT] Software assistance",
+                    help="Enter the complete Parent Offering text"
+                )
+            
+            with col_parent2:
+                new_parent = st.text_input(
+                    "New Parent",
+                    value="",
+                    placeholder="e.g., PL IT Support",
+                    help="Enter the Parent value"
+                )
+            
+            # Show preview
+            if new_parent_offering and new_parent:
+                st.success(f"📋 Will use: Parent Offering = '{new_parent_offering}', Parent = '{new_parent}'")
+        else:
+            new_parent_offering = ""
+            new_parent = ""
+        
+        st.markdown("---")
+        
+        # Existing keyword filtering section
+        if not use_new_parent:
+            st.info("""
+            **Keywords filtering:**
+            - Line-separated keywords: OR logic (any match)
+            - Comma-separated keywords: AND logic (all must match)
+            """)
+            
+            keywords_parent = st.text_area(
+                "Keywords in Parent Offering",
+                value="",
+                placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
+                help="Filter by Parent Offering column"
+            )
+            
+            keywords_child = st.text_area(
+                "Keywords in Name (Child Service Offering lvl 1)",
+                value="",
+                placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
+                help="Filter by Child Service Offering Name column"
+            )
+        else:
+            keywords_parent = ""
+            keywords_child = ""
+            st.info("🔒 Keyword filtering is disabled when using specific parent offering")
         
         new_apps = st.text_area(
             "Applications (one per line or comma-separated)",
@@ -316,11 +359,14 @@ with st.expander("📋 Naming Convention Examples"):
         st.code("[SR HS PL Permissions] Granting permissions to application Outlook Prod Mon-Fri 9-17")
         st.markdown("From parent: `[Parent HS PL Permissions] Granting permissions to application`")
 
+# MODIFY THIS VALIDATION SECTION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
-    elif not keywords_parent and not keywords_child:
-        st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
+    elif use_new_parent and (not new_parent_offering or not new_parent):
+        st.error("⚠️ When using specific parent offering, both 'New Parent Offering' and 'New Parent' must be filled")
+    elif not use_new_parent and not keywords_parent and not keywords_child:
+        st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering, or use specific parent offering")
     elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")
     elif all_selected > 1:
@@ -365,7 +411,11 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         custom_commitments_str=custom_commitments_str if 'custom_commitments_str' in locals() else "",
                         commitment_country=commitment_country if 'commitment_country' in locals() else None,
                         require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
-                        require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False
+                        require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
+                        # ADD THESE NEW PARAMETERS
+                        use_new_parent=use_new_parent,
+                        new_parent_offering=new_parent_offering,
+                        new_parent=new_parent
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
+from openpyxl.utils import get_column_letter
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
@@ -1077,11 +1078,13 @@ def run_generator(*,
     # Apply formatting
     wb=load_workbook(outfile)
     for ws in wb.worksheets:
-        ws.auto_filter.ref=ws.dimensions
-        for col in ws.columns:
-            ws.column_dimensions[col[0].column_letter].width=max(len(str(c.value)) if c.value else 0 for c in col)+2
+        # get_column_letter is already imported at the top
+        from openpyxl.utils import get_column_letter
+        for col_idx, col in enumerate(ws.columns, start=1):
+            col_letter = get_column_letter(col_idx)
+            ws.column_dimensions[col_letter].width = max(len(str(c.value)) if c.value else 0 for c in col) + 2
             for c in col:
-                c.alignment=Alignment(wrap_text=True)
+                c.alignment = Alignment(wrap_text=True)
                 # Ensure empty cells stay empty in Excel
                 if c.value in ['nan', 'NaN', 'None', None, 'none', 'NULL', 'null', '<NA>']:
                     c.value = None

@@ -74,10 +74,10 @@ with col2:
         delivery_manager = st.text_input("Delivery Manager", value="")
     
     with tab2:
-        st.subheader("Direct Parent Offering Selection")
+        st.subheader("Parent Offering")
         
         use_new_parent = st.checkbox(
-            "Use specific parent offering (instead of parent keyword search)",
+            "Create a new parent offering (instead of parent keyword search)",
             help="When checked, you can enter a completely new Parent Offering and Parent name"
         )
         

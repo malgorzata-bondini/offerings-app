@@ -690,7 +690,8 @@ def run_generator(*,
     rsp_time="", rsl_time="",
     require_corp_it=False, require_corp_dedicated=False,
     # ADD THESE NEW PARAMETERS
-    use_new_parent=False, new_parent_offering="", new_parent=""):
+    use_new_parent=False, new_parent_offering="", new_parent="",
+    keywords_excluded=""):
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -741,6 +742,35 @@ def run_generator(*,
                     return False
         
         return True
+
+    def row_excluded_keywords_ok(row):
+        """Check if row should be excluded based on excluded keywords"""
+        # Parse excluded keywords
+        excluded_keywords, excluded_use_and = parse_keywords(keywords_excluded)
+        
+        if not excluded_keywords:
+            return True  # No excluded keywords, so row is OK
+        
+        # Check both parent offering and child name for excluded keywords
+        p = str(row["Parent Offering"]).lower()
+        n = str(row["Name (Child Service Offering lvl 1)"]).lower()
+        
+        if excluded_use_and:
+            # AND logic - if ALL excluded keywords are found, exclude the row
+            parent_has_all = all(re.search(rf"\b{re.escape(k.lower())}\b", p) for k in excluded_keywords)
+            child_has_all = all(re.search(rf"\b{re.escape(k.lower())}\b", n) for k in excluded_keywords)
+            # Exclude if either parent or child has all excluded keywords
+            if parent_has_all or child_has_all:
+                return False
+        else:
+            # OR logic - if ANY excluded keyword is found, exclude the row
+            parent_has_any = any(re.search(rf"\b{re.escape(k.lower())}\b", p) for k in excluded_keywords)
+            child_has_any = any(re.search(rf"\b{re.escape(k.lower())}\b", n) for k in excluded_keywords)
+            # Exclude if either parent or child has any excluded keyword
+            if parent_has_any or child_has_any:
+                return False
+        
+        return True  # Row is OK (not excluded)
 
     def lc_ok(row):
         return all(str(row[c]).strip().lower() not in discard_lc
@@ -809,14 +839,11 @@ def run_generator(*,
                 df["Visibility group"] = ""
 
             mask=(df.apply(row_keywords_ok,axis=1)
+                  & df.apply(row_excluded_keywords_ok,axis=1)
                   & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
                   & df.apply(lc_ok,axis=1)
                   & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
             
-            # Replace this section in the run_generator function (around line 400-420)
-
-            # Replace this section in the run_generator function (around line 400-420)
-
             if require_corp:
                 mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
                 mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)

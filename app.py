@@ -29,13 +29,52 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Basic", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "New Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
     
     with tab1:
         st.subheader("Basic Settings")
         
-        # ADD THIS SECTION - Direct Parent Offering Selection
-        st.markdown("### Direct Parent Offering Selection")
+        # Existing keyword filtering section
+        st.info("""
+        **Keywords filtering:**
+        - Line-separated keywords: OR logic (any match)
+        - Comma-separated keywords: AND logic (all must match)
+        """)
+        
+        keywords_parent = st.text_area(
+            "Keywords in Parent Offering",
+            value="",
+            placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
+            help="Filter by Parent Offering column"
+        )
+        
+        keywords_child = st.text_area(
+            "Keywords in Name (Child Service Offering lvl 1)",
+            value="",
+            placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
+            help="Filter by Child Service Offering Name column"
+        )
+        
+        keywords_excluded = st.text_area(
+            "Keywords to Exclude",
+            value="",
+            placeholder="Enter keywords to exclude (one per line for OR, comma-separated for AND)",
+            help="Exclude rows containing these keywords in either Parent Offering or Child Name"
+        )
+        
+        new_apps = st.text_area(
+            "Applications (one per line or comma-separated)",
+            value="",
+            help="Optional - Enter application names. If empty, offerings will be created without application names"
+        ).strip().split('\n')
+        new_apps = [a.strip() for a in new_apps if a.strip()]
+        
+        sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
+        
+        delivery_manager = st.text_input("Delivery Manager", value="")
+    
+    with tab2:
+        st.subheader("Direct Parent Offering Selection")
         
         use_new_parent = st.checkbox(
             "Use specific parent offering (instead of parent keyword search)",
@@ -68,55 +107,15 @@ with col2:
         else:
             new_parent_offering = ""
             new_parent = ""
-        
-        st.markdown("---")
-        
-        # Existing keyword filtering section
-        if not use_new_parent:
-            st.info("""
-            **Keywords filtering:**
-            - Line-separated keywords: OR logic (any match)
-            - Comma-separated keywords: AND logic (all must match)
-            """)
             
-            keywords_parent = st.text_area(
-                "Keywords in Parent Offering",
-                value="",
-                placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
-                help="Filter by Parent Offering column"
-            )
-            
-            keywords_child = st.text_area(
-                "Keywords in Name (Child Service Offering lvl 1)",
-                value="",
-                placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
-                help="Filter by Child Service Offering Name column"
-            )
-            
-            keywords_excluded = st.text_area(
-                "Keywords to Exclude",
-                value="",
-                placeholder="Enter keywords to exclude (one per line for OR, comma-separated for AND)",
-                help="Exclude rows containing these keywords in either Parent Offering or Child Name"
-            )
-        else:
+        # Update keyword filtering visibility based on use_new_parent
+        if use_new_parent:
+            st.info("🔒 Keyword filtering in Basic tab is disabled when using specific parent offering")
             keywords_parent = ""
             keywords_child = ""
             keywords_excluded = ""
-            st.info("🔒 Keyword filtering is disabled when using specific parent offering")
-        
-        new_apps = st.text_area(
-            "Applications (one per line or comma-separated)",
-            value="",
-            help="Optional - Enter application names. If empty, offerings will be created without application names"
-        ).strip().split('\n')
-        new_apps = [a.strip() for a in new_apps if a.strip()]
-        
-        sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
-        
-        delivery_manager = st.text_input("Delivery Manager", value="")
     
-    with tab2:
+    with tab3:
         st.subheader("Schedule Settings")
         
         schedule_type = st.checkbox("Custom schedule per period")
@@ -222,7 +221,7 @@ with col2:
         with col_rsl:
             rsl_duration = st.text_input("RSL Duration", value="")
     
-    with tab3:
+    with tab4:
         st.subheader("Service Commitments")
         
         use_custom_commitments = st.checkbox("Define custom Service Commitments", help="If unchecked, commitments will be copied from source files")
@@ -274,7 +273,7 @@ with col2:
             custom_commitments_str = ""
             commitment_country = None
     
-    with tab4:
+    with tab5:
         support_group = st.text_input("Support Group", value="")
         managed_by_group = st.text_input(
             "Managed by Group", 
@@ -282,7 +281,7 @@ with col2:
             help="Optional - if empty, will use Support Group value"
         )
     
-    with tab5:
+    with tab6:
         st.subheader("Select one of the following:")
 
         
@@ -316,7 +315,7 @@ with col2:
         else:
             delivering_tag = ""
     
-    with tab6:
+    with tab7:
         # Global settings
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)
@@ -393,8 +392,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                 
                 with st.spinner("🔄 Generating service offerings..."):
                     result_file = run_generator(
-                        keywords_parent=keywords_parent,
-                        keywords_child=keywords_child,
+                        keywords_parent=keywords_parent if not use_new_parent else "",
+                        keywords_child=keywords_child if not use_new_parent else "",
                         new_apps=new_apps,
                         schedule_suffixes=schedule_suffixes,
                         delivery_manager=delivery_manager,
@@ -424,7 +423,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         use_new_parent=use_new_parent,
                         new_parent_offering=new_parent_offering,
                         new_parent=new_parent,
-                        keywords_excluded=keywords_excluded
+                        keywords_excluded=keywords_excluded if not use_new_parent else ""
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

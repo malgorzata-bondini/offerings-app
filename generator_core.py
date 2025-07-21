@@ -1,6 +1,5 @@
 import datetime as dt
-import re
-import warnings
+import re, warnings
 from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
@@ -776,7 +775,7 @@ def run_generator(*,
         special_dept = "DAK"
 
     # First, collect all existing offerings from the source files
-    for wb in src_dir.glob("*.xls*"):  # Accept both .xlsx and .xlsm files
+    for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         try:
             df = pd.read_excel(wb, sheet_name="Child SO lvl1")
             if "Name (Child Service Offering lvl 1)" in df.columns:
@@ -788,36 +787,8 @@ def run_generator(*,
             continue
 
     # MODIFY THIS SECTION - Now process the files
-    for wb in src_dir.glob("*.xls*"):  # Accept both .xlsx and .xlsm files
-        # Extract country from "Name (Child Service Offering lvl 1)" column
-        country = None
-        try:
-            df_sample = pd.read_excel(wb, sheet_name="Child SO lvl1")
-            if "Name (Child Service Offering lvl 1)" in df_sample.columns:
-                names = df_sample["Name (Child Service Offering lvl 1)"].dropna().astype(str)
-                
-                # Look for pattern like [SR HS PL ...] or [IM DS DE ...]
-                # Use regex to find country codes in brackets after SR/IM
-                for name in names:
-                    match = re.search(r'\[(SR|IM)\s+(?:HS|DS)\s+(PL|DE|UA|MD|CY)\b', str(name), re.IGNORECASE)
-                    if match:
-                        country = match.group(2).upper()
-                        break
-                
-                # If not found in first pattern, try simpler pattern [SR/IM ... COUNTRY]
-                if not country:
-                    for name in names:
-                        match = re.search(r'\[(SR|IM)\s+.*?\s+(PL|DE|UA|MD|CY)\b', str(name), re.IGNORECASE)
-                        if match:
-                            country = match.group(2).upper()
-                            break
-        except Exception:
-            pass
-        
-        # Skip this file if country could not be detected
-        if not country:
-            print(f"Skipping file {wb.name} - could not detect country code from service offering names")
-            continue
+    for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
+        country = wb.stem.split("_")[-1].upper()
         
         # IF USING NEW PARENT, CREATE SYNTHETIC ROW
         if use_new_parent:

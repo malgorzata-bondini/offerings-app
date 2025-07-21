@@ -92,9 +92,17 @@ with col2:
                 placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
                 help="Filter by Child Service Offering Name column"
             )
+            
+            keywords_excluded = st.text_area(
+                "Keywords to Exclude",
+                value="",
+                placeholder="Enter keywords to exclude (one per line for OR, comma-separated for AND)",
+                help="Exclude rows containing these keywords in either Parent Offering or Child Name"
+            )
         else:
             keywords_parent = ""
             keywords_child = ""
+            keywords_excluded = ""
             st.info("🔒 Keyword filtering is disabled when using specific parent offering")
         
         new_apps = st.text_area(
@@ -415,7 +423,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         # ADD THESE NEW PARAMETERS
                         use_new_parent=use_new_parent,
                         new_parent_offering=new_parent_offering,
-                        new_parent=new_parent
+                        new_parent=new_parent,
+                        keywords_excluded=keywords_excluded
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

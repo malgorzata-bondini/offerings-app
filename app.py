@@ -29,7 +29,7 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "Create Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "New Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
     
     with tab1:
         st.subheader("Basic Settings")
@@ -71,13 +71,30 @@ with col2:
         
         sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
         
+        # Add Lvl2 checkbox
+        st.markdown("---")
+        use_lvl2 = st.checkbox(
+            "Level 2 (Child SO lvl2)",
+            help="Search in Child SO lvl2 sheet and use different naming convention"
+        )
+        
+        if use_lvl2:
+            service_type = st.text_input(
+                "Service Type (for Lvl2)",
+                value="",
+                placeholder="e.g., Application issue, Hardware problem",
+                help="This will be added after Prod and before the schedule"
+            )
+        else:
+            service_type = ""
+        
         delivery_manager = st.text_input("Delivery Manager", value="")
     
     with tab2:
-        st.subheader("Parent Offering")
+        st.subheader("Direct Parent Offering Selection")
         
         use_new_parent = st.checkbox(
-            "Create a new parent offering (instead of parent keyword search)",
+            "Use specific parent offering (instead of parent keyword search)",
             help="When checked, you can enter a completely new Parent Offering and Parent name"
         )
         
@@ -337,7 +354,11 @@ st.markdown("---")
 
 # Show naming examples based on selections
 with st.expander("📋 Naming Convention Examples"):
-    if 'require_corp' in locals() and require_corp:
+    if 'use_lvl2' in locals() and use_lvl2:
+        st.markdown("**Level 2 Example:**")
+        st.code("[IM HS PL IT] Software incident solving EMR 2.0 Prod Application issue Mon-Sun 24/7")
+        st.markdown("From parent: `[Parent HS PL IT] Software incident solving`")
+    elif 'require_corp' in locals() and require_corp:
         st.markdown("**CORP Example:**")
         st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
     elif 'require_corp_it' in locals() and require_corp_it:
@@ -423,7 +444,10 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         use_new_parent=use_new_parent,
                         new_parent_offering=new_parent_offering,
                         new_parent=new_parent,
-                        keywords_excluded=keywords_excluded if not use_new_parent else ""
+                        keywords_excluded=keywords_excluded if not use_new_parent else "",
+                        # Add Lvl2 parameters
+                        use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
+                        service_type_lvl2=service_type if 'service_type' in locals() else ""
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

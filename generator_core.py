@@ -638,6 +638,42 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
     
     return "\n".join(lines) if lines else ""
 
+# ADD THIS NEW FUNCTION FOR CREATING NEW PARENT ROWS
+def create_new_parent_row(new_parent_offering, new_parent, country):
+    """Create a new row with the specified parent offering and parent values"""
+    # Create a basic row structure with required columns
+    new_row = {
+        "Name (Child Service Offering lvl 1)": "",  # Will be filled later
+        "Parent Offering": new_parent_offering,
+        "Parent": new_parent,
+        "Service Offerings | Depend On (Application Service)": "",
+        "Service Commitments": "",
+        "Delivery Manager": "",
+        "Subscribed by Location": "",
+        "Phase": "Live",
+        "Status": "Active",
+        "Life Cycle Stage": "Live",
+        "Life Cycle Status": "Active",
+        "Support group": "",
+        "Managed by Group": "",
+        "Subscribed by Company": "",
+        "Visibility group": ""
+    }
+    
+    # Set default values based on country
+    if country == "DE":
+        new_row["Subscribed by Location"] = "DE"
+    elif country == "UA":
+        new_row["Subscribed by Location"] = "UA"
+    elif country == "MD":
+        new_row["Subscribed by Location"] = "MD"
+    elif country == "CY":
+        new_row["Subscribed by Location"] = "CY"
+    elif country == "PL":
+        new_row["Subscribed by Location"] = "PL"
+    
+    return pd.Series(new_row)
+
 def run_generator(*,
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
@@ -651,7 +687,9 @@ def run_generator(*,
     rsp_schedule="", rsl_schedule="",
     rsp_priority="", rsl_priority="",
     rsp_time="", rsl_time="",
-    require_corp_it=False, require_corp_dedicated=False):
+    require_corp_it=False, require_corp_dedicated=False,
+    # ADD THESE NEW PARAMETERS
+    use_new_parent=False, new_parent_offering="", new_parent=""):
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -746,76 +784,85 @@ def run_generator(*,
             # Skip if there's an error reading the file
             continue
 
-    # Now process the files
+    # MODIFY THIS SECTION - Now process the files
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
-        df = pd.read_excel(wb, sheet_name="Child SO lvl1")
+        country = wb.stem.split("_")[-1].upper()
         
-        # Add missing columns as empty
-        for col in need_cols:
-            if col not in df.columns:
-                df[col] = ""
-        
-        # Ensure Visibility group column exists
-        if "Visibility group" not in df.columns:
-            df["Visibility group"] = ""
-
-        mask=(df.apply(row_keywords_ok,axis=1)
-              & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
-              & df.apply(lc_ok,axis=1)
-              & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
-        
-        if require_corp:
-            mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
-            mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)
-            # Exclude IT entries when looking for regular CORP
-            mask &= ~df["Parent Offering"].str.contains(r"\bIT\b",case=False)
-            # Exclude Dedicated Services entries
-            mask &= ~df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
-        elif require_recp:
-            # For RecP, filter parent offering that contains RecP
-            mask &= df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
-        elif require_corp_it:
-            # For CORP IT, we don't require CORP to already be in the name
-            # We're creating new CORP IT entries from regular entries
-            # Just apply the standard filtering without additional CORP requirements
-            pass  # No additional filtering needed
-        elif require_corp_dedicated:
-            # For CORP Dedicated Services, look for Dedicated in parent offering
-            mask &= df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
-            # Also ensure it's CORP related
-            mask &= (df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False) | 
-                     df["Parent Offering"].str.contains(r"\bCORP\b",case=False))
+        # IF USING NEW PARENT, CREATE SYNTHETIC ROW
+        if use_new_parent:
+            # Create a new synthetic row with the specified parent offering and parent
+            new_row = create_new_parent_row(new_parent_offering, new_parent, country)
+            base_pool = pd.DataFrame([new_row])
         else:
-            # For standard processing, exclude CORP entries
-            # But don't apply this exclusion for special departments
-            if not (special_dept in ["IT", "HR", "Medical", "DAK"]):
-                mask &= ~df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
+            # ORIGINAL LOGIC - read from Excel file
+            df = pd.read_excel(wb, sheet_name="Child SO lvl1")
             
-            # Also exclude RecP from standard processing
-            mask &= ~df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
+            # Add missing columns as empty
+            for col in need_cols:
+                if col not in df.columns:
+                    df[col] = ""
             
-            # For IT department, filter by IT in either parent offering OR child name
-            if special_dept == "IT":
-                mask &= (df["Parent Offering"].str.contains(r"\bIT\b",case=False) | 
-                         df["Name (Child Service Offering lvl 1)"].str.contains(r"\bIT\b",case=False))
-            # For HR department, filter by HR in parent offering
-            elif special_dept == "HR":
-                mask &= df["Parent Offering"].str.contains(r"\bHR\b",case=False)
-            # For Medical department, filter by Medical in parent offering
-            elif special_dept == "Medical":
-                mask &= df["Parent Offering"].str.contains(r"\bMedical\b",case=False)
-            # For DAK department, filter by DAK in parent offering
-            elif special_dept == "DAK":
-                mask &= df["Parent Offering"].str.contains(r"\bDAK\b",case=False)
+            # Ensure Visibility group column exists
+            if "Visibility group" not in df.columns:
+                df["Visibility group"] = ""
 
-        base_pool=df.loc[mask]
+            mask=(df.apply(row_keywords_ok,axis=1)
+                  & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
+                  & df.apply(lc_ok,axis=1)
+                  & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
+            
+            if require_corp:
+                mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
+                mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)
+                # Exclude IT entries when looking for regular CORP
+                mask &= ~df["Parent Offering"].str.contains(r"\bIT\b",case=False)
+                # Exclude Dedicated Services entries
+                mask &= ~df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
+            elif require_recp:
+                # For RecP, filter parent offering that contains RecP
+                mask &= df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
+            elif require_corp_it:
+                # For CORP IT, we don't require CORP to already be in the name
+                # We're creating new CORP IT entries from regular entries
+                # Just apply the standard filtering without additional CORP requirements
+                pass  # No additional filtering needed
+            elif require_corp_dedicated:
+                # For CORP Dedicated Services, look for Dedicated in parent offering
+                mask &= df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
+                # Also ensure it's CORP related
+                mask &= (df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False) | 
+                         df["Parent Offering"].str.contains(r"\bCORP\b",case=False))
+            else:
+                # For standard processing, exclude CORP entries
+                # But don't apply this exclusion for special departments
+                if not (special_dept in ["IT", "HR", "Medical", "DAK"]):
+                    mask &= ~df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
+                
+                # Also exclude RecP from standard processing
+                mask &= ~df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
+                
+                # For IT department, filter by IT in either parent offering OR child name
+                if special_dept == "IT":
+                    mask &= (df["Parent Offering"].str.contains(r"\bIT\b",case=False) | 
+                             df["Name (Child Service Offering lvl 1)"].str.contains(r"\bIT\b",case=False))
+                # For HR department, filter by HR in parent offering
+                elif special_dept == "HR":
+                    mask &= df["Parent Offering"].str.contains(r"\bHR\b",case=False)
+                # For Medical department, filter by Medical in parent offering
+                elif special_dept == "Medical":
+                    mask &= df["Parent Offering"].str.contains(r"\bMedical\b",case=False)
+                # For DAK department, filter by DAK in parent offering
+                elif special_dept == "DAK":
+                    mask &= df["Parent Offering"].str.contains(r"\bDAK\b",case=False)
+
+            base_pool=df.loc[mask]
+        
         if base_pool.empty:
             continue
         
         # Process ALL matching rows, not just the first one
         for idx, base_row in base_pool.iterrows():
             base_row_df = base_row.to_frame().T.copy()
-            country=wb.stem.split("_")[-1].upper()
             tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
             # Determine receivers based on country and CORP/RecP/CORP IT/CORP Dedicated setting
@@ -846,7 +893,7 @@ def run_generator(*,
                 for schedule_suffix in schedule_suffixes:
                     for recv in receivers:
                     # For DE, find the matching row (DS DE or HS DE) in the original data
-                        if country == "DE" and (require_corp or require_recp or require_corp_it or require_corp_dedicated):
+                        if country == "DE" and (require_corp or require_recp or require_corp_it or require_corp_dedicated) and not use_new_parent:
                         # Search for the specific receiver in the base pool
                             recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(recv)}\b", case=False)
                             matching_rows = base_pool[recv_mask]

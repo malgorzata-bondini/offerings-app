@@ -34,19 +34,6 @@ with col2:
     with tab1:
         st.subheader("Basic Settings")
         
-        # Existing keyword filtering section
-        st.info("""
-        **Keywords filtering:**
-        - Line-separated keywords: OR logic (any match)
-        - Comma-separated keywords: AND logic (all must match)
-        - When "Include Level 2" is checked: Searches in BOTH Child SO lvl1 AND lvl2 sheets
-        - When unchecked: Searches only in Child SO lvl1 sheet
-        
-        **Note:** Any occurrence of "incident" will be automatically expanded to "Software incident solving"
-        - Example: "incident" → "Software incident solving"
-        - Example: "incident management" → "Software incident solving"
-        """)
-        
         keywords_parent = st.text_area(
             "Keywords in Parent Offering",
             value="",
@@ -75,13 +62,13 @@ with col2:
         ).strip().split('\n')
         new_apps = [a.strip() for a in new_apps if a.strip()]
         
-        sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True, help="This will be used in naming for both lvl1 and lvl2 entries")
+        sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
         
         # Add Lvl2 checkbox
         st.markdown("---")
         use_lvl2 = st.checkbox(
             "Include Level 2 (Child SO lvl2)",
-            help="When checked, search in BOTH Child SO lvl1 AND Child SO lvl2 sheets. When unchecked, only search lvl1."
+            help="When checked, search in BOTH Child SO lvl1 AND Child SO lvl2 sheets."
         )
         
         if use_lvl2:
@@ -91,10 +78,8 @@ with col2:
                 placeholder="e.g., Application issue, Hardware problem",
                 help="Optional - This will be added to Lvl2 entries after Prod and before the schedule"
             )
-            st.info("📌 Will search in BOTH levels: Child SO lvl1 AND Child SO lvl2. For Lvl2 entries, the selected SR/IM will be added to Parent Offering if not already present.")
         else:
             service_type = ""
-            st.info("📌 Will search only in Child SO lvl1")
         
         delivery_manager = st.text_input("Delivery Manager", value="")
     
@@ -125,29 +110,9 @@ with col2:
                     placeholder="e.g., PL IT Support",
                     help="Enter the Parent value"
                 )
-            
-            # Show preview
-            if new_parent_offering and new_parent:
-                st.success(f"📋 Will use: Parent Offering = '{new_parent_offering}', Parent = '{new_parent}'")
-                # Note about Level 2 behavior
-                st.info("📌 If 'Include Level 2' is checked in Basic tab, SR/IM will be added to Level 2 entries")
         else:
             new_parent_offering = ""
             new_parent = ""
-            
-        # Update keyword filtering visibility based on use_new_parent
-        if use_new_parent:
-            st.info("🔒 Keyword filtering in Basic tab is disabled when using specific parent offering")
-            keywords_parent = ""
-            keywords_child = ""
-            keywords_excluded = ""
-        elif use_lvl2:
-            st.info("""
-            📝 Note: Keywords will search in BOTH "Child SO lvl1" AND "Child SO lvl2" sheets.
-            For Lvl2 entries, SR/IM will be automatically added to Parent Offering when building names.
-            
-            **Special rule:** Any occurrence of "incident" will be expanded to "Software incident solving"
-            """)
     
     with tab3:
         st.subheader("Schedule Settings")
@@ -156,7 +121,6 @@ with col2:
         create_multiple_schedules = st.checkbox("Create multiple schedules", help="Generate the same offerings with different schedules")
         
         if not schedule_type and create_multiple_schedules:
-            st.info("📅 Enter multiple schedules (one per line)")
             schedule_simple = st.text_area(
                 "Schedules", 
                 value="", 
@@ -164,15 +128,7 @@ with col2:
                 height=150
             )
             schedule_suffixes = [s.strip() for s in schedule_simple.split('\n') if s.strip()]
-            
-            # Show preview of all schedules
-            if schedule_suffixes:
-                st.success(f"📋 Will create {len(schedule_suffixes)} offering(s) with different schedules:")
-                for i, sched in enumerate(schedule_suffixes, 1):
-                    st.text(f"  {i}. {sched}")
         elif schedule_type and not create_multiple_schedules:
-            st.info("📅 Enter schedule periods (e.g., Mon-Thu 9-17, Fri 9-16, Sat 8-12)")
-            
             # Allow up to 5 schedule periods
             schedule_parts = []
             num_periods = st.number_input("Number of periods", min_value=1, max_value=5, value=2)
@@ -200,15 +156,9 @@ with col2:
                 if period and hours:
                     schedule_parts.append(f"{period} {hours}")
             
-            # Join all non-empty schedule parts
             schedule_suffix = " ".join(schedule_parts) if schedule_parts else ""
             schedule_suffixes = [schedule_suffix] if schedule_suffix else []
-            
-            # Show preview
-            if schedule_suffix:
-                st.success(f"📋 Schedule: **{schedule_suffix}**")
         elif schedule_type and create_multiple_schedules:
-            st.info("📅 Enter multiple custom schedule periods")
             num_schedules = st.number_input("Number of schedules", min_value=1, max_value=5, value=2)
             schedule_suffixes = []
             
@@ -243,7 +193,6 @@ with col2:
                 if schedule_parts:
                     schedule_suffix = " ".join(schedule_parts)
                     schedule_suffixes.append(schedule_suffix)
-                    st.success(f"📋 Schedule {sched_idx + 1}: **{schedule_suffix}**")
         else:
             schedule_simple = st.text_input("Schedule", value="", placeholder="e.g. Mon-Fri 9-17")
             schedule_suffixes = [schedule_simple] if schedule_simple else []
@@ -308,32 +257,77 @@ with col2:
             commitment_country = None
     
     with tab5:
-        support_group = st.text_input("Support Group", value="")
-        managed_by_group = st.text_input(
-            "Managed by Group", 
-            value="",
-            help="Optional - if empty, will use Support Group value"
-        )
+        st.subheader("Support Groups")
+        
+        # Option to use same group for all countries or different per country
+        use_per_country_groups = st.checkbox("Use different support groups per country", value=False)
+        
+        if not use_per_country_groups:
+            # Single support group for all countries
+            st.markdown("#### Global Support Groups")
+            support_group = st.text_input("Support Group", value="", help="Same support group for all countries")
+            managed_by_group = st.text_input(
+                "Managed by Group", 
+                value="",
+                help="Optional - if empty, will use Support Group value"
+            )
+            # Store as single values for backward compatibility
+            support_groups_per_country = {}
+            managed_by_groups_per_country = {}
+        else:
+            # Per-country support groups
+            st.markdown("#### Support Groups by Country")
+            st.info("Select countries to configure specific support groups. Unchecked countries will use empty support groups.")
+            
+            countries = ["DE", "UA", "MD", "CY", "PL"]
+            support_groups_per_country = {}
+            managed_by_groups_per_country = {}
+            
+            # Create columns for better layout
+            cols = st.columns(2)
+            
+            for i, country in enumerate(countries):
+                col_idx = i % 2
+                with cols[col_idx]:
+                    country_enabled = st.checkbox(f"Configure {country}", key=f"enable_{country}")
+                    
+                    if country_enabled:
+                        support_groups_per_country[country] = st.text_input(
+                            f"Support Group",
+                            value="",
+                            key=f"support_{country}",
+                            placeholder=f"e.g., {country} IT Support"
+                        )
+                        managed_by_groups_per_country[country] = st.text_input(
+                            f"Managed by Group",
+                            value="",
+                            key=f"managed_{country}",
+                            placeholder=f"Optional - defaults to Support Group if empty",
+                            help="If empty, will use the Support Group value"
+                        )
+                    else:
+                        support_groups_per_country[country] = ""
+                        managed_by_groups_per_country[country] = ""
+            
+            # Set global variables to empty for backward compatibility
+            support_group = ""
+            managed_by_group = ""
     
     with tab6:
-        st.subheader("Select naming convention to use:")
-        
-        st.info("⚠️ Important: These checkboxes only control which naming convention is applied to ALL matching entries. They do NOT filter which entries are processed.")
-
+        st.subheader("Select naming convention:")
         
         # Create a column to ensure vertical layout - ALPHABETICAL ORDER
         col = st.container()
         with col:
             # List in alphabetical order
-            require_corp = st.checkbox("CORP", help="Apply CORP naming to ALL matching entries")
-            require_recp = st.checkbox("RecP", help="Apply RecP naming to ALL matching entries")
-            require_corp_dedicated = st.checkbox("CORP Dedicated Services", help="Apply CORP Dedicated naming to ALL matching entries")
-            require_corp_it = st.checkbox("CORP IT", help="Apply CORP IT naming to ALL matching entries")
-            special_dak = st.checkbox("DAK (Business Services)", help="Apply Business Services naming to ALL matching entries")
-            special_hr = st.checkbox("HR", help="Apply HR naming to ALL matching entries")
-            special_it = st.checkbox("IT", help="Apply IT naming to ALL matching entries")
-            special_medical = st.checkbox("Medical", help="Apply Medical naming to ALL matching entries")
-
+            require_corp = st.checkbox("CORP")
+            require_recp = st.checkbox("RecP")
+            require_corp_dedicated = st.checkbox("CORP Dedicated Services")
+            require_corp_it = st.checkbox("CORP IT")
+            special_dak = st.checkbox("DAK (Business Services)")
+            special_hr = st.checkbox("HR")
+            special_it = st.checkbox("IT")
+            special_medical = st.checkbox("Medical")
         
         # Ensure only one is selected
         all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated])
@@ -342,7 +336,7 @@ with col2:
             # Reset all to handle multiple selection
             require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = False
         elif all_selected == 0:
-            st.info("📌 No special naming selected - will use standard naming for ALL matching entries (including RecP, IT, HR, Medical, etc.)")
+            st.info("📌 Standard naming will be used")
         
         if require_corp or require_recp or require_corp_it or require_corp_dedicated:
             delivering_tag = st.text_input(
@@ -360,7 +354,7 @@ with col2:
         
         # Aliases
         st.markdown("### Aliases")
-        aliases_on = st.checkbox("Enable Aliases", value=False)  # Default to False
+        aliases_on = st.checkbox("Enable Aliases", value=False)
         
         if aliases_on:
             aliases_value = st.text_input(
@@ -372,59 +366,6 @@ with col2:
             aliases_value = ""
 
 st.markdown("---")
-
-# Show naming examples based on selections
-with st.expander("📋 Naming Convention Examples"):
-    st.warning("⚠️ Important: Any occurrence of 'incident' will automatically be expanded to 'Software incident solving'")
-    st.markdown("**Example:** If parent has 'incident handling' → becomes 'Software incident solving'")
-    
-    if 'use_lvl2' in locals() and use_lvl2:
-        st.markdown("**Level 1 Example:**")
-        st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 9-17")
-        st.markdown("**Level 2 Example:**")
-        st.code("[IM HS PL IT] Software incident solving EMR 2.0 Prod Application issue Mon-Sun 24/7")
-        st.markdown("From parent: `[Parent HS PL IT] Software incident solving` → IM added automatically")
-        st.info("📌 Note: If parent had just 'incident', it would be expanded to 'Software incident solving'")
-        if 'service_type' in locals() and service_type:
-            st.info(f"Service Type '{service_type}' will be added to Lvl2 entries after Prod")
-        st.markdown("**📂 Output:** Separate sheets like 'PL lvl1' and 'PL lvl2' in the same file")
-    elif 'require_corp' in locals() and require_corp:
-        st.markdown("**CORP Example:**")
-        st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
-        st.info("Applied to ALL matching entries using CORP naming style")
-    elif 'require_corp_it' in locals() and require_corp_it:
-        st.markdown("**CORP IT Example:**")
-        st.code("[SR HS PL CORP HS PL IT] Software assistance MS Outlook Prod Mon-Fri 8-17")
-        st.info("Applied to ALL matching entries using CORP IT naming style")
-    elif 'require_corp_dedicated' in locals() and require_corp_dedicated:
-        st.markdown("**CORP Dedicated Services Example:**")
-        st.code("[SR HS PL CORP HS DE Dedicated Services] HelpMe announcement creation ServiceNow HelpMe Prod Mon-Fri 9-17")
-        st.info("Applied to ALL matching entries using CORP Dedicated Services naming style")
-    elif 'require_recp' in locals() and require_recp:
-        st.markdown("**RecP Example:**")
-        st.code("[IM HS PL CORP HS PL IT] Software incident solving Active Directory Prod Mon-Fri 6-21")
-        st.info("Applied to ALL matching entries using RecP naming style")
-    elif 'special_it' in locals() and special_it:
-        st.markdown("**IT Example:**")
-        st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17")
-        st.info("Applied to ALL matching entries using IT naming style")
-    elif 'special_hr' in locals() and special_hr:
-        st.markdown("**HR Example:**")
-        st.code("[SR HS PL HR] Software assistance Outlook Prod Mon-Fri 8-17")
-        st.info("Applied to ALL matching entries using HR naming style")
-    elif 'special_medical' in locals() and special_medical:
-        st.markdown("**Medical Example:**")
-        st.code("[SR HS PL Medical] TeleCentrum medical procedures and quality of care Mon-Fri 7-20")
-        st.info("Applied to ALL matching entries using Medical naming style")
-    elif 'special_dak' in locals() and special_dak:
-        st.markdown("**DAK (Business Services) Example:**")
-        st.code("[SR HS PL Business Services] Product modifications Service removal Mon-Fri 8-17")
-        st.info("Applied to ALL matching entries using Business Services naming style")
-    else:
-        st.markdown("**Standard Example:**")
-        st.code("[SR HS PL Permissions] Granting permissions to application Outlook Prod Mon-Fri 9-17")
-        st.markdown("From parent: `[Parent HS PL Permissions] Granting permissions to application`")
-        st.info("Standard naming is applied to ALL matching entries (no special naming selected)")
 
 # MODIFY THIS VALIDATION SECTION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
@@ -479,14 +420,15 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         commitment_country=commitment_country if 'commitment_country' in locals() else None,
                         require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
                         require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
-                        # ADD THESE NEW PARAMETERS
                         use_new_parent=use_new_parent,
                         new_parent_offering=new_parent_offering,
                         new_parent=new_parent,
                         keywords_excluded=keywords_excluded if not use_new_parent else "",
-                        # Add Lvl2 parameters
                         use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
-                        service_type_lvl2=service_type if 'service_type' in locals() else ""
+                        service_type_lvl2=service_type if 'service_type' in locals() else "",
+                        # Add per-country support groups
+                        support_groups_per_country=support_groups_per_country if use_per_country_groups else {},
+                        managed_by_groups_per_country=managed_by_groups_per_country if use_per_country_groups else {}
                     )
                 
                 st.success("✅ Service offerings generated successfully!")
@@ -501,10 +443,6 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                     )
                 
                 st.info(f"Generated file: {result_file.name}")
-                if use_lvl2:
-                    st.info("📊 The file contains separate sheets for each level (e.g., 'PL lvl1', 'PL lvl2')")
-                else:
-                    st.info("📊 The file contains sheets named by country with lvl1 suffix (e.g., 'PL lvl1')")
                 
         except ValueError as e:
             if "duplicate offering" in str(e).lower():
@@ -519,7 +457,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v3.4 | Added: Auto-expansion of 'incident' to 'Software incident solving'
+        Service Offerings Generator v3.5 | Support Groups by Country
     </div>
     """,
     unsafe_allow_html=True

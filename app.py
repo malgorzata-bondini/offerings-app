@@ -279,7 +279,7 @@ with col2:
             st.markdown("#### Support Groups by Country")
             st.info("Select countries to configure specific support groups. Unchecked countries will use empty support groups.")
             
-            countries = ["DE", "UA", "MD", "CY", "PL"]
+            countries = ["DE", "UA", "MD", "CY", "HS PL", "DS PL"]
             support_groups_per_country = {}
             managed_by_groups_per_country = {}
             
@@ -457,7 +457,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v3.5 | Support Groups by Country
+        Service Offerings Generator v3.6 | Support Groups: HS PL / DS PL Division Support
     </div>
     """,
     unsafe_allow_html=True

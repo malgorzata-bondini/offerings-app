@@ -760,7 +760,6 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
     
     return "\n".join(lines) if lines else ""
 
-# ADD THIS NEW FUNCTION FOR CREATING NEW PARENT ROWS
 def create_new_parent_row(new_parent_offering, new_parent, country):
     """Create a new row with the specified parent offering and parent values"""
     # Create a basic row structure with required columns
@@ -796,6 +795,21 @@ def create_new_parent_row(new_parent_offering, new_parent, country):
     
     return pd.Series(new_row)
 
+def get_support_group_for_country(country, support_group, support_groups_per_country):
+    """Get the appropriate support group for a given country"""
+    if support_groups_per_country and country in support_groups_per_country:
+        return support_groups_per_country[country]
+    return support_group
+
+def get_managed_by_group_for_country(country, managed_by_group, managed_by_groups_per_country, support_group_for_country):
+    """Get the appropriate managed by group for a given country"""
+    if managed_by_groups_per_country and country in managed_by_groups_per_country:
+        managed_by_value = managed_by_groups_per_country[country]
+        # If managed_by is empty but support_group is filled, use support_group
+        return managed_by_value if managed_by_value else support_group_for_country
+    # Fall back to global managed_by_group, or support_group_for_country if empty
+    return managed_by_group if managed_by_group else support_group_for_country
+
 def run_generator(*,
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
@@ -810,11 +824,16 @@ def run_generator(*,
     rsp_priority="", rsl_priority="",
     rsp_time="", rsl_time="",
     require_corp_it=False, require_corp_dedicated=False,
-    # ADD THESE NEW PARAMETERS
     use_new_parent=False, new_parent_offering="", new_parent="",
     keywords_excluded="",
-    # ADD LVL2 PARAMETERS
-    use_lvl2=False, service_type_lvl2=""):
+    use_lvl2=False, service_type_lvl2="",
+    support_groups_per_country=None, managed_by_groups_per_country=None):
+
+    # Initialize per-country support groups dictionaries if not provided
+    if support_groups_per_country is None:
+        support_groups_per_country = {}
+    if managed_by_groups_per_country is None:
+        managed_by_groups_per_country = {}
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -945,7 +964,7 @@ def run_generator(*,
             # Skip if there's an error reading the file
             continue
 
-    # MODIFY THIS SECTION - Now process the files
+    # Process the files
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         country = wb.stem.split("_")[-1].upper()
         
@@ -990,10 +1009,6 @@ def run_generator(*,
                               & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
                               & df.apply(lc_ok,axis=1)
                               & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
-                    
-                    # NO FILTERING based on checkboxes - they only control naming convention
-                    # All matching entries (based on keywords) will be processed
-                    # The checkboxes only determine which naming function is used
 
                     base_pool=df.loc[mask]
                 
@@ -1094,10 +1109,13 @@ def run_generator(*,
                                 row=base_row_df.copy()
                                 row["Name (Child Service Offering lvl 1)"]=new_name
                                 row["Delivery Manager"]=delivery_manager
-                                # Leave Support group empty if not provided
-                                row["Support group"] = support_group if support_group else ""
-                                # If Managed by Group is empty but Support Group is filled, copy Support Group
-                                row["Managed by Group"] = managed_by_group if managed_by_group else (support_group if support_group else "")
+                                
+                                # Use per-country support groups
+                                support_group_for_country = get_support_group_for_country(country, support_group, support_groups_per_country)
+                                managed_by_group_for_country = get_managed_by_group_for_country(country, managed_by_group, managed_by_groups_per_country, support_group_for_country)
+                                
+                                row["Support group"] = support_group_for_country
+                                row["Managed by Group"] = managed_by_group_for_country
                                 
                                 # Handle aliases - copy from original row if aliases_on is False
                                 if not aliases_on:

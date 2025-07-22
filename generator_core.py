@@ -795,20 +795,67 @@ def create_new_parent_row(new_parent_offering, new_parent, country):
     
     return pd.Series(new_row)
 
-def get_support_group_for_country(country, support_group, support_groups_per_country):
-    """Get the appropriate support group for a given country"""
+def get_support_group_for_country(country, support_group, support_groups_per_country, division=None):
+    """Get the appropriate support group for a given country and division"""
+    # For PL, use division-specific support groups
+    if country == "PL" and division:
+        division_key = f"{division} PL"
+        if support_groups_per_country and division_key in support_groups_per_country:
+            return support_groups_per_country[division_key]
+    
+    # For other countries, use the country key directly
     if support_groups_per_country and country in support_groups_per_country:
         return support_groups_per_country[country]
     return support_group
 
-def get_managed_by_group_for_country(country, managed_by_group, managed_by_groups_per_country, support_group_for_country):
-    """Get the appropriate managed by group for a given country"""
+def get_managed_by_group_for_country(country, managed_by_group, managed_by_groups_per_country, support_group_for_country, division=None):
+    """Get the appropriate managed by group for a given country and division"""
+    # For PL, use division-specific managed by groups
+    if country == "PL" and division:
+        division_key = f"{division} PL"
+        if managed_by_groups_per_country and division_key in managed_by_groups_per_country:
+            managed_by_value = managed_by_groups_per_country[division_key]
+            # If managed_by is empty but support_group is filled, use support_group
+            return managed_by_value if managed_by_value else support_group_for_country
+    
+    # For other countries, use the country key directly
     if managed_by_groups_per_country and country in managed_by_groups_per_country:
         managed_by_value = managed_by_groups_per_country[country]
         # If managed_by is empty but support_group is filled, use support_group
         return managed_by_value if managed_by_value else support_group_for_country
     # Fall back to global managed_by_group, or support_group_for_country if empty
     return managed_by_group if managed_by_group else support_group_for_country
+
+def get_support_groups_list_for_country(country, support_group, support_groups_per_country, managed_by_groups_per_country, division=None):
+    """Get list of support groups for a country (handles multiple groups for DE)"""
+    # Get support groups
+    if country == "PL" and division:
+        division_key = f"{division} PL"
+        country_support_groups = support_groups_per_country.get(division_key, support_group) if support_groups_per_country else support_group
+        country_managed_groups = managed_by_groups_per_country.get(division_key, "") if managed_by_groups_per_country else ""
+    else:
+        country_support_groups = support_groups_per_country.get(country, support_group) if support_groups_per_country else support_group
+        country_managed_groups = managed_by_groups_per_country.get(country, "") if managed_by_groups_per_country else ""
+    
+    # Handle multiple groups (separated by newlines)
+    if country_support_groups and '\n' in country_support_groups:
+        support_list = [sg.strip() for sg in country_support_groups.split('\n') if sg.strip()]
+        managed_list = []
+        if country_managed_groups and '\n' in country_managed_groups:
+            managed_list = [mg.strip() for mg in country_managed_groups.split('\n') if mg.strip()]
+        else:
+            managed_list = [country_managed_groups.strip()] * len(support_list) if country_managed_groups else support_list
+        
+        # Ensure managed_list has same length as support_list
+        while len(managed_list) < len(support_list):
+            managed_list.append(support_list[len(managed_list)])
+            
+        return list(zip(support_list, managed_list))
+    else:
+        # Single support group
+        single_support = country_support_groups or support_group or ""
+        single_managed = country_managed_groups or single_support or ""
+        return [(single_support, single_managed)] if single_support else [("", "")]
 
 def run_generator(*,
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
@@ -1106,91 +1153,114 @@ def run_generator(*,
                                 
                                 seen.add(new_name_normalized)
 
-                                row=base_row_df.copy()
-                                row["Name (Child Service Offering lvl 1)"]=new_name
-                                row["Delivery Manager"]=delivery_manager
-                                
-                                # Use per-country support groups
-                                support_group_for_country = get_support_group_for_country(country, support_group, support_groups_per_country)
-                                managed_by_group_for_country = get_managed_by_group_for_country(country, managed_by_group, managed_by_groups_per_country, support_group_for_country)
-                                
-                                row["Support group"] = support_group_for_country
-                                row["Managed by Group"] = managed_by_group_for_country
-                                
-                                # Handle aliases - copy from original row if aliases_on is False
-                                if not aliases_on:
-                                    # Keep original aliases values
-                                    pass
-                                else:
-                                    # Apply new alias value
-                                    for c in [c for c in row.columns if "Aliases" in c]:
-                                        row[c]=aliases_value if aliases_value else "-"
-                                
-                                # Handle Visibility group - ensure it exists for PL
-                                if country == "PL" and "Visibility group" not in row.columns:
-                                    row["Visibility group"] = ""
-                                
-                                if country=="DE":
-                                    row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
-                                elif country=="UA":
-                                    row["Subscribed by Company"]="Сiнево Україна"
-                                elif country=="MD":
-                                    if global_prod:
-                                        row["Subscribed by Company"]=recv or tag_hs
+                                # Determine division for PL support groups
+                                division = None
+                                if country == "PL":
+                                    # Try to determine division from the new_name or original data
+                                    if "HS PL" in new_name or "HS PL" in str(base_row.get("Name (Child Service Offering lvl 1)", "")):
+                                        division = "HS"
+                                    elif "DS PL" in new_name or "DS PL" in str(base_row.get("Name (Child Service Offering lvl 1)", "")):
+                                        division = "DS"
                                     else:
-                                        row["Subscribed by Company"]="DS MD"
-                                elif country=="CY":
-                                    row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
-                                else:
-                                    row["Subscribed by Company"]=recv or tag_hs
+                                        # Try to determine from parent offering
+                                        parent_content = extract_parent_info(parent_full)
+                                        if "HS" in parent_content.split():
+                                            division = "HS"
+                                        elif "DS" in parent_content.split():
+                                            division = "DS"
+                                        else:
+                                            # Default to HS if cannot determine
+                                            division = "HS"
+                                
+                                # Get support groups list (handles multiple groups for DE)
+                                support_groups_list = get_support_groups_list_for_country(
+                                    country, support_group, support_groups_per_country, 
+                                    managed_by_groups_per_country, division
+                                )
+                                
+                                # Create offerings for each support group combination
+                                for support_group_for_country, managed_by_group_for_country in support_groups_list:
+                                    row=base_row_df.copy()
+                                    row["Name (Child Service Offering lvl 1)"]=new_name
+                                    row["Delivery Manager"]=delivery_manager
                                     
-                                orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
-                                
-                                # For Lvl2, keep empty commitments empty
-                                if is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
-                                    row["Service Commitments"] = ""
-                                else:
-                                    # Handle custom commitments - use both approaches
-                                    if use_custom_commitments and custom_commitments_str:
-                                       # Use the direct string if provided
-                                       row["Service Commitments"] = custom_commitments_str
-                                    elif use_custom_commitments and commitment_country:
-                                        # Use custom_commit_block function if country provided
-                                        row["Service Commitments"] = custom_commit_block(
-                                            commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
-                                            rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
-                                            rsp_time, rsl_time
-                                        )
+                                    row["Support group"] = support_group_for_country
+                                    row["Managed by Group"] = managed_by_group_for_country
+                                    
+                                    # Handle aliases - copy from original row if aliases_on is False
+                                    if not aliases_on:
+                                        # Keep original aliases values
+                                        pass
                                     else:
-                                       # Use existing logic
-                                       row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
-                                
-                                # Special handling for IT with UA/MD - always use DS
-                                if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
-                                    depend_tag = f"DS {country} Prod"
-                                elif global_prod:
-                                    depend_tag = "Global Prod"
-                                else:
-                                    depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{recv or tag_hs} Prod"
-                                
-                                # Handle Service Offerings | Depend On - preserve original values
-                                if original_depend_on in ["-", "", "nan", "NaN", None]:
-                                    # Preserve the original empty/dash value
-                                    if original_depend_on == "-":
-                                        row["Service Offerings | Depend On (Application Service)"] = "-"
+                                        # Apply new alias value
+                                        for c in [c for c in row.columns if "Aliases" in c]:
+                                            row[c]=aliases_value if aliases_value else "-"
+                                    
+                                    # Handle Visibility group - ensure it exists for PL
+                                    if country == "PL" and "Visibility group" not in row.columns:
+                                        row["Visibility group"] = ""
+                                    
+                                    if country=="DE":
+                                        row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
+                                    elif country=="UA":
+                                        row["Subscribed by Company"]="Сiнево Україна"
+                                    elif country=="MD":
+                                        if global_prod:
+                                            row["Subscribed by Company"]=recv or tag_hs
+                                        else:
+                                            row["Subscribed by Company"]="DS MD"
+                                    elif country=="CY":
+                                        row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
                                     else:
-                                        row["Service Offerings | Depend On (Application Service)"] = ""
-                                else:
-                                    # Only update if original had a real value
-                                    if app:
-                                        row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                                        row["Subscribed by Company"]=recv or tag_hs
+                                        
+                                    orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
+                                    
+                                    # For Lvl2, keep empty commitments empty
+                                    if is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
+                                        row["Service Commitments"] = ""
                                     else:
-                                        row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
-                                
-                                # Create sheet key with level distinction
-                                sheet_key = f"{country} lvl{current_level}"
-                                sheets.setdefault(sheet_key, pd.DataFrame())
-                                sheets[sheet_key] = pd.concat([sheets[sheet_key], row], ignore_index=True)
+                                        # Handle custom commitments - use both approaches
+                                        if use_custom_commitments and custom_commitments_str:
+                                           # Use the direct string if provided
+                                           row["Service Commitments"] = custom_commitments_str
+                                        elif use_custom_commitments and commitment_country:
+                                            # Use custom_commit_block function if country provided
+                                            row["Service Commitments"] = custom_commit_block(
+                                                commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
+                                                rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
+                                                rsp_time, rsl_time
+                                            )
+                                        else:
+                                           # Use existing logic
+                                           row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
+                                    
+                                    # Special handling for IT with UA/MD - always use DS
+                                    if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
+                                        depend_tag = f"DS {country} Prod"
+                                    elif global_prod:
+                                        depend_tag = "Global Prod"
+                                    else:
+                                        depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{recv or tag_hs} Prod"
+                                    
+                                    # Handle Service Offerings | Depend On - preserve original values
+                                    if original_depend_on in ["-", "", "nan", "NaN", None]:
+                                        # Preserve the original empty/dash value
+                                        if original_depend_on == "-":
+                                            row["Service Offerings | Depend On (Application Service)"] = "-"
+                                        else:
+                                            row["Service Offerings | Depend On (Application Service)"] = ""
+                                    else:
+                                        # Only update if original had a real value
+                                        if app:
+                                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                                        else:
+                                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
+                                    
+                                    # Create sheet key with level distinction
+                                    sheet_key = f"{country} lvl{current_level}"
+                                    sheets.setdefault(sheet_key, pd.DataFrame())
+                                    sheets[sheet_key] = pd.concat([sheets[sheet_key], row], ignore_index=True)
                             
             except Exception as e:
                 # Skip if sheet doesn't exist or other error

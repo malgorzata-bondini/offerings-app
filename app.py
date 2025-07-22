@@ -279,7 +279,7 @@ with col2:
             st.markdown("#### Support Groups by Country")
             st.info("Select countries to configure specific support groups. Unchecked countries will use empty support groups.")
             
-            countries = ["DE", "UA", "MD", "CY", "HS PL", "DS PL"]
+            countries = ["HS PL", "DS PL", "DE", "UA", "MD", "CY"]
             support_groups_per_country = {}
             managed_by_groups_per_country = {}
             

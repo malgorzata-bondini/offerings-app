@@ -1119,8 +1119,11 @@ def run_generator(*,
                         else:                       
                             receivers=[f"DS {country}"]
                     else:
-                        # For standard naming (including IT, HR, Medical, etc.) - single receiver
-                        receivers=[""]
+                        # For standard naming (IT, HR, Medical, etc.) - DE ALWAYS gets both HS and DS
+                        if country == "DE":
+                            receivers=["DS DE","HS DE"]  # DE always splits into both
+                        else:
+                            receivers=[""]
 
                     parent_full=str(base_row["Parent Offering"])
                     

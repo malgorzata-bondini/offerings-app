@@ -41,6 +41,10 @@ with col2:
         - Comma-separated keywords: AND logic (all must match)
         - When "Include Level 2" is checked: Searches in BOTH Child SO lvl1 AND lvl2 sheets
         - When unchecked: Searches only in Child SO lvl1 sheet
+        
+        **Note:** Any occurrence of "incident" will be automatically expanded to "Software incident solving"
+        - Example: "incident" → "Software incident solving"
+        - Example: "incident management" → "Software incident solving"
         """)
         
         keywords_parent = st.text_area(
@@ -141,6 +145,8 @@ with col2:
             st.info("""
             📝 Note: Keywords will search in BOTH "Child SO lvl1" AND "Child SO lvl2" sheets.
             For Lvl2 entries, SR/IM will be automatically added to Parent Offering when building names.
+            
+            **Special rule:** Any occurrence of "incident" will be expanded to "Software incident solving"
             """)
     
     with tab3:
@@ -369,12 +375,16 @@ st.markdown("---")
 
 # Show naming examples based on selections
 with st.expander("📋 Naming Convention Examples"):
+    st.warning("⚠️ Important: Any occurrence of 'incident' will automatically be expanded to 'Software incident solving'")
+    st.markdown("**Example:** If parent has 'incident handling' → becomes 'Software incident solving'")
+    
     if 'use_lvl2' in locals() and use_lvl2:
         st.markdown("**Level 1 Example:**")
         st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 9-17")
         st.markdown("**Level 2 Example:**")
         st.code("[IM HS PL IT] Software incident solving EMR 2.0 Prod Application issue Mon-Sun 24/7")
         st.markdown("From parent: `[Parent HS PL IT] Software incident solving` → IM added automatically")
+        st.info("📌 Note: If parent had just 'incident', it would be expanded to 'Software incident solving'")
         if 'service_type' in locals() and service_type:
             st.info(f"Service Type '{service_type}' will be added to Lvl2 entries after Prod")
         st.markdown("**📂 Output:** Separate sheets like 'PL lvl1' and 'PL lvl2' in the same file")
@@ -509,7 +519,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v3.3 | Fixed: Naming checkboxes now only control naming style, not filtering
+        Service Offerings Generator v3.4 | Added: Auto-expansion of 'incident' to 'Software incident solving'
     </div>
     """,
     unsafe_allow_html=True

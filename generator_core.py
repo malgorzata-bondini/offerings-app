@@ -59,6 +59,79 @@ def get_division_and_country(parent_content, country, delivering_tag):
     
     return division, country
 
+def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_type_lvl2):
+    """Build name for Lvl2 entries - SR/IM is added to both Parent Offering parsing and final name"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
+    
+    # Check if SR/IM already exists in parent content
+    parts = parent_content.split()
+    has_sr_im = "SR" in parts or "IM" in parts
+    
+    # If SR/IM not already there, insert it after Parent
+    if not has_sr_im:
+        # Insert SR/IM as the first element after "Parent" was removed
+        parts.insert(0, sr_or_im)
+        parent_content = " ".join(parts)
+    
+    # Now extract parts for building
+    parts = parent_content.split()
+    country = ""
+    division = ""
+    dept = ""  # IT, HR, etc.
+    sr_im_pos = ""
+    
+    for part in parts:
+        if part in ["SR", "IM"]:
+            sr_im_pos = part
+        elif len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
+            country = part
+        elif part in ["HS", "DS"]:
+            division = part
+        elif part in ["IT", "HR", "Medical", "Business Services"]:
+            dept = part
+    
+    # Build the prefix - use the SR/IM from parent or the one provided
+    prefix_parts = [sr_im_pos if sr_im_pos else sr_or_im]
+    
+    # Special handling for UA and MD - always use DS
+    if country in ["UA", "MD"]:
+        prefix_parts.append("DS")
+    elif division:
+        prefix_parts.append(division)
+    else:
+        prefix_parts.append("HS")  # Default
+    
+    if country:
+        prefix_parts.append(country)
+    
+    if dept:
+        prefix_parts.append(dept)
+    
+    # Build the name
+    name_prefix = f"[{' '.join(prefix_parts)}]"
+    
+    # Extract the core part of catalog name (e.g., "Software incident solving")
+    name_parts = [name_prefix, catalog_name]
+    
+    # Add app if provided
+    if app:
+        name_parts.append(app)
+    
+    # Check if name contains Microsoft - if so, don't add Prod
+    name_so_far = " ".join(name_parts).lower()
+    if "microsoft" not in name_so_far:
+        name_parts.append("Prod")
+    
+    # Add service type if provided (e.g., "Application issue")
+    if service_type_lvl2:
+        name_parts.append(service_type_lvl2)
+    
+    # Add schedule
+    name_parts.append(schedule_suffix)
+    
+    return " ".join(name_parts)
+
 def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP IT offerings"""
     parent_content = extract_parent_info(parent_offering)
@@ -691,7 +764,9 @@ def run_generator(*,
     require_corp_it=False, require_corp_dedicated=False,
     # ADD THESE NEW PARAMETERS
     use_new_parent=False, new_parent_offering="", new_parent="",
-    keywords_excluded=""):
+    keywords_excluded="",
+    # ADD LVL2 PARAMETERS
+    use_lvl2=False, service_type_lvl2=""):
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -793,25 +868,31 @@ def run_generator(*,
     if not all_apps:
         all_apps = [""]
 
-    # Determine special department
+    # Determine special department - this only affects naming, not filtering
     special_dept = None
-    if special_it and not require_corp and not require_recp and not require_corp_it and not require_corp_dedicated:
+    if special_it:
         special_dept = "IT"
-    elif special_hr and not require_corp and not require_recp and not require_corp_it and not require_corp_dedicated:
+    elif special_hr:
         special_dept = "HR"
-    elif special_medical and not require_corp and not require_recp and not require_corp_it and not require_corp_dedicated:
+    elif special_medical:
         special_dept = "Medical"
-    elif special_dak and not require_corp and not require_recp and not require_corp_it and not require_corp_dedicated:
+    elif special_dak:
         special_dept = "DAK"
 
     # First, collect all existing offerings from the source files
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         try:
-            df = pd.read_excel(wb, sheet_name="Child SO lvl1")
-            if "Name (Child Service Offering lvl 1)" in df.columns:
-                # Clean the names before adding to set - remove extra whitespace and convert to string
-                existing_names = df["Name (Child Service Offering lvl 1)"].dropna().astype(str).str.strip()
-                existing_offerings.update(existing_names)
+            # Check BOTH sheets for existing offerings
+            for sheet_name in ["Child SO lvl1", "Child SO lvl2"]:
+                try:
+                    df = pd.read_excel(wb, sheet_name=sheet_name)
+                    if "Name (Child Service Offering lvl 1)" in df.columns:
+                        # Clean the names before adding to set - remove extra whitespace and convert to string
+                        existing_names = df["Name (Child Service Offering lvl 1)"].dropna().astype(str).str.strip()
+                        existing_offerings.update(existing_names)
+                except Exception:
+                    # Skip if sheet doesn't exist
+                    continue
         except Exception:
             # Skip if there's an error reading the file
             continue
@@ -820,246 +901,260 @@ def run_generator(*,
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         country = wb.stem.split("_")[-1].upper()
         
-        # IF USING NEW PARENT, CREATE SYNTHETIC ROW
-        if use_new_parent:
-            # Create a new synthetic row with the specified parent offering and parent
-            new_row = create_new_parent_row(new_parent_offering, new_parent, country)
-            base_pool = pd.DataFrame([new_row])
-        else:
-            # ORIGINAL LOGIC - read from Excel file
-            df = pd.read_excel(wb, sheet_name="Child SO lvl1")
-            
-            # Add missing columns as empty
-            for col in need_cols:
-                if col not in df.columns:
-                    df[col] = ""
-            
-            # Ensure Visibility group column exists
-            if "Visibility group" not in df.columns:
-                df["Visibility group"] = ""
-
-            mask=(df.apply(row_keywords_ok,axis=1)
-                  & df.apply(row_excluded_keywords_ok,axis=1)
-                  & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
-                  & df.apply(lc_ok,axis=1)
-                  & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
-            
-            if require_corp:
-                mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
-                mask &= df["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(delivering_tag)}\b",case=False)
-                # Exclude IT entries when looking for regular CORP
-                mask &= ~df["Parent Offering"].str.contains(r"\bIT\b",case=False)
-                # Exclude Dedicated Services entries
-                mask &= ~df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
-            elif require_recp:
-                # For RecP, filter parent offering that contains RecP
-                mask &= df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
-            elif require_corp_it:
-                # For CORP IT, we don't require CORP to already be in the name
-                # We're creating new CORP IT entries from regular entries
-                # Just apply the standard filtering without additional CORP requirements
-                pass  # No additional filtering needed
-            elif require_corp_dedicated:
-                # For CORP Dedicated Services, look for Dedicated in parent offering
-                mask &= df["Parent Offering"].str.contains(r"\bDedicated\b",case=False)
-                # Also ensure it's CORP related
-                mask &= (df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False) | 
-                         df["Parent Offering"].str.contains(r"\bCORP\b",case=False))
-            else:
-                # REMOVED ALL EXCLUSIONARY FILTERING FOR STANDARD PROCESSING
-                # Now it will include entries regardless of CORP, IT, HR, Medical, DAK, etc.
-                # The only filtering applied is the keyword matching and lifecycle checks
-                
-                # Only exclude RecP from standard processing since RecP has special handling
-                mask &= ~df["Parent Offering"].str.contains(r"\bRecP\b",case=False)
-                
-                # REMOVED all department-specific filtering for standard processing
-                # When a specific department is selected, it should find matching entries
-                # regardless of what other entries exist with the same parent offering
-
-            base_pool=df.loc[mask]
+        # Process BOTH lvl1 and lvl2 sheets when use_lvl2 is True
+        # Process only lvl1 when use_lvl2 is False
+        levels_to_process = [1, 2] if use_lvl2 else [1]
         
-        if base_pool.empty:
-            continue
-        
-        # Process ALL matching rows, not just the first one
-        for idx, base_row in base_pool.iterrows():
-            base_row_df = base_row.to_frame().T.copy()
-            tag_hs, tag_ds = f"HS {country}", f"DS {country}"
+        for current_level in levels_to_process:
+            sheet_name = f"Child SO lvl{current_level}"
+            is_lvl2 = (current_level == 2)
+                
+            try:
+                # IF USING NEW PARENT, CREATE SYNTHETIC ROW
+                if use_new_parent:
+                    # Create a new synthetic row with the specified parent offering and parent
+                    new_row = create_new_parent_row(new_parent_offering, new_parent, country)
+                    base_pool = pd.DataFrame([new_row])
+                    # For new parent, we can process both levels with the same synthetic data
+                else:
+                    # ORIGINAL LOGIC - read from Excel file
+                    df = pd.read_excel(wb, sheet_name=sheet_name)
+                    
+                    # Add missing columns as empty
+                    for col in need_cols:
+                        if col not in df.columns:
+                            df[col] = ""
+                    
+                    # Ensure Visibility group column exists
+                    if "Visibility group" not in df.columns:
+                        df["Visibility group"] = ""
 
-            # Determine receivers based on country and CORP/RecP/CORP IT/CORP Dedicated setting
-            if require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                if country=="DE":         
-                    receivers=["DS DE","HS DE"]
-                elif country in {"UA","MD"}: 
-                    receivers=[f"DS {country}"]
-                elif country=="PL":         
-                    # Check if DS PL exists in the data
-                    if "DS PL" in base_pool["Name (Child Service Offering lvl 1)"].str.cat(sep=" "):
-                        receivers=["DS PL"]
+                    # For Lvl2, different filtering logic
+                    if is_lvl2:
+                        # For Lvl2, we don't check for SR/IM prefix and handle commitments differently
+                        mask=(df.apply(row_keywords_ok,axis=1)
+                              & df.apply(row_excluded_keywords_ok,axis=1)
+                              & df.apply(lc_ok,axis=1))
+                        # Don't filter out entries with empty Service Commitments for Lvl2
                     else:
-                        receivers=["HS PL"]
-                elif country=="CY":         
-                    receivers=["DS CY","HS CY"]
-                else:                       
-                    receivers=[f"DS {country}"]
-            else:
-                receivers=[""]
+                        mask=(df.apply(row_keywords_ok,axis=1)
+                              & df.apply(row_excluded_keywords_ok,axis=1)
+                              & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
+                              & df.apply(lc_ok,axis=1)
+                              & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
+                    
+                    # NO FILTERING based on checkboxes - they only control naming convention
+                    # All matching entries (based on keywords) will be processed
+                    # The checkboxes only determine which naming function is used
 
-            parent_full=str(base_row["Parent Offering"])
-            
-            # Store original depend on value
-            original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
-
-            for app in all_apps:
-                for schedule_suffix in schedule_suffixes:
-                    for recv in receivers:
-                    # For DE, find the matching row (DS DE or HS DE) in the original data
-                        if country == "DE" and (require_corp or require_recp or require_corp_it or require_corp_dedicated) and not use_new_parent:
-                        # Search for the specific receiver in the base pool
-                            recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(recv)}\b", case=False)
-                            matching_rows = base_pool[recv_mask]
-                        
-                            if not matching_rows.empty:
-                            # Use the first matching row as base
-                                base_row = matching_rows.iloc[0]
-                                base_row_df = base_row.to_frame().T.copy()
-                                original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
+                    base_pool=df.loc[mask]
                 
-                        if require_corp:
-                            new_name = build_corp_name(
-                                parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                            )
-                        elif require_recp:
-                            new_name = build_recp_name(
-                                parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                            )
-                        elif require_corp_it:
-                            new_name = build_corp_it_name(
-                                parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                            )
-                        elif require_corp_dedicated:
-                            new_name = build_corp_dedicated_name(
-                                parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                            )
-                        else:
-                            new_name = build_standard_name(
-                                parent_full, sr_or_im, app, schedule_suffix, special_dept
-                            )
-                        
-                        # Normalize the name for comparison (remove extra spaces)
-                        new_name_normalized = ' '.join(new_name.split())
-                        
-                        # Check for duplicates within this generation run
-                        if new_name_normalized in seen:
-                            # Skip this one instead of raising error - it's already being created
-                            continue
-                        
-                        # Check against existing offerings in source files
-                        found_in_existing = False
-                        for existing in existing_offerings:
-                            existing_normalized = ' '.join(str(existing).split())
-                            if existing_normalized == new_name_normalized:
-                                found_in_existing = True
-                                break
-                        
-                        if found_in_existing:
-                            raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
-                        
-                        seen.add(new_name_normalized)
+                if base_pool.empty:
+                    continue
+                
+                # Process ALL matching rows, not just the first one
+                for idx, base_row in base_pool.iterrows():
+                    base_row_df = base_row.to_frame().T.copy()
+                    tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
-                        row=base_row_df.copy()
-                        row["Name (Child Service Offering lvl 1)"]=new_name
-                        row["Delivery Manager"]=delivery_manager
-                        # Leave Support group empty if not provided
-                        row["Support group"] = support_group if support_group else ""
-                        # If Managed by Group is empty but Support Group is filled, copy Support Group
-                        row["Managed by Group"] = managed_by_group if managed_by_group else (support_group if support_group else "")
-                        
-                        # Handle aliases - copy from original row if aliases_on is False
-                        if not aliases_on:
-                            # Keep original aliases values
-                            pass
-                        else:
-                            # Apply new alias value
-                            for c in [c for c in row.columns if "Aliases" in c]:
-                                row[c]=aliases_value if aliases_value else "-"
-                        
-                        # Handle Visibility group - ensure it exists for PL
-                        if country == "PL" and "Visibility group" not in row.columns:
-                            row["Visibility group"] = ""
-                        
-                        if country=="DE":
-                            row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
-                        elif country=="UA":
-                            row["Subscribed by Company"]="Сiнево Україна"
-                        elif country=="MD":
-                            if global_prod:
-                                row["Subscribed by Company"]=recv or tag_hs
+                    # Determine receivers based on country and CORP/RecP/CORP IT/CORP Dedicated setting
+                    if require_corp or require_recp or require_corp_it or require_corp_dedicated:
+                        if country=="DE":         
+                            receivers=["DS DE","HS DE"]
+                        elif country in {"UA","MD"}: 
+                            receivers=[f"DS {country}"]
+                        elif country=="PL":         
+                            # Check if DS PL exists in the data
+                            if "DS PL" in base_pool["Name (Child Service Offering lvl 1)"].str.cat(sep=" "):
+                                receivers=["DS PL"]
                             else:
-                                row["Subscribed by Company"]="DS MD"
-                        elif country=="CY":
-                            row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
-                        else:
-                            row["Subscribed by Company"]=recv or tag_hs
+                                receivers=["HS PL"]
+                        elif country=="CY":         
+                            receivers=["DS CY","HS CY"]
+                        else:                       
+                            receivers=[f"DS {country}"]
+                    else:
+                        receivers=[""]
+
+                    parent_full=str(base_row["Parent Offering"])
+                    
+                    # Store original depend on value
+                    original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
+
+                    for app in all_apps:
+                        for schedule_suffix in schedule_suffixes:
+                            for recv in receivers:
+                            # For DE, find the matching row (DS DE or HS DE) in the original data
+                                if country == "DE" and (require_corp or require_recp or require_corp_it or require_corp_dedicated) and not use_new_parent:
+                                # Search for the specific receiver in the base pool
+                                    recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(recv)}\b", case=False)
+                                    matching_rows = base_pool[recv_mask]
+                                
+                                    if not matching_rows.empty:
+                                    # Use the first matching row as base
+                                        base_row = matching_rows.iloc[0]
+                                        base_row_df = base_row.to_frame().T.copy()
+                                        original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
+                        
+                                # Build name based on type
+                                if is_lvl2:
+                                    new_name = build_lvl2_name(
+                                        parent_full, sr_or_im, app, schedule_suffix, service_type_lvl2
+                                    )
+                                elif require_corp:
+                                    new_name = build_corp_name(
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                                    )
+                                elif require_recp:
+                                    new_name = build_recp_name(
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                                    )
+                                elif require_corp_it:
+                                    new_name = build_corp_it_name(
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                                    )
+                                elif require_corp_dedicated:
+                                    new_name = build_corp_dedicated_name(
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                                    )
+                                else:
+                                    new_name = build_standard_name(
+                                        parent_full, sr_or_im, app, schedule_suffix, special_dept
+                                    )
+                                
+                                # Normalize the name for comparison (remove extra spaces)
+                                new_name_normalized = ' '.join(new_name.split())
+                                
+                                # Check for duplicates within this generation run
+                                if new_name_normalized in seen:
+                                    # Skip this one instead of raising error - it's already being created
+                                    continue
+                                
+                                # Check against existing offerings in source files
+                                found_in_existing = False
+                                for existing in existing_offerings:
+                                    existing_normalized = ' '.join(str(existing).split())
+                                    if existing_normalized == new_name_normalized:
+                                        found_in_existing = True
+                                        break
+                                
+                                if found_in_existing:
+                                    raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
+                                
+                                seen.add(new_name_normalized)
+
+                                row=base_row_df.copy()
+                                row["Name (Child Service Offering lvl 1)"]=new_name
+                                row["Delivery Manager"]=delivery_manager
+                                # Leave Support group empty if not provided
+                                row["Support group"] = support_group if support_group else ""
+                                # If Managed by Group is empty but Support Group is filled, copy Support Group
+                                row["Managed by Group"] = managed_by_group if managed_by_group else (support_group if support_group else "")
+                                
+                                # Handle aliases - copy from original row if aliases_on is False
+                                if not aliases_on:
+                                    # Keep original aliases values
+                                    pass
+                                else:
+                                    # Apply new alias value
+                                    for c in [c for c in row.columns if "Aliases" in c]:
+                                        row[c]=aliases_value if aliases_value else "-"
+                                
+                                # Handle Visibility group - ensure it exists for PL
+                                if country == "PL" and "Visibility group" not in row.columns:
+                                    row["Visibility group"] = ""
+                                
+                                if country=="DE":
+                                    row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
+                                elif country=="UA":
+                                    row["Subscribed by Company"]="Сiнево Україна"
+                                elif country=="MD":
+                                    if global_prod:
+                                        row["Subscribed by Company"]=recv or tag_hs
+                                    else:
+                                        row["Subscribed by Company"]="DS MD"
+                                elif country=="CY":
+                                    row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
+                                else:
+                                    row["Subscribed by Company"]=recv or tag_hs
+                                    
+                                orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
+                                
+                                # For Lvl2, keep empty commitments empty
+                                if is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
+                                    row["Service Commitments"] = ""
+                                else:
+                                    # Handle custom commitments - use both approaches
+                                    if use_custom_commitments and custom_commitments_str:
+                                       # Use the direct string if provided
+                                       row["Service Commitments"] = custom_commitments_str
+                                    elif use_custom_commitments and commitment_country:
+                                        # Use custom_commit_block function if country provided
+                                        row["Service Commitments"] = custom_commit_block(
+                                            commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
+                                            rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
+                                            rsp_time, rsl_time
+                                        )
+                                    else:
+                                       # Use existing logic
+                                       row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
+                                
+                                # Special handling for IT with UA/MD - always use DS
+                                if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
+                                    depend_tag = f"DS {country} Prod"
+                                elif global_prod:
+                                    depend_tag = "Global Prod"
+                                else:
+                                    depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{recv or tag_hs} Prod"
+                                
+                                # Handle Service Offerings | Depend On - preserve original values
+                                if original_depend_on in ["-", "", "nan", "NaN", None]:
+                                    # Preserve the original empty/dash value
+                                    if original_depend_on == "-":
+                                        row["Service Offerings | Depend On (Application Service)"] = "-"
+                                    else:
+                                        row["Service Offerings | Depend On (Application Service)"] = ""
+                                else:
+                                    # Only update if original had a real value
+                                    if app:
+                                        row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                                    else:
+                                        row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
+                                
+                                # Create sheet key with level distinction
+                                sheet_key = f"{country} lvl{current_level}"
+                                sheets.setdefault(sheet_key, pd.DataFrame())
+                                sheets[sheet_key] = pd.concat([sheets[sheet_key], row], ignore_index=True)
                             
-                        orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
-                        
-                        # Handle custom commitments - use both approaches
-                        if use_custom_commitments and custom_commitments_str:
-                           # Use the direct string if provided
-                           row["Service Commitments"] = custom_commitments_str
-                        elif use_custom_commitments and commitment_country:
-                            # Use custom_commit_block function if country provided
-                            row["Service Commitments"] = custom_commit_block(
-                                commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
-                                rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
-                                rsp_time, rsl_time
-                            )
-                        else:
-                           # Use existing logic
-                           row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
-                        
-                        # Special handling for IT with UA/MD - always use DS
-                        if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
-                            depend_tag = f"DS {country} Prod"
-                        elif global_prod:
-                            depend_tag = "Global Prod"
-                        else:
-                            depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{recv or tag_hs} Prod"
-                        
-                        # Handle Service Offerings | Depend On - preserve original values
-                        if original_depend_on in ["-", "", "nan", "NaN", None]:
-                            # Preserve the original empty/dash value
-                            if original_depend_on == "-":
-                                row["Service Offerings | Depend On (Application Service)"] = "-"
-                            else:
-                                row["Service Offerings | Depend On (Application Service)"] = ""
-                        else:
-                            # Only update if original had a real value
-                            if app:
-                                row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
-                            else:
-                                row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
-                        
-                        sheets.setdefault(country,pd.DataFrame())
-                        sheets[country]=pd.concat([sheets[country],row],ignore_index=True)
+            except Exception as e:
+                # Skip if sheet doesn't exist or other error
+                if "Worksheet" not in str(e):  # Only skip worksheet not found errors silently
+                    print(f"Error processing {sheet_name} in {wb}: {e}")
+                continue
 
     if not sheets:
         raise ValueError("No matching rows found with the specified keywords.")
 
     out_dir.mkdir(parents=True,exist_ok=True)
-    outfile=out_dir / f"Offerings_NEW_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    # Update filename to indicate which levels are included
+    if use_lvl2:
+        suffix = "lvl1_and_lvl2"
+    else:
+        suffix = "lvl1"
+    outfile=out_dir / f"Offerings_NEW_{suffix}_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
     
 
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile,engine="openpyxl") as w:
-        # Sort country codes alphabetically
-        sorted_countries = sorted(sheets.keys())
+        # Sort sheet names alphabetically
+        sorted_sheets = sorted(sheets.keys())
         
-        for cc in sorted_countries:
-            dfc = sheets[cc]
-            # Ensure unique names per country
+        for sheet_name in sorted_sheets:
+            dfc = sheets[sheet_name]
+            # Extract country code from sheet name (e.g., "PL lvl1" -> "PL")
+            cc = sheet_name.split()[0]
+            
+            # Ensure unique names per sheet
             df_final = dfc.drop_duplicates(subset=["Name (Child Service Offering lvl 1)"])
             
             if "Number" in df_final.columns:
@@ -1095,7 +1190,7 @@ def run_generator(*,
                     # Also handle when the string is literally "nan"
                     df_final[col] = df_final[col].apply(lambda x: '' if str(x).lower() == 'nan' else x)
             
-            df_final.to_excel(w,sheet_name=cc,index=False)
+            df_final.to_excel(w,sheet_name=sheet_name,index=False)
     
     # Apply formatting
     wb=load_workbook(outfile)

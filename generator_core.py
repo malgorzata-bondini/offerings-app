@@ -21,27 +21,33 @@ discard_lc  = {"retired", "retiring", "end of life", "end of support"}
 def ensure_incident_naming(name):
     """
     Ensure that 'incident' is always part of 'Software incident solving'
+    But preserve app names that come after incident
     Examples:
     - "incident" → "Software incident solving"  
-    - "incident management" → "Software incident solving"
-    - "incident solving" → "Software incident solving"
+    - "incident SDMS" → "Software incident SDMS solving"
+    - "incident Translation Hub" → "Software incident Translation Hub solving"
     - "Software incident solving" → "Software incident solving" (no change)
     """
     # Check if the name contains "incident"
     if "incident" in name.lower():
-        # If it already has the correct format, return as is
-        if "software incident solving" in name.lower():
+        # If it already has the correct format with "software incident", return as is
+        if "software incident" in name.lower():
             return name
         
-        # Replace various forms of incident with the correct phrase
-        import re
+        # Pattern to find incident and capture app name that comes between incident and solving/prod
+        # This pattern captures everything between "incident" and "solving" or "Prod"
+        pattern = r'\bincident\b((?:\s+\w+)*?)(?:\s+solving|\s+Prod|\s*$)'
         
-        # Pattern to match "incident" followed by optional words (like "solving", "management", etc.)
-        # but not if it's already preceded by "Software" and followed by "solving"
-        pattern = r'(?<!Software\s)\bincident\b(?:\s+\w+)?'
+        def replace_incident(match):
+            app_part = match.group(1) if match.group(1) else ""
+            if app_part.strip():
+                # If there's something after incident (like app name), preserve it
+                return f"Software incident{app_part} solving"
+            else:
+                return "Software incident solving"
         
-        # Replace with "Software incident solving"
-        name = re.sub(pattern, 'Software incident solving', name, flags=re.IGNORECASE)
+        # Replace incident with proper format
+        name = re.sub(pattern, replace_incident, name, flags=re.IGNORECASE)
         
         # Clean up case - ensure first letter is capitalized if at start
         if name.lower().startswith('software'):
@@ -354,7 +360,7 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     # Build the name with topic from parent
     name_prefix = f"[{' '.join(prefix_parts)}]"
     
-    # For RecP, use topic (e.g., "Software") + catalog name in lowercase + "solving" for IM
+    # For RecP, use topic (e.g., "Software") + catalog name in lowercase + app + "solving" for IM
     name_parts = [name_prefix]
     
     if topic:
@@ -362,11 +368,12 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     
     name_parts.append(catalog_name.lower())
     
-    if sr_or_im == "IM":
-        name_parts.append("solving")
-    
+    # Add app BEFORE solving for IM
     if app:
         name_parts.append(app)
+    
+    if sr_or_im == "IM":
+        name_parts.append("solving")
     
     name_parts.append("Prod")
     name_parts.append(schedule_suffix)
@@ -555,11 +562,11 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         name_parts.append(catalog_name.lower())
         
-        # Add app if provided
+        # Add app if provided BEFORE solving
         if app:
             name_parts.append(app)
         
-        # Add "solving" for IM - BEFORE checking for Prod
+        # Add "solving" for IM - AFTER app but BEFORE checking for Prod
         if sr_or_im == "IM":
             name_parts.append("solving")
         
@@ -578,40 +585,67 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         return ensure_incident_naming(final_name)
     
     else:
-        # Standard case - just replace Parent with SR/IM
+        # Standard case - replace Parent with SR/IM and add IT for RecP entries
+        parts = parent_content.split()
+        division = ""
+        country_code = ""
+        dept = ""
+        other_parts = []
+        
+        # Parse parent content to extract components
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
+                country_code = part
+            elif part in ["IT", "HR", "Medical", "Business Services"]:
+                dept = part
+            else:
+                other_parts.append(part)
+        
+        # Build the new name components
+        name_parts = [sr_or_im]
+        
         # Special handling for UA and MD - always use DS
         if country in ["UA", "MD"]:
-            # Ensure DS is present for MD and UA
-            updated_parent_content = parent_content
-            
-            if country == "MD":
-                # Handle various cases: "HS MD", "MD", "DS MD" should all become "DS MD"
-                if re.search(r'\bHS\s+MD\b', parent_content):
-                    updated_parent_content = re.sub(r'\bHS\s+MD\b', 'DS MD', parent_content)
-                elif re.search(r'^MD\b', parent_content) and not re.search(r'\bDS\s+MD\b', parent_content):
-                    updated_parent_content = f"DS {parent_content}"
-                elif not re.search(r'\b(HS|DS)\s+MD\b', parent_content):
-                    updated_parent_content = f"DS MD {parent_content.replace('MD', '').strip()}"
-            elif country == "UA":
-                # Handle various cases: "HS UA", "UA", "DS UA" should all become "DS UA"
-                if re.search(r'\bHS\s+UA\b', parent_content):
-                    updated_parent_content = re.sub(r'\bHS\s+UA\b', 'DS UA', parent_content)
-                elif re.search(r'^UA\b', parent_content) and not re.search(r'\bDS\s+UA\b', parent_content):
-                    updated_parent_content = f"DS {parent_content}"
-                elif not re.search(r'\b(HS|DS)\s+UA\b', parent_content):
-                    updated_parent_content = f"DS UA {parent_content.replace('UA', '').strip()}"
-            
-            if app:
-                final_name = f"[{sr_or_im} {updated_parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
-            else:
-                final_name = f"[{sr_or_im} {updated_parent_content}] {catalog_name} Prod {schedule_suffix}"
-            return ensure_incident_naming(final_name)
+            name_parts.append("DS")
+        elif division:
+            name_parts.append(division)
         else:
-            if app:
-                final_name = f"[{sr_or_im} {parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
-            else:
-                final_name = f"[{sr_or_im} {parent_content}] {catalog_name} Prod {schedule_suffix}"
-            return ensure_incident_naming(final_name)
+            # Default to HS if no division found
+            name_parts.append("HS")
+        
+        if country_code:
+            name_parts.append(country_code)
+        
+        # Add other parts (like RecP, Software, etc.)
+        name_parts.extend(other_parts)
+        
+        # For RecP entries, add IT department if not already present
+        if "RecP" in other_parts and not dept:
+            name_parts.append("IT")
+        elif dept:
+            name_parts.append(dept)
+        
+        # Build the final name
+        prefix = f"[{' '.join(name_parts)}]"
+        
+        # Add catalog name and app
+        final_parts = [prefix, catalog_name]
+        
+        if app:
+            final_parts.append(app)
+        
+        # Check if we should add Prod
+        catalog_lower = catalog_name.lower()
+        exclude_prod = any(keyword in catalog_lower for keyword in ["hardware", "mailbox", "network", "mobile", "security"])
+        if not exclude_prod:
+            final_parts.append("Prod")
+        
+        final_parts.append(schedule_suffix)
+        
+        final_name = " ".join(final_parts)
+        return ensure_incident_naming(final_name)
 
 def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP offerings"""
@@ -658,8 +692,9 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
         else:
             final_name = f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
     else:
+        # For IM: catalog_name + app + solving
         if app:
-            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving {app} Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving Prod {schedule_suffix}"
         else:
             final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
     
@@ -978,9 +1013,9 @@ def run_generator(*,
             if app:
                 all_apps.append(app)
     
-    # If no apps provided, use empty string as placeholder
+    # If no apps provided, do NOT add empty string - process without apps
     if not all_apps:
-        all_apps = [""]
+        all_apps = [None]  # Use None instead of empty string
 
     # Determine special department - this only affects naming, not filtering
     special_dept = None
@@ -1084,6 +1119,7 @@ def run_generator(*,
                         else:                       
                             receivers=[f"DS {country}"]
                     else:
+                        # For standard naming (including IT, HR, Medical, etc.) - single receiver
                         receivers=[""]
 
                     parent_full=str(base_row["Parent Offering"])

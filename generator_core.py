@@ -21,38 +21,23 @@ discard_lc  = {"retired", "retiring", "end of life", "end of support"}
 def ensure_incident_naming(name):
     """
     Ensure that 'incident' is always part of 'Software incident solving'
-    But preserve app names that come after incident
+    The app name should come AFTER solving, not between incident and solving
     Examples:
     - "incident" → "Software incident solving"  
-    - "incident SDMS" → "Software incident SDMS solving"
-    - "incident Translation Hub" → "Software incident Translation Hub solving"
-    - "Software incident solving" → "Software incident solving" (no change)
+    - "[IM HS PL IT] Software incident FDM Prod Mon-Fri 9-17" → "[IM HS PL IT] Software incident solving FDM Prod Mon-Fri 9-17"
     """
-    # Check if the name contains "incident"
-    if "incident" in name.lower():
-        # If it already has the correct format with "software incident", return as is
-        if "software incident" in name.lower():
-            return name
-        
-        # Pattern to find incident and capture app name that comes between incident and solving/prod
-        # This pattern captures everything between "incident" and "solving" or "Prod"
-        pattern = r'\bincident\b((?:\s+\w+)*?)(?:\s+solving|\s+Prod|\s*$)'
-        
-        def replace_incident(match):
-            app_part = match.group(1) if match.group(1) else ""
-            if app_part.strip():
-                # If there's something after incident (like app name), preserve it
-                return f"Software incident{app_part} solving"
-            else:
-                return "Software incident solving"
-        
-        # Replace incident with proper format
-        name = re.sub(pattern, replace_incident, name, flags=re.IGNORECASE)
-        
-        # Clean up case - ensure first letter is capitalized if at start
-        if name.lower().startswith('software'):
-            name = 'Software' + name[8:]
-        
+    # If the name already has the correct format, return as is
+    if "Software incident solving" in name:
+        return name
+    
+    # Replace standalone "incident" with "Software incident solving"
+    # Use word boundaries to avoid replacing partial matches
+    name = re.sub(r'\bincident\b', 'Software incident solving', name, flags=re.IGNORECASE)
+    
+    # Clean up case - ensure first letter is capitalized if at start
+    if name.lower().startswith('software'):
+        name = 'Software' + name[8:]
+    
     return name
 
 def extract_parent_info(parent_offering):
@@ -224,12 +209,16 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     
     name_parts = [name_prefix, topic, catalog_name.lower()]
     
+    # For incident cases, add "solving" BEFORE app
+    if "incident" in catalog_name.lower() and sr_or_im == "IM":
+        name_parts.append("solving")
+    
     # Add app if provided
     if app:
         name_parts.append(app)
     
-    # Add "solving" for IM
-    if sr_or_im == "IM":
+    # Add "solving" for IM (if not already added for incident)
+    if sr_or_im == "IM" and "solving" not in name_parts:
         name_parts.append("solving")
     
     #name_parts.append("Prod")
@@ -284,12 +273,16 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     
     name_parts = [name_prefix, catalog_name]
     
+    # For incident cases, add "solving" BEFORE app
+    if "incident" in catalog_name.lower() and sr_or_im == "IM":
+        name_parts.append("solving")
+    
     # Add app if provided
     if app:
         name_parts.append(app)
     
-    # Add "solving" for IM
-    if sr_or_im == "IM":
+    # Add "solving" for IM (if not already added for incident)
+    if sr_or_im == "IM" and "solving" not in name_parts:
         name_parts.append("solving")
     
     name_parts.append("Prod")
@@ -360,7 +353,7 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     # Build the name with topic from parent
     name_prefix = f"[{' '.join(prefix_parts)}]"
     
-    # For RecP, use topic (e.g., "Software") + catalog name in lowercase + app + "solving" for IM
+    # For RecP, use topic (e.g., "Software") + catalog name in lowercase
     name_parts = [name_prefix]
     
     if topic:
@@ -368,11 +361,16 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     
     name_parts.append(catalog_name.lower())
     
-    # Add app BEFORE solving for IM
+    # For incident cases, add "solving" BEFORE app
+    if "incident" in catalog_name.lower() and sr_or_im == "IM":
+        name_parts.append("solving")
+    
+    # Add app if provided
     if app:
         name_parts.append(app)
     
-    if sr_or_im == "IM":
+    # Add "solving" for IM (if not already added for incident)
+    if sr_or_im == "IM" and "solving" not in name_parts:
         name_parts.append("solving")
     
     name_parts.append("Prod")
@@ -562,12 +560,16 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         name_parts.append(catalog_name.lower())
         
-        # Add app if provided BEFORE solving
+        # For incident cases, add "solving" BEFORE app
+        if "incident" in catalog_name.lower() and sr_or_im == "IM":
+            name_parts.append("solving")
+        
+        # Add app if provided
         if app:
             name_parts.append(app)
         
-        # Add "solving" for IM - AFTER app but BEFORE checking for Prod
-        if sr_or_im == "IM":
+        # Add "solving" for IM (if not already added for incident)
+        if sr_or_im == "IM" and "solving" not in name_parts:
             name_parts.append("solving")
         
         # Check if topic contains any no-prod keywords
@@ -630,15 +632,25 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         # Build the final name
         prefix = f"[{' '.join(name_parts)}]"
         
-        # Add catalog name and app
+        # Add catalog name
         final_parts = [prefix, catalog_name]
-        
-        if app:
-            final_parts.append(app)
         
         # Check if we should add Prod
         catalog_lower = catalog_name.lower()
         exclude_prod = any(keyword in catalog_lower for keyword in ["hardware", "mailbox", "network", "mobile", "security"])
+        
+        # For incident cases with IM, add solving before app
+        if "incident" in catalog_name.lower() and sr_or_im == "IM":
+            final_parts.append("solving")
+        
+        # Add app if provided
+        if app:
+            final_parts.append(app)
+        
+        # Add "solving" for IM (if not already added)
+        if sr_or_im == "IM" and "solving" not in final_parts:
+            final_parts.append("solving")
+        
         if not exclude_prod:
             final_parts.append("Prod")
         
@@ -692,11 +704,19 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
         else:
             final_name = f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
     else:
-        # For IM: catalog_name + app + solving
-        if app:
-            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving Prod {schedule_suffix}"
+        # For IM: check if incident
+        if "incident" in catalog_name.lower():
+            # For incident cases, add "solving" before app
+            if app:
+                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving {app} Prod {schedule_suffix}"
+            else:
+                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
         else:
-            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
+            # Non-incident IM cases
+            if app:
+                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving Prod {schedule_suffix}"
+            else:
+                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
     
     return ensure_incident_naming(final_name)
 

@@ -59,66 +59,6 @@ def get_division_and_country(parent_content, country, delivering_tag):
     
     return division, country
 
-def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_type_lvl2):
-    """Build name for Lvl2 entries"""
-    parent_content = extract_parent_info(parent_offering)
-    catalog_name = extract_catalog_name(parent_offering)
-    
-    # Extract parts from parent content
-    parts = parent_content.split()
-    country = ""
-    division = ""
-    dept = ""  # IT, HR, etc.
-    
-    for part in parts:
-        if len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
-            country = part
-        elif part in ["HS", "DS"]:
-            division = part
-        elif part in ["IT", "HR", "Medical", "Business Services"]:
-            dept = part
-    
-    # Build the prefix
-    prefix_parts = [sr_or_im]
-    
-    # Special handling for UA and MD - always use DS
-    if country in ["UA", "MD"]:
-        prefix_parts.append("DS")
-    elif division:
-        prefix_parts.append(division)
-    else:
-        prefix_parts.append("HS")  # Default
-    
-    if country:
-        prefix_parts.append(country)
-    
-    if dept:
-        prefix_parts.append(dept)
-    
-    # Build the name
-    name_prefix = f"[{' '.join(prefix_parts)}]"
-    
-    # Extract the core part of catalog name (e.g., "Software incident solving")
-    name_parts = [name_prefix, catalog_name]
-    
-    # Add app if provided
-    if app:
-        name_parts.append(app)
-    
-    # Check if name contains Microsoft - if so, don't add Prod
-    name_so_far = " ".join(name_parts).lower()
-    if "microsoft" not in name_so_far:
-        name_parts.append("Prod")
-    
-    # Add service type if provided (e.g., "Application issue")
-    if service_type_lvl2:
-        name_parts.append(service_type_lvl2)
-    
-    # Add schedule
-    name_parts.append(schedule_suffix)
-    
-    return " ".join(name_parts)
-
 def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP IT offerings"""
     parent_content = extract_parent_info(parent_offering)
@@ -751,9 +691,7 @@ def run_generator(*,
     require_corp_it=False, require_corp_dedicated=False,
     # ADD THESE NEW PARAMETERS
     use_new_parent=False, new_parent_offering="", new_parent="",
-    keywords_excluded="",
-    # ADD LVL2 PARAMETERS
-    use_lvl2=False, service_type_lvl2=""):
+    keywords_excluded=""):
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -869,9 +807,7 @@ def run_generator(*,
     # First, collect all existing offerings from the source files
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         try:
-            # Choose sheet based on use_lvl2
-            sheet_name = "Child SO lvl2" if use_lvl2 else "Child SO lvl1"
-            df = pd.read_excel(wb, sheet_name=sheet_name)
+            df = pd.read_excel(wb, sheet_name="Child SO lvl1")
             if "Name (Child Service Offering lvl 1)" in df.columns:
                 # Clean the names before adding to set - remove extra whitespace and convert to string
                 existing_names = df["Name (Child Service Offering lvl 1)"].dropna().astype(str).str.strip()
@@ -891,9 +827,7 @@ def run_generator(*,
             base_pool = pd.DataFrame([new_row])
         else:
             # ORIGINAL LOGIC - read from Excel file
-            # Choose sheet based on use_lvl2
-            sheet_name = "Child SO lvl2" if use_lvl2 else "Child SO lvl1"
-            df = pd.read_excel(wb, sheet_name=sheet_name)
+            df = pd.read_excel(wb, sheet_name="Child SO lvl1")
             
             # Add missing columns as empty
             for col in need_cols:
@@ -904,19 +838,11 @@ def run_generator(*,
             if "Visibility group" not in df.columns:
                 df["Visibility group"] = ""
 
-            # For Lvl2, different filtering logic
-            if use_lvl2:
-                # For Lvl2, we prepend SR/IM to parent offering during name building
-                # So we need to filter differently
-                mask=(df.apply(row_keywords_ok,axis=1)
-                      & df.apply(row_excluded_keywords_ok,axis=1)
-                      & df.apply(lc_ok,axis=1))
-            else:
-                mask=(df.apply(row_keywords_ok,axis=1)
-                      & df.apply(row_excluded_keywords_ok,axis=1)
-                      & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
-                      & df.apply(lc_ok,axis=1)
-                      & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
+            mask=(df.apply(row_keywords_ok,axis=1)
+                  & df.apply(row_excluded_keywords_ok,axis=1)
+                  & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
+                  & df.apply(lc_ok,axis=1)
+                  & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
             
             if require_corp:
                 mask &= df["Name (Child Service Offering lvl 1)"].str.contains(r"\bCORP\b",case=False)
@@ -982,14 +908,6 @@ def run_generator(*,
 
             parent_full=str(base_row["Parent Offering"])
             
-            # For Lvl2, modify parent_full to include SR/IM
-            if use_lvl2:
-                # Extract parent content and catalog name
-                parent_content = extract_parent_info(parent_full)
-                catalog_name = extract_catalog_name(parent_full)
-                # Create new parent_full with SR/IM prepended
-                parent_full = f"[Parent {sr_or_im} {parent_content}] {catalog_name}"
-            
             # Store original depend on value
             original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
 
@@ -1008,12 +926,7 @@ def run_generator(*,
                                 base_row_df = base_row.to_frame().T.copy()
                                 original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
                 
-                        # Build name based on type
-                        if use_lvl2:
-                            new_name = build_lvl2_name(
-                                parent_full, sr_or_im, app, schedule_suffix, service_type_lvl2
-                            )
-                        elif require_corp:
+                        if require_corp:
                             new_name = build_corp_name(
                                 parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                             )
@@ -1092,24 +1005,20 @@ def run_generator(*,
                             
                         orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
                         
-                        # For Lvl2, keep empty commitments empty
-                        if use_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
-                            row["Service Commitments"] = ""
+                        # Handle custom commitments - use both approaches
+                        if use_custom_commitments and custom_commitments_str:
+                           # Use the direct string if provided
+                           row["Service Commitments"] = custom_commitments_str
+                        elif use_custom_commitments and commitment_country:
+                            # Use custom_commit_block function if country provided
+                            row["Service Commitments"] = custom_commit_block(
+                                commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
+                                rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
+                                rsp_time, rsl_time
+                            )
                         else:
-                            # Handle custom commitments - use both approaches
-                            if use_custom_commitments and custom_commitments_str:
-                               # Use the direct string if provided
-                               row["Service Commitments"] = custom_commitments_str
-                            elif use_custom_commitments and commitment_country:
-                                # Use custom_commit_block function if country provided
-                                row["Service Commitments"] = custom_commit_block(
-                                    commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
-                                    rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
-                                    rsp_time, rsl_time
-                                )
-                            else:
-                               # Use existing logic
-                               row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
+                           # Use existing logic
+                           row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
                         
                         # Special handling for IT with UA/MD - always use DS
                         if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
@@ -1140,9 +1049,7 @@ def run_generator(*,
         raise ValueError("No matching rows found with the specified keywords.")
 
     out_dir.mkdir(parents=True,exist_ok=True)
-    # Update filename to include lvl1 or lvl2
-    suffix = "lvl2" if use_lvl2 else "lvl1"
-    outfile=out_dir / f"Offerings_NEW_{suffix}_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    outfile=out_dir / f"Offerings_NEW_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
     
 
     # Write to Excel with special handling for empty values

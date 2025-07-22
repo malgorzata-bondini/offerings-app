@@ -29,7 +29,7 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "Create Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "New Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
     
     with tab1:
         st.subheader("Basic Settings")
@@ -39,6 +39,8 @@ with col2:
         **Keywords filtering:**
         - Line-separated keywords: OR logic (any match)
         - Comma-separated keywords: AND logic (all must match)
+        - When "Include Level 2" is checked: Searches in BOTH Child SO lvl1 AND lvl2 sheets
+        - When unchecked: Searches only in Child SO lvl1 sheet
         """)
         
         keywords_parent = st.text_area(
@@ -69,15 +71,34 @@ with col2:
         ).strip().split('\n')
         new_apps = [a.strip() for a in new_apps if a.strip()]
         
-        sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
+        sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True, help="This will be used in naming for both lvl1 and lvl2 entries")
+        
+        # Add Lvl2 checkbox
+        st.markdown("---")
+        use_lvl2 = st.checkbox(
+            "Include Level 2 (Child SO lvl2)",
+            help="When checked, search in BOTH Child SO lvl1 AND Child SO lvl2 sheets. When unchecked, only search lvl1."
+        )
+        
+        if use_lvl2:
+            service_type = st.text_input(
+                "Service Type (for Lvl2 entries)",
+                value="",
+                placeholder="e.g., Application issue, Hardware problem",
+                help="Optional - This will be added to Lvl2 entries after Prod and before the schedule"
+            )
+            st.info("📌 Will search in BOTH levels: Child SO lvl1 AND Child SO lvl2. For Lvl2 entries, the selected SR/IM will be added to Parent Offering if not already present.")
+        else:
+            service_type = ""
+            st.info("📌 Will search only in Child SO lvl1")
         
         delivery_manager = st.text_input("Delivery Manager", value="")
     
     with tab2:
-        st.subheader("Parent Offering")
+        st.subheader("Direct Parent Offering Selection")
         
         use_new_parent = st.checkbox(
-            "Create a new parent offering (instead of parent keyword search)",
+            "Use specific parent offering (instead of parent keyword search)",
             help="When checked, you can enter a completely new Parent Offering and Parent name"
         )
         
@@ -104,6 +125,8 @@ with col2:
             # Show preview
             if new_parent_offering and new_parent:
                 st.success(f"📋 Will use: Parent Offering = '{new_parent_offering}', Parent = '{new_parent}'")
+                # Note about Level 2 behavior
+                st.info("📌 If 'Include Level 2' is checked in Basic tab, SR/IM will be added to Level 2 entries")
         else:
             new_parent_offering = ""
             new_parent = ""
@@ -114,6 +137,11 @@ with col2:
             keywords_parent = ""
             keywords_child = ""
             keywords_excluded = ""
+        elif use_lvl2:
+            st.info("""
+            📝 Note: Keywords will search in BOTH "Child SO lvl1" AND "Child SO lvl2" sheets.
+            For Lvl2 entries, SR/IM will be automatically added to Parent Offering when building names.
+            """)
     
     with tab3:
         st.subheader("Schedule Settings")
@@ -282,21 +310,23 @@ with col2:
         )
     
     with tab6:
-        st.subheader("Select one of the following:")
+        st.subheader("Select naming convention to use:")
+        
+        st.info("⚠️ Important: These checkboxes only control which naming convention is applied to ALL matching entries. They do NOT filter which entries are processed.")
 
         
         # Create a column to ensure vertical layout - ALPHABETICAL ORDER
         col = st.container()
         with col:
             # List in alphabetical order
-            require_corp = st.checkbox("CORP")
-            require_recp = st.checkbox("RecP")
-            require_corp_dedicated = st.checkbox("CORP Dedicated Services")
-            require_corp_it = st.checkbox("CORP IT")
-            special_dak = st.checkbox("DAK (Business Services)")
-            special_hr = st.checkbox("HR")
-            special_it = st.checkbox("IT")
-            special_medical = st.checkbox("Medical")
+            require_corp = st.checkbox("CORP", help="Apply CORP naming to ALL matching entries")
+            require_recp = st.checkbox("RecP", help="Apply RecP naming to ALL matching entries")
+            require_corp_dedicated = st.checkbox("CORP Dedicated Services", help="Apply CORP Dedicated naming to ALL matching entries")
+            require_corp_it = st.checkbox("CORP IT", help="Apply CORP IT naming to ALL matching entries")
+            special_dak = st.checkbox("DAK (Business Services)", help="Apply Business Services naming to ALL matching entries")
+            special_hr = st.checkbox("HR", help="Apply HR naming to ALL matching entries")
+            special_it = st.checkbox("IT", help="Apply IT naming to ALL matching entries")
+            special_medical = st.checkbox("Medical", help="Apply Medical naming to ALL matching entries")
 
         
         # Ensure only one is selected
@@ -305,6 +335,8 @@ with col2:
             st.error("⚠️ Please select only one naming type")
             # Reset all to handle multiple selection
             require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = False
+        elif all_selected == 0:
+            st.info("📌 No special naming selected - will use standard naming for ALL matching entries (including RecP, IT, HR, Medical, etc.)")
         
         if require_corp or require_recp or require_corp_it or require_corp_dedicated:
             delivering_tag = st.text_input(
@@ -337,34 +369,52 @@ st.markdown("---")
 
 # Show naming examples based on selections
 with st.expander("📋 Naming Convention Examples"):
-    if 'require_corp' in locals() and require_corp:
+    if 'use_lvl2' in locals() and use_lvl2:
+        st.markdown("**Level 1 Example:**")
+        st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 9-17")
+        st.markdown("**Level 2 Example:**")
+        st.code("[IM HS PL IT] Software incident solving EMR 2.0 Prod Application issue Mon-Sun 24/7")
+        st.markdown("From parent: `[Parent HS PL IT] Software incident solving` → IM added automatically")
+        if 'service_type' in locals() and service_type:
+            st.info(f"Service Type '{service_type}' will be added to Lvl2 entries after Prod")
+        st.markdown("**📂 Output:** Separate sheets like 'PL lvl1' and 'PL lvl2' in the same file")
+    elif 'require_corp' in locals() and require_corp:
         st.markdown("**CORP Example:**")
         st.code("[SR HS PL CORP DS DE] Software assistance Outlook Prod Mon-Fri 8-17")
+        st.info("Applied to ALL matching entries using CORP naming style")
     elif 'require_corp_it' in locals() and require_corp_it:
         st.markdown("**CORP IT Example:**")
         st.code("[SR HS PL CORP HS PL IT] Software assistance MS Outlook Prod Mon-Fri 8-17")
+        st.info("Applied to ALL matching entries using CORP IT naming style")
     elif 'require_corp_dedicated' in locals() and require_corp_dedicated:
         st.markdown("**CORP Dedicated Services Example:**")
         st.code("[SR HS PL CORP HS DE Dedicated Services] HelpMe announcement creation ServiceNow HelpMe Prod Mon-Fri 9-17")
+        st.info("Applied to ALL matching entries using CORP Dedicated Services naming style")
     elif 'require_recp' in locals() and require_recp:
         st.markdown("**RecP Example:**")
         st.code("[IM HS PL CORP HS PL IT] Software incident solving Active Directory Prod Mon-Fri 6-21")
+        st.info("Applied to ALL matching entries using RecP naming style")
     elif 'special_it' in locals() and special_it:
         st.markdown("**IT Example:**")
         st.code("[SR HS PL IT] Software assistance Outlook Prod Mon-Fri 8-17")
+        st.info("Applied to ALL matching entries using IT naming style")
     elif 'special_hr' in locals() and special_hr:
         st.markdown("**HR Example:**")
         st.code("[SR HS PL HR] Software assistance Outlook Prod Mon-Fri 8-17")
+        st.info("Applied to ALL matching entries using HR naming style")
     elif 'special_medical' in locals() and special_medical:
         st.markdown("**Medical Example:**")
         st.code("[SR HS PL Medical] TeleCentrum medical procedures and quality of care Mon-Fri 7-20")
+        st.info("Applied to ALL matching entries using Medical naming style")
     elif 'special_dak' in locals() and special_dak:
         st.markdown("**DAK (Business Services) Example:**")
         st.code("[SR HS PL Business Services] Product modifications Service removal Mon-Fri 8-17")
+        st.info("Applied to ALL matching entries using Business Services naming style")
     else:
         st.markdown("**Standard Example:**")
         st.code("[SR HS PL Permissions] Granting permissions to application Outlook Prod Mon-Fri 9-17")
         st.markdown("From parent: `[Parent HS PL Permissions] Granting permissions to application`")
+        st.info("Standard naming is applied to ALL matching entries (no special naming selected)")
 
 # MODIFY THIS VALIDATION SECTION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
@@ -423,7 +473,10 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         use_new_parent=use_new_parent,
                         new_parent_offering=new_parent_offering,
                         new_parent=new_parent,
-                        keywords_excluded=keywords_excluded if not use_new_parent else ""
+                        keywords_excluded=keywords_excluded if not use_new_parent else "",
+                        # Add Lvl2 parameters
+                        use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
+                        service_type_lvl2=service_type if 'service_type' in locals() else ""
                     )
                 
                 st.success("✅ Service offerings generated successfully!")
@@ -438,6 +491,10 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                     )
                 
                 st.info(f"Generated file: {result_file.name}")
+                if use_lvl2:
+                    st.info("📊 The file contains separate sheets for each level (e.g., 'PL lvl1', 'PL lvl2')")
+                else:
+                    st.info("📊 The file contains sheets named by country with lvl1 suffix (e.g., 'PL lvl1')")
                 
         except ValueError as e:
             if "duplicate offering" in str(e).lower():
@@ -452,7 +509,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v3.0 | With Enhanced Naming Logic
+        Service Offerings Generator v3.3 | Fixed: Naming checkboxes now only control naming style, not filtering
     </div>
     """,
     unsafe_allow_html=True

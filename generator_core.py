@@ -18,6 +18,37 @@ need_cols = [
 
 discard_lc  = {"retired", "retiring", "end of life", "end of support"}
 
+def ensure_incident_naming(name):
+    """
+    Ensure that 'incident' is always part of 'Software incident solving'
+    Examples:
+    - "incident" → "Software incident solving"  
+    - "incident management" → "Software incident solving"
+    - "incident solving" → "Software incident solving"
+    - "Software incident solving" → "Software incident solving" (no change)
+    """
+    # Check if the name contains "incident"
+    if "incident" in name.lower():
+        # If it already has the correct format, return as is
+        if "software incident solving" in name.lower():
+            return name
+        
+        # Replace various forms of incident with the correct phrase
+        import re
+        
+        # Pattern to match "incident" followed by optional words (like "solving", "management", etc.)
+        # but not if it's already preceded by "Software" and followed by "solving"
+        pattern = r'(?<!Software\s)\bincident\b(?:\s+\w+)?'
+        
+        # Replace with "Software incident solving"
+        name = re.sub(pattern, 'Software incident solving', name, flags=re.IGNORECASE)
+        
+        # Clean up case - ensure first letter is capitalized if at start
+        if name.lower().startswith('software'):
+            name = 'Software' + name[8:]
+        
+    return name
+
 def extract_parent_info(parent_offering):
     """Extract the content between [Parent ...] from parent offering"""
     match = re.search(r'\[Parent\s+(.*?)\]', str(parent_offering), re.I)
@@ -130,7 +161,9 @@ def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_typ
     # Add schedule
     name_parts.append(schedule_suffix)
     
-    return " ".join(name_parts)
+    # Join and ensure incident naming
+    final_name = " ".join(name_parts)
+    return ensure_incident_naming(final_name)
 
 def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP IT offerings"""
@@ -196,7 +229,9 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     #name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
-    return " ".join(name_parts)
+    # Join and ensure incident naming
+    final_name = " ".join(name_parts)
+    return ensure_incident_naming(final_name)
 
 def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP Dedicated Services offerings"""
@@ -254,7 +289,9 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
-    return " ".join(name_parts)
+    # Join and ensure incident naming
+    final_name = " ".join(name_parts)
+    return ensure_incident_naming(final_name)
 
 def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for RecP offerings"""
@@ -334,7 +371,9 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
-    return " ".join(name_parts)
+    # Join and ensure incident naming
+    final_name = " ".join(name_parts)
+    return ensure_incident_naming(final_name)
 
 def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None):
     """Build standard name when not CORP"""
@@ -388,7 +427,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         prefix_parts.append("Medical")
         
         # Use topic from parent and lowercase catalog name
-        return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+        final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
     
     elif special_dept == "DAK":
         # Replace DAK with Business Services - NO PROD
@@ -417,9 +457,10 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Add app only if provided - NO PROD
         if app:
-            return f"[{' '.join(prefix_parts)}] {catalog_name} {app} {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} {schedule_suffix}"
         else:
-            return f"[{' '.join(prefix_parts)}] {catalog_name} {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
     
     elif special_dept == "HR":
         # HR - NO PROD
@@ -455,9 +496,10 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Add app if provided - NO PROD
         if app:
-            return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} {schedule_suffix}"
         else:
-            return f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
     
     elif special_dept == "IT":
         # IT - special handling
@@ -531,7 +573,9 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         name_parts.append(schedule_suffix)
         
-        return " ".join(name_parts)
+        # Join and ensure incident naming
+        final_name = " ".join(name_parts)
+        return ensure_incident_naming(final_name)
     
     else:
         # Standard case - just replace Parent with SR/IM
@@ -558,14 +602,16 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
                     updated_parent_content = f"DS UA {parent_content.replace('UA', '').strip()}"
             
             if app:
-                return f"[{sr_or_im} {updated_parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
+                final_name = f"[{sr_or_im} {updated_parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
             else:
-                return f"[{sr_or_im} {updated_parent_content}] {catalog_name} Prod {schedule_suffix}"
+                final_name = f"[{sr_or_im} {updated_parent_content}] {catalog_name} Prod {schedule_suffix}"
+            return ensure_incident_naming(final_name)
         else:
             if app:
-                return f"[{sr_or_im} {parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
+                final_name = f"[{sr_or_im} {parent_content}] {catalog_name} {app} Prod {schedule_suffix}"
             else:
-                return f"[{sr_or_im} {parent_content}] {catalog_name} Prod {schedule_suffix}"
+                final_name = f"[{sr_or_im} {parent_content}] {catalog_name} Prod {schedule_suffix}"
+            return ensure_incident_naming(final_name)
 
 def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP offerings"""
@@ -608,14 +654,16 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     
     if sr_or_im == "SR":
         if app:
-            return f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
         else:
-            return f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
     else:
         if app:
-            return f"[{' '.join(prefix_parts)}] {catalog_name} solving {app} Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving {app} Prod {schedule_suffix}"
         else:
-            return f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
+    
+    return ensure_incident_naming(final_name)
 
 def update_commitments(orig, sched, rsp, rsl, sr_or_im, country):
     """Update existing commitments and ensure OLA is present"""

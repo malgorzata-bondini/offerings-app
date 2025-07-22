@@ -292,19 +292,58 @@ with col2:
                     country_enabled = st.checkbox(f"Configure {country}", key=f"enable_{country}")
                     
                     if country_enabled:
-                        support_groups_per_country[country] = st.text_input(
-                            f"Support Group",
-                            value="",
-                            key=f"support_{country}",
-                            placeholder=f"e.g., {country} IT Support"
-                        )
-                        managed_by_groups_per_country[country] = st.text_input(
-                            f"Managed by Group",
-                            value="",
-                            key=f"managed_{country}",
-                            placeholder=f"Optional - defaults to Support Group if empty",
-                            help="If empty, will use the Support Group value"
-                        )
+                        # Special handling for DE - multiple support groups
+                        if country == "DE":
+                            num_de_groups = st.number_input(
+                                f"Number of Support Groups for DE", 
+                                min_value=1, 
+                                max_value=5, 
+                                value=1, 
+                                key=f"num_groups_DE",
+                                help="DE can have multiple support groups for the same offerings"
+                            )
+                            
+                            de_support_groups = []
+                            de_managed_groups = []
+                            
+                            for group_idx in range(num_de_groups):
+                                st.markdown(f"**DE Support Group {group_idx + 1}**")
+                                de_support_group = st.text_input(
+                                    f"Support Group {group_idx + 1}",
+                                    value="",
+                                    key=f"support_DE_{group_idx}",
+                                    placeholder=f"e.g., DE IT Support Team {group_idx + 1}"
+                                )
+                                de_managed_group = st.text_input(
+                                    f"Managed by Group {group_idx + 1}",
+                                    value="",
+                                    key=f"managed_DE_{group_idx}",
+                                    placeholder=f"Optional - defaults to Support Group if empty",
+                                    help="If empty, will use the Support Group value"
+                                )
+                                
+                                if de_support_group:
+                                    de_support_groups.append(de_support_group)
+                                    de_managed_groups.append(de_managed_group if de_managed_group else de_support_group)
+                            
+                            # Join multiple groups with newlines
+                            support_groups_per_country[country] = "\n".join(de_support_groups) if de_support_groups else ""
+                            managed_by_groups_per_country[country] = "\n".join(de_managed_groups) if de_managed_groups else ""
+                        else:
+                            # Standard single support group for other countries
+                            support_groups_per_country[country] = st.text_input(
+                                f"Support Group",
+                                value="",
+                                key=f"support_{country}",
+                                placeholder=f"e.g., {country} IT Support"
+                            )
+                            managed_by_groups_per_country[country] = st.text_input(
+                                f"Managed by Group",
+                                value="",
+                                key=f"managed_{country}",
+                                placeholder=f"Optional - defaults to Support Group if empty",
+                                help="If empty, will use the Support Group value"
+                            )
                     else:
                         support_groups_per_country[country] = ""
                         managed_by_groups_per_country[country] = ""
@@ -457,7 +496,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v3.6 | Support Groups: HS PL / DS PL Division Support
+        Service Offerings Generator v3.7 | DE Multiple Support Groups Support
     </div>
     """,
     unsafe_allow_html=True

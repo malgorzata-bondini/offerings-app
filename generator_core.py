@@ -517,7 +517,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Special handling for UA and MD - always use DS
         if country in ["UA", "MD"]:
-            prefix_parts.extend(["DS", country])
+            prefix_parts.extend(["DS", country"])
         else:
             if division:
                 prefix_parts.append(division)
@@ -940,6 +940,19 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
         single_managed = country_managed_groups or single_support or ""
         return [(single_support, single_managed)] if single_support else [("", "")]
 
+def get_de_company_and_ldap(support_group, receiver):
+    """Get the Subscribed by Company and LDAP values for DE based on support group"""
+    # Special mappings for DE support groups
+    if support_group == "DS DE IT Service Desk -Labs" and receiver == "DS DE":
+        return "DE IFLB Laboratories DE IMD Laboratories", "imd-labore.intern [General]"
+    elif support_group == "HS DE IT Service Desk - MCC" and receiver == "HS DE":
+        return "DE External Patients", "mednet-de.world [Medicover Clinics]"
+    elif support_group == "HS DE IT Service Desk HC" and receiver == "HS DE":
+        return "DE Internal Patients", "CALDOM1.DE [Hospital Calbe]"
+    else:
+        # For other support groups, return the support group as company and empty LDAP
+        return support_group, ""
+
 def run_generator(*,
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
@@ -967,6 +980,7 @@ def run_generator(*,
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
+    original_ldap_data = {}  # Store LDAP data from original files
 
     def parse_keywords(keyword_string):
         """Parse keywords - returns (keywords_list, use_and_logic)"""
@@ -1095,7 +1109,7 @@ def run_generator(*,
     elif special_dak:
         special_dept = "DAK"
 
-    # First, collect all existing offerings from the source files
+    # First, collect all existing offerings and LDAP data from the source files
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         try:
             # Check BOTH sheets for existing offerings
@@ -1106,6 +1120,23 @@ def run_generator(*,
                         # Clean the names before adding to set - remove extra whitespace and convert to string
                         existing_names = df["Name (Child Service Offering lvl 1)"].dropna().astype(str).str.strip()
                         existing_offerings.update(existing_names)
+                    
+                    # Collect LDAP data for DE
+                    if wb.stem.endswith("_DE") and "Support group" in df.columns:
+                        # Look for LDAP columns
+                        ldap_cols = [col for col in df.columns if "LDAP" in col or "Ldap" in col or "ldap" in col]
+                        if ldap_cols and "Support group" in df.columns:
+                            for idx, row in df.iterrows():
+                                sg = str(row.get("Support group", "")).strip()
+                                if sg:
+                                    # Store all LDAP values for this support group
+                                    ldap_values = {}
+                                    for ldap_col in ldap_cols:
+                                        ldap_val = str(row.get(ldap_col, "")).strip()
+                                        if ldap_val and ldap_val not in ["nan", "NaN", ""]:
+                                            ldap_values[ldap_col] = ldap_val
+                                    if ldap_values:
+                                        original_ldap_data[sg] = ldap_values
                 except Exception:
                     # Skip if sheet doesn't exist
                     continue
@@ -1148,6 +1179,12 @@ def run_generator(*,
                     # Ensure Visibility group column exists
                     if "Visibility group" not in df.columns:
                         df["Visibility group"] = ""
+                    
+                    # Add LDAP columns if they don't exist
+                    ldap_cols = [col for col in df.columns if "LDAP" in col or "Ldap" in col or "ldap" in col]
+                    if not ldap_cols:
+                        # Add a default LDAP column
+                        df["LDAP"] = ""
 
                     # Debug: Check if we have the required columns
                     if "Parent Offering" in df.columns and "Name (Child Service Offering lvl 1)" in df.columns:
@@ -1391,17 +1428,37 @@ def run_generator(*,
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
                                     
+                                    # Handle DE special cases
+                                    if country == "DE":
+                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv)
+                                        row.loc[:, "Subscribed by Company"] = company
+                                        
+                                        # Handle LDAP columns
+                                        ldap_cols = [col for col in row.columns if "LDAP" in col or "Ldap" in col or "ldap" in col]
+                                        if ldap_cols:
+                                            # Clear all LDAP columns first
+                                            for ldap_col in ldap_cols:
+                                                row.loc[:, ldap_col] = ""
+                                            
+                                            # Set the special LDAP value if we have one
+                                            if ldap:
+                                                # Use the first LDAP column
+                                                row.loc[:, ldap_cols[0]] = ldap
+                                            else:
+                                                # Try to find LDAP from original data
+                                                if support_group_for_country in original_ldap_data:
+                                                    ldap_data = original_ldap_data[support_group_for_country]
+                                                    for ldap_col, ldap_val in ldap_data.items():
+                                                        if ldap_col in row.columns:
+                                                            row.loc[:, ldap_col] = ldap_val
                                     # PL subscription splits: determine based on actual generated name new_name
-                                    if country == "PL":
+                                    elif country == "PL":
                                         # Check for HS PL pattern in generated name
                                         if re.search(r'\[\w+\s+HS\s+PL', new_name) or " HS PL " in new_name:
                                             row.loc[:, "Subscribed by Company"] = "HS PL"
                                         else:
                                             # Default to DS PL
                                             row.loc[:, "Subscribed by Company"] = "DS PL"
-                                    elif country == "DE":
-                                        # Set Subscribed by Company directly from the support group entered
-                                        row.loc[:, "Subscribed by Company"] = support_group_for_country if support_group_for_country else ""
                                     elif country == "UA":
                                         row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
                                     elif country == "MD":

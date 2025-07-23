@@ -1292,7 +1292,17 @@ def run_generator(
                                 country, recv, schedule_settings_per_country, schedule_suffixes
                             )
                             
+                            # Check if schedule is missing (no schedules found)
+                            schedule_missing = not country_schedule_suffixes or all(not s.strip() for s in country_schedule_suffixes)
+                            
+                            # If no schedules found, create one entry with empty schedule and flag
+                            if not country_schedule_suffixes:
+                                country_schedule_suffixes = [""]  # Empty schedule
+                            
                             for schedule_suffix in country_schedule_suffixes:
+                                # Flag to track if schedule is missing
+                                missing_schedule = schedule_missing
+                                
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:
                                     # Always attempt to pick matching row but do not skip if none found
@@ -1449,6 +1459,9 @@ def run_generator(
                                     seen.add(key)
                                     row = base_row_df.copy()
                                     
+                                    # Add flag for missing schedule (for red formatting later)
+                                    row.loc[:, "_missing_schedule"] = missing_schedule
+                                    
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
                                     row.loc[:, "Delivery Manager"] = delivery_manager
@@ -1531,8 +1544,11 @@ def run_generator(
                                     
                                     orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
                                     
+                                    # If schedule is missing, leave Service Commitments empty
+                                    if missing_schedule:
+                                        row.loc[:, "Service Commitments"] = ""
                                     # For Lvl2, keep empty commitments empty
-                                    if is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
+                                    elif is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
                                         row.loc[:, "Service Commitments"] = ""
                                     else:
                                         # Handle custom commitments - use both approaches
@@ -1606,6 +1622,9 @@ def run_generator(
         suffix = "lvl1"
     outfile = out_dir / f"Offerings_NEW_{suffix}_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
     
+    # Store missing schedule info for formatting
+    missing_schedule_info = {}
+    
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile, engine="openpyxl") as w:
         # Sort sheet names alphabetically
@@ -1613,6 +1632,12 @@ def run_generator(
         
         for sheet_name in sorted_sheets:
             dfc = sheets[sheet_name].copy()  # Make a copy to avoid modifying original
+            
+            # Track rows with missing schedules for red formatting
+            missing_schedule_rows = []
+            if "_missing_schedule" in dfc.columns:
+                missing_schedule_rows = dfc[dfc["_missing_schedule"] == True].index.tolist()
+                dfc = dfc.drop(columns=["_missing_schedule"])
             
             # Remove helper column tracking receiver side
             if "_recv" in dfc.columns:
@@ -1628,12 +1653,24 @@ def run_generator(
                 keep="first"
             ).copy()
             
+            # Update missing schedule rows indices after deduplication
+            if missing_schedule_rows:
+                # Map old indices to new indices after deduplication
+                old_to_new_mapping = {old_idx: new_idx for new_idx, old_idx in enumerate(dfc.index) 
+                                     if old_idx in df_final.index}
+                missing_schedule_rows = [old_to_new_mapping.get(idx) for idx in missing_schedule_rows 
+                                       if idx in old_to_new_mapping]
+                missing_schedule_rows = [idx for idx in missing_schedule_rows if idx is not None]
+            
             if "Number" in df_final.columns:
                 df_final = df_final.drop(columns=["Number"])
             
             # Remove Visibility group column for PL
             if cc == "PL" and "Visibility group" in df_final.columns:
                 df_final = df_final.drop(columns=["Visibility group"])
+            
+            # Store missing schedule info for this sheet for later formatting
+            missing_schedule_info[sheet_name] = missing_schedule_rows
             
             # Clean data before writing to Excel
             for col in df_final.columns:
@@ -1676,6 +1713,29 @@ def run_generator(
     try:
         wb = load_workbook(outfile)
         for ws in wb.worksheets:
+            sheet_name = ws.title
+            
+            # Apply red formatting to Name column for rows with missing schedules
+            if sheet_name in missing_schedule_info:
+                from openpyxl.styles import PatternFill
+                red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+                
+                # Find Name column
+                name_col_idx = None
+                for col_idx, cell in enumerate(ws[1], start=1):  # Header row
+                    if cell.value == "Name (Child Service Offering lvl 1)":
+                        name_col_idx = col_idx
+                        break
+                
+                if name_col_idx:
+                    name_col_letter = get_column_letter(name_col_idx)
+                    for row_idx in missing_schedule_info[sheet_name]:
+                        # +2 because: +1 for header row, +1 for 1-based indexing
+                        excel_row_idx = row_idx + 2
+                        if excel_row_idx <= ws.max_row:
+                            cell = ws[f"{name_col_letter}{excel_row_idx}"]
+                            cell.fill = red_fill
+            
             # Apply column widths and formatting
             for col_idx, col in enumerate(ws.columns, start=1):
                 col_letter = get_column_letter(col_idx)

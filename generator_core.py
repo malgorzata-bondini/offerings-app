@@ -1185,30 +1185,26 @@ def run_generator(*,
                     base_row_df = base_row.to_frame().T.copy()
                     tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
-                    # FIXED: Always determine receivers for DE based on naming settings
-                    # FIXED: For PL with IT department, create both DS PL and HS PL receivers
+                    # Determine receivers by country
                     if country == "DE":
-                        # DE ALWAYS gets split into DS DE and HS DE regardless of naming tab selection
+                        # DE always splits into DS and HS
                         receivers = ["DS DE", "HS DE"]
-                    elif special_dept == "IT" and country == "PL":
-                        # FIXED: For PL IT department, create both DS PL and HS PL receivers
+                    elif country == "PL":
+                        # PL always splits into DS and HS
                         receivers = ["DS PL", "HS PL"]
                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                        # Other countries when CORP/RecP/CORP IT/CORP Dedicated is selected
-                        if country in {"UA", "MD"}: 
+                        # CORP/RecP cases use DS by default for supported countries
+                        if country in {"UA", "MD"}:
                             receivers = [f"DS {country}"]
-                        elif country == "PL":         
-                            # Check if DS PL exists in the data
-                            if "DS PL" in base_pool["Name (Child Service Offering lvl 1)"].str.cat(sep=" "):
-                                receivers = ["DS PL"]
-                            else:
-                                receivers = ["HS PL"]
-                        elif country == "CY":         
-                            receivers = ["DS CY", "HS CY"]
-                        else:                       
+                        else:
                             receivers = [f"DS {country}"]
+                    elif country == "CY":
+                        receivers = ["DS CY", "HS CY"]
+                    elif country in {"UA", "MD"}:
+                        # Standard naming for UA/MD
+                        receivers = [f"DS {country}"]
                     else:
-                        # For standard naming (IT, HR, Medical, etc.) - non-DE countries
+                        # Standard single receiver for other countries
                         receivers = [""]
 
                     parent_full = str(base_row["Parent Offering"])

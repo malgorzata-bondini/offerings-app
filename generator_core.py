@@ -1000,7 +1000,8 @@ def run_generator(
     keywords_excluded="",
     use_lvl2=False, service_type_lvl2="",
     support_groups_per_country=None, managed_by_groups_per_country=None,
-    schedule_settings_per_country=None):
+    schedule_settings_per_country=None,
+    use_custom_depend_on=False, custom_depend_on_value=""):
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
@@ -1553,7 +1554,10 @@ def run_generator(
                                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
                                     
                                     # Always update Service Offerings | Depend On based on computed depend_tag and app
-                                    if app:
+                                    if use_custom_depend_on and custom_depend_on_value:
+                                        # Use custom value if specified
+                                        row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
+                                    elif app:
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}] {app}"
                                     else:
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}]"

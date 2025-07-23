@@ -421,6 +421,21 @@ with col2:
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)
         
+        # Custom Depend On setting
+        st.markdown("### Service Offerings | Depend On")
+        use_custom_depend_on = st.checkbox("Use custom 'Service Offerings | Depend On' value", value=False, 
+                                          help="Override automatic generation with a custom value for all rows")
+        
+        if use_custom_depend_on:
+            custom_depend_on_value = st.text_input(
+                "Custom Depend On Value",
+                value="",
+                placeholder="e.g., [Global Prod] Application Name",
+                help="This value will be used for ALL generated rows instead of the automatic generation"
+            )
+        else:
+            custom_depend_on_value = ""
+        
         # Aliases
         st.markdown("### Aliases")
         aliases_on = st.checkbox("Enable Aliases", value=False)
@@ -499,7 +514,10 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         support_groups_per_country=support_groups_per_country if use_per_country_groups else {},
                         managed_by_groups_per_country=managed_by_groups_per_country if use_per_country_groups else {},
                         # Add per-country schedule settings
-                        schedule_settings_per_country=schedule_settings_per_country if use_per_country_schedules else {}
+                        schedule_settings_per_country=schedule_settings_per_country if use_per_country_schedules else {},
+                        # Add custom depend on value
+                        use_custom_depend_on=use_custom_depend_on if 'use_custom_depend_on' in locals() else False,
+                        custom_depend_on_value=custom_depend_on_value if 'custom_depend_on_value' in locals() else ""
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

@@ -1,5 +1,6 @@
 import datetime as dt
-import re, warnings
+import re
+import warnings
 from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
@@ -16,7 +17,7 @@ need_cols = [
     "Subscribed by Company", "Visibility group",
 ]
 
-discard_lc  = {"retired", "retiring", "end of life", "end of support"}
+discard_lc = {"retired", "retiring", "end of life", "end of support"}
 
 def ensure_incident_naming(name):
     """
@@ -262,7 +263,7 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    #name_parts.append("Prod")
+    # name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
     # Join and ensure incident naming
@@ -431,7 +432,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_lower = parent_offering.lower()
     catalog_lower = catalog_name.lower()
     parent_content_lower = parent_content.lower()
-    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower for keyword in no_prod_keywords)
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                      for keyword in no_prod_keywords)
     
     if special_dept == "Medical":
         # Extract division and country from parent content
@@ -803,20 +805,20 @@ def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
     """Create commitment block with OLA for all countries"""
     if sr_or_im == "IM":
         # For IM, no OLA
-        lines=[
+        lines = [
             f"[{cc}] SLA IM RSP {schedule_suffix} P1-P4 {rsp_duration}",
             f"[{cc}] SLA IM RSL {schedule_suffix} P1-P4 {rsl_duration}"
         ]
     elif cc == "PL":
         # For SR and PL, include OLA (PL already has OLA in source data)
-        lines=[
+        lines = [
             f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
             f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
             f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
         ]
     else:
         # For SR and other countries, include OLA
-        lines=[
+        lines = [
             f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
             f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
             f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
@@ -887,7 +889,8 @@ def get_support_group_for_country(country, support_group, support_groups_per_cou
         return support_groups_per_country[country]
     return support_group
 
-def get_managed_by_group_for_country(country, managed_by_group, managed_by_groups_per_country, support_group_for_country, division=None):
+def get_managed_by_group_for_country(country, managed_by_group, managed_by_groups_per_country, 
+                                     support_group_for_country, division=None):
     """Get the appropriate managed by group for a given country and division"""
     # For PL, use division-specific managed by groups
     if country == "PL" and division:
@@ -905,7 +908,8 @@ def get_managed_by_group_for_country(country, managed_by_group, managed_by_group
     # Fall back to global managed_by_group, or support_group_for_country if empty
     return managed_by_group if managed_by_group else support_group_for_country
 
-def get_support_groups_list_for_country(country, support_group, support_groups_per_country, managed_by_groups_per_country, division=None):
+def get_support_groups_list_for_country(country, support_group, support_groups_per_country, 
+                                       managed_by_groups_per_country, division=None):
     """Get list of support groups for a country (handles multiple groups for DE)"""
     # Get support groups
     if country == "PL" and division:
@@ -923,8 +927,10 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
         print(f"  managed_by_groups_per_country: {managed_by_groups_per_country}")
         print(f"  country_support_groups: {repr(country_support_groups)}")
         print(f"  country_managed_groups: {repr(country_managed_groups)}")
-        print(f"  Has newlines in support groups: {'\\n' in str(country_support_groups)}")
-        print(f"  Has newlines in managed groups: {'\\n' in str(country_managed_groups)}")
+        has_newlines_in_support_groups = '\n' in str(country_support_groups)
+        print(f"  Has newlines in support groups: {has_newlines_in_support_groups}")
+        has_newlines_in_managed_groups = '\n' in str(country_managed_groups)
+        print(f"  Has newlines in managed groups: {has_newlines_in_managed_groups}")
     
     # Handle multiple groups (separated by newlines)
     if country_support_groups and '\n' in country_support_groups:
@@ -1083,7 +1089,7 @@ def run_generator(*,
 
     def lc_ok(row):
         return all(str(row[c]).strip().lower() not in discard_lc
-                   for c in ("Phase","Status","Life Cycle Stage","Life Cycle Status"))
+                   for c in ("Phase", "Status", "Life Cycle Stage", "Life Cycle Status"))
 
     def name_prefix_ok(name):
         # Make prefix check case-insensitive and handle extra spaces
@@ -1182,18 +1188,18 @@ def run_generator(*,
                     # For Lvl2, different filtering logic
                     if is_lvl2:
                         # For Lvl2, we don't check for SR/IM prefix and handle commitments differently
-                        mask=(df.apply(row_keywords_ok,axis=1)
-                              & df.apply(row_excluded_keywords_ok,axis=1)
-                              & df.apply(lc_ok,axis=1))
+                        mask = (df.apply(row_keywords_ok, axis=1)
+                                & df.apply(row_excluded_keywords_ok, axis=1)
+                                & df.apply(lc_ok, axis=1))
                         # Don't filter out entries with empty Service Commitments for Lvl2
                     else:
-                        mask=(df.apply(row_keywords_ok,axis=1)
-                              & df.apply(row_excluded_keywords_ok,axis=1)
-                              & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
-                              & df.apply(lc_ok,axis=1)
-                              & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
+                        mask = (df.apply(row_keywords_ok, axis=1)
+                                & df.apply(row_excluded_keywords_ok, axis=1)
+                                & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
+                                & df.apply(lc_ok, axis=1)
+                                & (df["Service Commitments"].astype(str).str.strip().replace({"nan": ""}) != "-"))
 
-                    base_pool=df.loc[mask]
+                    base_pool = df.loc[mask]
                     print(f"Final matching rows: {len(base_pool)}")
                 
                 if base_pool.empty:
@@ -1214,23 +1220,23 @@ def run_generator(*,
                         receivers = ["DS PL", "HS PL"]
                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                         # Other countries when CORP/RecP/CORP IT/CORP Dedicated is selected
-                        if country in {"UA","MD"}: 
-                            receivers=[f"DS {country}"]
-                        elif country=="PL":         
+                        if country in {"UA", "MD"}: 
+                            receivers = [f"DS {country}"]
+                        elif country == "PL":         
                             # Check if DS PL exists in the data
                             if "DS PL" in base_pool["Name (Child Service Offering lvl 1)"].str.cat(sep=" "):
-                                receivers=["DS PL"]
+                                receivers = ["DS PL"]
                             else:
-                                receivers=["HS PL"]
-                        elif country=="CY":         
-                            receivers=["DS CY","HS CY"]
+                                receivers = ["HS PL"]
+                        elif country == "CY":         
+                            receivers = ["DS CY", "HS CY"]
                         else:                       
-                            receivers=[f"DS {country}"]
+                            receivers = [f"DS {country}"]
                     else:
                         # For standard naming (IT, HR, Medical, etc.) - non-DE countries
-                        receivers=[""]
+                        receivers = [""]
 
-                    parent_full=str(base_row["Parent Offering"])
+                    parent_full = str(base_row["Parent Offering"])
                     
                     # Store original depend on value
                     original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
@@ -1241,7 +1247,9 @@ def run_generator(*,
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:
                                     # Search for the specific receiver in the base pool
-                                    recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(rf"\b{re.escape(recv)}\b", case=False)
+                                    recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(
+                                        rf"\b{re.escape(recv)}\b", case=False
+                                    )
                                     matching_rows = base_pool[recv_mask]
                                 
                                     if not matching_rows.empty:
@@ -1357,7 +1365,7 @@ def run_generator(*,
                                 
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
-                                    row=base_row_df.copy()
+                                    row = base_row_df.copy()
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
@@ -1395,18 +1403,19 @@ def run_generator(*,
                                         # For DE, preserve the original "Subscribed by Company" based on division
                                         original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
                                         row.loc[:, "Subscribed by Company"] = original_subscribed
-                                    elif country=="UA":
+                                    elif country == "UA":
                                         row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
-                                    elif country=="MD":
+                                    elif country == "MD":
                                         if global_prod:
                                             row.loc[:, "Subscribed by Company"] = recv or tag_hs
                                         else:
                                             row.loc[:, "Subscribed by Company"] = "DS MD"
-                                    elif country=="CY":
-                                        row.loc[:, "Subscribed by Company"] = "CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
+                                    elif country == "CY":
+                                        row.loc[:, "Subscribed by Company"] = "CY Healthcare Services\nCY Medical Centers" if recv == "HS CY" else "CY Diagnostic Laboratories"
                                     else:
                                         row.loc[:, "Subscribed by Company"] = recv or tag_hs
-                                    orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
+                                    
+                                    orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
                                     
                                     # For Lvl2, keep empty commitments empty
                                     if is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
@@ -1414,8 +1423,8 @@ def run_generator(*,
                                     else:
                                         # Handle custom commitments - use both approaches
                                         if use_custom_commitments and custom_commitments_str:
-                                           # Use the direct string if provided
-                                           row.loc[:, "Service Commitments"] = custom_commitments_str
+                                            # Use the direct string if provided
+                                            row.loc[:, "Service Commitments"] = custom_commitments_str
                                         elif use_custom_commitments and commitment_country:
                                             # Use custom_commit_block function if country provided
                                             row.loc[:, "Service Commitments"] = custom_commit_block(
@@ -1424,8 +1433,11 @@ def run_generator(*,
                                                 rsp_time, rsl_time
                                             )
                                         else:
-                                           # Use existing logic
-                                           row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
+                                            # Use existing logic
+                                            if not orig_comm or orig_comm == "-":
+                                                row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im)
+                                            else:
+                                                row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
                                     
                                     # Special handling for IT with UA/MD - always use DS
                                     if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
@@ -1481,17 +1493,16 @@ def run_generator(*,
     if not sheets:
         raise ValueError("No matching rows found with the specified keywords.")
 
-    out_dir.mkdir(parents=True,exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
     # Update filename to indicate which levels are included
     if use_lvl2:
         suffix = "lvl1_and_lvl2"
     else:
         suffix = "lvl1"
-    outfile=out_dir / f"Offerings_NEW_{suffix}_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    outfile = out_dir / f"Offerings_NEW_{suffix}_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
     
-
     # Write to Excel with special handling for empty values
-    with pd.ExcelWriter(outfile,engine="openpyxl") as w:
+    with pd.ExcelWriter(outfile, engine="openpyxl") as w:
         # Sort sheet names alphabetically
         sorted_sheets = sorted(sheets.keys())
         
@@ -1507,10 +1518,9 @@ def run_generator(*,
                 df_final = df_final.drop(columns=["Number"])
             # Remove Visibility group column for PL
             if cc == "PL" and "Visibility group" in df_final.columns:
-               df_final = df_final.drop(columns=["Visibility group"])
+                df_final = df_final.drop(columns=["Visibility group"])
             # Replace all forms of empty/null values with empty string
             df_final = df_final.fillna('')
-            
             
             for col in df_final.columns:
                 if df_final[col].dtype == 'bool':
@@ -1530,19 +1540,18 @@ def run_generator(*,
                     })
                     # normalize any True/False (any case) to lowercase
                     df_final[col] = df_final[col].replace({
-                       'True': 'true',  'TRUE': 'true',
-                    'False': 'false','FALSE': 'false'
+                        'True': 'true', 'TRUE': 'true',
+                        'False': 'false', 'FALSE': 'false'
                     })
                     # Also handle when the string is literally "nan"
                     df_final[col] = df_final[col].apply(lambda x: '' if str(x).lower() == 'nan' else x)
             
-            df_final.to_excel(w,sheet_name=sheet_name,index=False)
+            df_final.to_excel(w, sheet_name=sheet_name, index=False)
     
     # Apply formatting
-    wb=load_workbook(outfile)
+    wb = load_workbook(outfile)
     for ws in wb.worksheets:
         # get_column_letter is already imported at the top
-        from openpyxl.utils import get_column_letter
         for col_idx, col in enumerate(ws.columns, start=1):
             col_letter = get_column_letter(col_idx)
             ws.column_dimensions[col_letter].width = max(len(str(c.value)) if c.value else 0 for c in col) + 2

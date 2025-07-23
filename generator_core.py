@@ -1336,9 +1336,16 @@ def run_generator(
                             # Check if schedule is missing (no valid schedules found)
                             schedule_missing = not country_schedule_suffixes or all(not str(s).strip() for s in country_schedule_suffixes)
                             
-                            # If no schedules found, create one entry with empty schedule and flag
-                            if not country_schedule_suffixes:
-                                country_schedule_suffixes = [""]  # Empty schedule
+                            # If no schedules found, still use original schedules for naming but mark as missing
+                            if schedule_missing:
+                                # Get original schedules back for naming purposes
+                                original_schedules = get_schedule_suffixes_for_country(
+                                    country, recv, schedule_settings_per_country, schedule_suffixes
+                                )
+                                if original_schedules:
+                                    country_schedule_suffixes = original_schedules
+                                else:
+                                    country_schedule_suffixes = [""]  # Empty schedule if really no schedules
                             
                             for schedule_suffix in country_schedule_suffixes:
                                 # Flag to track if schedule is missing

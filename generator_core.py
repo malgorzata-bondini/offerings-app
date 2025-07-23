@@ -1,5 +1,6 @@
 import datetime as dt
 import re
+import time
 import warnings
 from pathlib import Path
 import pandas as pd
@@ -1247,9 +1248,29 @@ def run_generator(
                         print(f"First few Parent Offerings: {df['Parent Offering'].head().tolist()}")
                         print(f"First few Names: {df['Name (Child Service Offering lvl 1)'].head().tolist()}")
                         
-                        # Debug: Check how many rows match keywords before other filters
-                        keyword_matches = df.apply(row_keywords_ok, axis=1).sum()
-                        print(f"Rows matching keywords: {keyword_matches}")
+                        # Apply pre-filtering with vectorized operations where possible
+                    if keywords_parent.strip():
+                        # Fast pre-filter using vectorized string operations
+                        parent_col = df["Parent Offering"].astype(str).str.lower()
+                        parent_keywords, parent_use_and = parse_keywords(keywords_parent)
+                        if parent_keywords:
+                            if parent_use_and:
+                                # AND logic - all keywords must be present
+                                parent_mask = parent_col.str.contains('|'.join([re.escape(k.lower()) for k in parent_keywords]), na=False)
+                                # Further filter with apply for exact AND logic
+                                parent_mask = parent_mask & df.apply(row_keywords_ok, axis=1)
+                            else:
+                                # OR logic - any keyword must be present
+                                parent_mask = parent_col.str.contains('|'.join([re.escape(k.lower()) for k in parent_keywords]), na=False)
+                        else:
+                            parent_mask = pd.Series([True] * len(df), index=df.index)
+                        df = df[parent_mask]  # Reduce dataset size early
+                    
+                    if df.empty:
+                        continue
+                        
+                    # Debug: Check how many rows match keywords before other filters
+                    print(f"Rows after parent keyword pre-filter: {len(df)}")
 
                     # For Lvl2, different filtering logic
                     if is_lvl2:
@@ -1271,8 +1292,38 @@ def run_generator(
                 if base_pool.empty:
                     continue
                 
+                # Pre-compute schedule availability to avoid nested loops
+                # Extract all names and check for CORP indicators once
+                all_names = base_pool["Name (Child Service Offering lvl 1)"].astype(str).str.upper()
+                corp_names = all_names[all_names.str.contains('CORP|DEDICATED|RECP', na=False)]
+                non_corp_names = all_names[~all_names.str.contains('CORP|DEDICATED|RECP', na=False)]
+                
+                # Pre-compute receivers by country (same for all base_rows)
+                tag_hs, tag_ds = f"HS {country}", f"DS {country}"
+                if country == "DE":
+                    receivers = ["DS DE", "HS DE"]
+                elif country == "PL":
+                    receivers = ["DS PL", "HS PL"]
+                elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
+                    if country in {"UA", "MD"}:
+                        receivers = [f"DS {country}"]
+                    else:
+                        receivers = [tag_ds]
+                else:
+                    receivers = [""]
+                
                 # Process ALL matching rows, not just the first one
-                for idx, base_row in base_pool.iterrows():
+                total_base_rows = len(base_pool)
+                print(f"Processing {total_base_rows} base rows...")
+                start_time = time.time()
+                
+                for row_idx, (idx, base_row) in enumerate(base_pool.iterrows()):
+                    if row_idx % 10 == 0 and row_idx > 0:
+                        elapsed = time.time() - start_time
+                        avg_time = elapsed / row_idx
+                        remaining = (total_base_rows - row_idx) * avg_time
+                        print(f"  Processed {row_idx}/{total_base_rows} base rows... ETA: {remaining:.1f}s")
+                        
                     base_row_df = base_row.to_frame().T.copy()
                     tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
@@ -1323,28 +1374,17 @@ def run_generator(
                                         valid_schedules.append(schedule)
                                         continue
                                     
-                                    # Check if any name in base_pool has this schedule AND matches our generation type
+                                    # Use pre-computed names for faster validation
                                     schedule_available = False
+                                    schedule_lower = schedule_str.lower()
                                     
-                                    for _, row in base_pool.iterrows():
-                                        name = str(row.get("Name (Child Service Offering lvl 1)", ""))
-                                        
-                                        # Check if name contains CORP indicators
-                                        name_has_corp = any(indicator in name.upper() for indicator in ["CORP", "DEDICATED", "RECP"])
-                                        
-                                        # Check if name contains this schedule
-                                        name_has_schedule = schedule_str.lower() in name.lower()
-                                        
-                                        # Include schedule only if:
-                                        # 1. Name has this schedule AND
-                                        # 2. Name type matches our generation type
-                                        if name_has_schedule:
-                                            if is_corp_type and name_has_corp:
-                                                schedule_available = True
-                                                break
-                                            elif not is_corp_type and not name_has_corp:
-                                                schedule_available = True
-                                                break
+                                    # Check appropriate name set based on generation type
+                                    if is_corp_type:
+                                        # Check if any corp name contains this schedule
+                                        schedule_available = corp_names.str.lower().str.contains(schedule_lower, na=False).any()
+                                    else:
+                                        # Check if any non-corp name contains this schedule  
+                                        schedule_available = non_corp_names.str.lower().str.contains(schedule_lower, na=False).any()
                                     
                                     if schedule_available:
                                         valid_schedules.append(schedule)
@@ -1680,6 +1720,12 @@ def run_generator(
                 if "Worksheet" not in str(e):  # Only skip worksheet not found errors silently
                     print(f"Error processing {sheet_name} in {wb}: {e}")
                 continue
+
+    print(f"Starting main processing with {len(sheets_data)} potential sheets...")
+    total_combinations = 0
+    for sheet_key, rows_list in sheets_data.items():
+        total_combinations += len(rows_list)
+    print(f"Total combinations to process: {total_combinations}")
 
     # Convert lists to DataFrames once - major performance improvement!
     print(f"Converting {len(sheets_data)} sheet lists to DataFrames...")

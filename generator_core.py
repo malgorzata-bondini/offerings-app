@@ -1001,7 +1001,8 @@ def run_generator(
     use_lvl2=False, service_type_lvl2="",
     support_groups_per_country=None, managed_by_groups_per_country=None,
     schedule_settings_per_country=None,
-    use_custom_depend_on=False, custom_depend_on_value=""):
+    use_custom_depend_on=False, custom_depend_on_value="",
+    aliases_per_country=None):
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
@@ -1010,6 +1011,8 @@ def run_generator(
         managed_by_groups_per_country = {}
     if schedule_settings_per_country is None:
         schedule_settings_per_country = {}
+    if aliases_per_country is None:
+        aliases_per_country = {}
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -1459,9 +1462,25 @@ def run_generator(
                                         # Keep original aliases values
                                         pass
                                     else:
-                                        # Apply new alias value
+                                        # Determine which alias value to use
+                                        alias_value_to_use = ""
+                                        
+                                        # Check for per-country alias first
+                                        if aliases_per_country:
+                                            # For PL, check both HS PL and DS PL based on receiver
+                                            if country == "PL" and recv:
+                                                alias_value_to_use = aliases_per_country.get(recv, "")
+                                            else:
+                                                # For other countries, use country code directly
+                                                alias_value_to_use = aliases_per_country.get(country, "")
+                                        
+                                        # Fallback to global alias value if no per-country value
+                                        if not alias_value_to_use:
+                                            alias_value_to_use = aliases_value
+                                        
+                                        # Apply alias value to all alias columns
                                         for c in [c for c in row.columns if "Aliases" in c]:
-                                            row.loc[:, c] = aliases_value if aliases_value else "-"
+                                            row.loc[:, c] = alias_value_to_use if alias_value_to_use else "-"
                                     
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:

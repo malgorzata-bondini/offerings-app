@@ -1292,7 +1292,32 @@ def run_generator(
                                 country, recv, schedule_settings_per_country, schedule_suffixes
                             )
                             
-                            # Check if schedule is missing (no schedules found)
+                            # Filter schedules based on what type of names we're generating
+                            # Check if we're generating CORP/RecP names or standard names
+                            is_corp_type = require_corp or require_recp or require_corp_it or require_corp_dedicated
+                            
+                            if country_schedule_suffixes:
+                                # Filter schedules to match the type of names we're generating
+                                matching_schedules = []
+                                for schedule in country_schedule_suffixes:
+                                    schedule_str = str(schedule).strip()
+                                    if not schedule_str:
+                                        matching_schedules.append(schedule)
+                                        continue
+                                    
+                                    # Check if schedule contains CORP indicators
+                                    schedule_has_corp = any(indicator in schedule_str.upper() 
+                                                          for indicator in ["CORP", "DEDICATED", "RECP"])
+                                    
+                                    # Include schedule if it matches our generation type
+                                    if is_corp_type and schedule_has_corp:
+                                        matching_schedules.append(schedule)
+                                    elif not is_corp_type and not schedule_has_corp:
+                                        matching_schedules.append(schedule)
+                                
+                                country_schedule_suffixes = matching_schedules
+                            
+                            # Check if schedule is missing (no schedules found after filtering)
                             schedule_missing = not country_schedule_suffixes or all(not s.strip() for s in country_schedule_suffixes)
                             
                             # If no schedules found, create one entry with empty schedule and flag

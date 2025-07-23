@@ -1600,9 +1600,14 @@ def run_generator(
                                     
                                     orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
                                     
-                                    # If schedule is missing, leave Service Commitments empty
+                                    # If schedule is missing, use original commitments with user schedule
                                     if missing_schedule:
-                                        row.loc[:, "Service Commitments"] = ""
+                                        if not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]:
+                                            # If original commitments are empty, create new ones with user schedule
+                                            row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im)
+                                        else:
+                                            # Update original commitments with user schedule
+                                            row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
                                     # For Lvl2, keep empty commitments empty
                                     elif is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
                                         row.loc[:, "Service Commitments"] = ""

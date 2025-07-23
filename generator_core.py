@@ -1340,23 +1340,9 @@ def run_generator(*,
                                         country, support_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
                                     )
-                                    # For DE, regenerate groups per receiver to ensure each suffix has DS and HS rows
-                                    if country == "DE" and recv:
-                                        # Extract raw suffixes (remove any existing side prefix)
-                                        suffixes = []
-                                        for sg, mg in support_groups_list:
-                                            parts = sg.strip().split()
-                                            if "DE" in parts:
-                                                idx = parts.index("DE")
-                                                suffix = " ".join(parts[idx+1:]).strip()
-                                            else:
-                                                suffix = " ".join(parts[2:]).strip()
-                                            suffixes.append(suffix)
-                                        # Build support groups for this receiver
-                                        support_groups_list = [(f"{recv} {suf}", f"{recv} {suf}")
-                                                              for suf in suffixes if suf]
                                     # Expand DE support groups across both DS and HS sides
                                     if country == "DE":
+                                        # extract unique suffixes from original list
                                         suffixes = []
                                         for sg, mg in support_groups_list:
                                             parts = sg.strip().split()

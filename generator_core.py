@@ -1334,16 +1334,25 @@ def run_generator(*,
                                     managed_by_groups_per_country, division
                                 )
                                 
-                                # For DE, filter support groups based on receiver (HS DE vs DS DE)
+                                # For DE, STRICTLY filter support groups based on receiver (HS DE vs DS DE)
                                 if country == "DE" and recv:
                                     filtered_groups = []
                                     for sg, mg in support_groups_list:
-                                        # Only include groups that match the receiver division
-                                        if recv == "HS DE" and sg.startswith("HS DE"):
-                                            filtered_groups.append((sg, mg))
-                                        elif recv == "DS DE" and sg.startswith("DS DE"):
-                                            filtered_groups.append((sg, mg))
-                                    support_groups_list = filtered_groups if filtered_groups else support_groups_list
+                                        # STRICT filtering - only include if group matches receiver
+                                        sg_stripped = sg.strip()
+                                        if recv == "HS DE":
+                                            # Only include if it starts with "HS DE" or doesn't start with DS/HS
+                                            if sg_stripped.startswith("HS DE") or (not sg_stripped.startswith("DS DE") and not sg_stripped.startswith("HS DE")):
+                                                filtered_groups.append((sg, mg))
+                                        elif recv == "DS DE":
+                                            # Only include if it starts with "DS DE" or doesn't start with DS/HS
+                                            if sg_stripped.startswith("DS DE") or (not sg_stripped.startswith("DS DE") and not sg_stripped.startswith("HS DE")):
+                                                filtered_groups.append((sg, mg))
+                                    
+                                    # If no groups match, skip this combination entirely
+                                    if not filtered_groups:
+                                        continue
+                                    support_groups_list = filtered_groups
                                 
                                 # Debug: Print support group info for DE
                                 if country == "DE" and (support_group or support_groups_per_country):
@@ -1391,12 +1400,14 @@ def run_generator(*,
                                                 row.loc[:, "Subscribed by Company"] = "HS PL"  # Default to HS
                                     elif country == "DE":
                                         # FIXED: For DE, set Subscribed by Company based on support group
-                                        if support_group_for_country == "HS DE IT Service Desk HC":
+                                        support_group_normalized = support_group_for_country.strip()
+                                        
+                                        if support_group_normalized == "HS DE IT Service Desk HC":
                                             row.loc[:, "Subscribed by Company"] = "DE Internal Patients"
-                                        elif managed_by_group_for_country == "HS DE IT Service Desk - MCC" and recv == "HS DE":
+                                        elif managed_by_group_for_country and managed_by_group_for_country.strip() == "HS DE IT Service Desk - MCC" and recv == "HS DE":
                                             row.loc[:, "Subscribed by Company"] = "DE External Patients"
-                                        elif support_group_for_country == "DS DE IT Service Desk Labs":
-                                            row.loc[:, "Subscribed by Company"] = "DE IMD Laboratories\nDE IFLB Laboratories"
+                                        elif support_group_normalized == "DS DE IT Service Desk -Labs" or support_group_normalized == "DS DE IT Service Desk Labs":
+                                            row.loc[:, "Subscribed by Company"] = "DE IFLB Laboratories\nDE IMD Laboratories"
                                         else:
                                             # Fallback to original value
                                             original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
@@ -1448,17 +1459,20 @@ def run_generator(*,
                                             # For DE and CY with receivers, use the receiver's division
                                             depend_tag = f"{recv} Prod"
                                         elif country == "PL":
-                                            # FIXED: For PL, ALWAYS check the generated name first
-                                            if "[DS PL" in new_name or " DS PL " in new_name:
-                                                depend_tag = "DS PL Prod"
-                                            elif "[HS PL" in new_name or " HS PL " in new_name:
+                                            # FIXED: For PL, check the actual generated name very explicitly
+                                            # Check for the pattern in brackets like [IM HS PL IT] or [SR DS PL]
+                                            if re.search(r'\[\w+\s+HS\s+PL', new_name):
                                                 depend_tag = "HS PL Prod"
+                                            elif re.search(r'\[\w+\s+DS\s+PL', new_name):
+                                                depend_tag = "DS PL Prod"
+                                            # Secondary check for cases without brackets
+                                            elif " HS PL " in new_name:
+                                                depend_tag = "HS PL Prod"
+                                            elif " DS PL " in new_name:
+                                                depend_tag = "DS PL Prod"
                                             else:
-                                                # More thorough check
-                                                if "DS" in new_name and "PL" in new_name:
-                                                    depend_tag = "DS PL Prod"
-                                                else:
-                                                    depend_tag = "HS PL Prod"  # Default to HS
+                                                # Default based on division determined earlier
+                                                depend_tag = f"{division} PL Prod" if division else "HS PL Prod"
                                         else:
                                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
                                     

@@ -413,7 +413,7 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)
 
-def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None):
+def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None, receiver=None):
     """Build standard name when not CORP"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -571,11 +571,18 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         prefix_parts = [sr_or_im]
         
+        # For DE with receiver, extract division from receiver (e.g., "HS DE" -> "HS")
+        if country == "DE" and receiver:
+            recv_division = receiver.split()[0]  # Extract HS or DS
+            prefix_parts.append(recv_division)
         # Special handling for UA and MD - always use DS
-        if country in ["UA", "MD"]:
+        elif country in ["UA", "MD"]:
             prefix_parts.append("DS")
         elif division:
             prefix_parts.append(division)
+        else:
+            # Default to HS if no division found
+            prefix_parts.append("HS")
         
         if country:
             prefix_parts.append(country)
@@ -1264,11 +1271,11 @@ def run_generator(*,
                                         # Build new parent offering with updated division
                                         new_parent_offering = f"[Parent {' '.join(new_parts)}] {catalog_name}"
                                         new_name = build_standard_name(
-                                            new_parent_offering, sr_or_im, app, schedule_suffix, special_dept
+                                            new_parent_offering, sr_or_im, app, schedule_suffix, special_dept, recv
                                         )
                                     else:
                                         new_name = build_standard_name(
-                                            parent_full, sr_or_im, app, schedule_suffix, special_dept
+                                            parent_full, sr_or_im, app, schedule_suffix, special_dept, recv
                                         )
                                 
                                 # Normalize the name for comparison (remove extra spaces)
@@ -1346,8 +1353,15 @@ def run_generator(*,
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
                                     
-                                    if country=="DE":
-                                        row.loc[:, "Subscribed by Company"] = "DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
+                                    # For PL, preserve the original "Subscribed by Company" value
+                                    if country == "PL":
+                                        # Keep the original value from the source file
+                                        original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
+                                        row.loc[:, "Subscribed by Company"] = original_subscribed
+                                    elif country == "DE":
+                                        # For DE, preserve the original "Subscribed by Company" based on division
+                                        original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
+                                        row.loc[:, "Subscribed by Company"] = original_subscribed
                                     elif country=="UA":
                                         row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
                                     elif country=="MD":
@@ -1386,7 +1400,25 @@ def run_generator(*,
                                     elif global_prod:
                                         depend_tag = "Global Prod"
                                     else:
-                                        depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{recv or tag_hs} Prod"
+                                        # Determine the correct division tag based on receiver or name
+                                        if recv:
+                                            # For DE and CY with receivers, use the receiver's division
+                                            depend_tag = f"{recv} Prod"
+                                        elif country == "PL":
+                                            # For PL, determine from the new name or original name
+                                            if "DS PL" in new_name:
+                                                depend_tag = "DS PL Prod"
+                                            elif "HS PL" in new_name:
+                                                depend_tag = "HS PL Prod"
+                                            else:
+                                                # Fallback: check original name
+                                                orig_name = str(base_row.get("Name (Child Service Offering lvl 1)", ""))
+                                                if "DS PL" in orig_name:
+                                                    depend_tag = "DS PL Prod"
+                                                else:
+                                                    depend_tag = "HS PL Prod"
+                                        else:
+                                            depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
                                     
                                     # Handle Service Offerings | Depend On - preserve original values
                                     if original_depend_on in ["-", "", "nan", "NaN", None]:

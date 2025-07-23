@@ -930,13 +930,22 @@ def run_generator(*,
         # Check parent offering
         if parent_keywords:
             p = str(row["Parent Offering"]).lower()
+            # Remove extra spaces and normalize
+            p = ' '.join(p.split())
+            
             if parent_use_and:
-                # AND logic - all keywords must match (using simple substring search)
-                if not all(k.lower() in p for k in parent_keywords):
-                    return False
+                # AND logic - all keywords must match (case-insensitive substring search)
+                for k in parent_keywords:
+                    if k.lower() not in p:
+                        return False
             else:
-                # OR logic - any keyword must match (using simple substring search)
-                if not any(k.lower() in p for k in parent_keywords):
+                # OR logic - any keyword must match (case-insensitive substring search)
+                found = False
+                for k in parent_keywords:
+                    if k.lower() in p:
+                        found = True
+                        break
+                if not found:
                     return False
         
         # Parse child keywords
@@ -945,13 +954,22 @@ def run_generator(*,
         # Check child name
         if child_keywords:
             n = str(row["Name (Child Service Offering lvl 1)"]).lower()
+            # Remove extra spaces and normalize
+            n = ' '.join(n.split())
+            
             if child_use_and:
-                # AND logic - all keywords must match (using simple substring search)
-                if not all(k.lower() in n for k in child_keywords):
-                    return False
+                # AND logic - all keywords must match (case-insensitive substring search)
+                for k in child_keywords:
+                    if k.lower() not in n:
+                        return False
             else:
-                # OR logic - any keyword must match (using simple substring search)
-                if not any(k.lower() in n for k in child_keywords):
+                # OR logic - any keyword must match (case-insensitive substring search)
+                found = False
+                for k in child_keywords:
+                    if k.lower() in n:
+                        found = True
+                        break
+                if not found:
                     return False
         
         return True
@@ -990,8 +1008,10 @@ def run_generator(*,
                    for c in ("Phase","Status","Life Cycle Stage","Life Cycle Status"))
 
     def name_prefix_ok(name):
-        # Make prefix check case-insensitive
-        return name.strip().upper().startswith(f"[{sr_or_im.upper()} ")
+        # Make prefix check case-insensitive and handle extra spaces
+        name = name.strip()
+        # Check if name starts with [SR or [IM (case-insensitive)
+        return name.upper().startswith(f"[{sr_or_im.upper()} ") or name.upper().startswith(f"[{sr_or_im.upper()}\t")
 
     # Process apps - support both newline and comma separation
     all_apps = []

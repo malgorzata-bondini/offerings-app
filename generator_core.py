@@ -1072,16 +1072,15 @@ def run_generator(*,
         # Check if name starts with [SR or [IM (case-insensitive)
         return name.upper().startswith(f"[{sr_or_im.upper()} ") or name.upper().startswith(f"[{sr_or_im.upper()}\t")
 
-    # Process apps - support both newline and comma separation
+    # Process apps - split on comma, newline, or semicolon
     all_apps = []
-    for app_line in new_apps:
-        # Split by comma and add non-empty values
-        for app in app_line.split(','):
+    for raw in new_apps:
+        for app in re.split(r'[,\n;]+', str(raw)):
             app = app.strip()
             if app:
                 all_apps.append(app)
-    
-    # If no apps provided, do NOT add empty string - process without apps
+
+    # If no apps provided, process without apps
     if not all_apps:
         all_apps = [None]  # Use None instead of empty string
 

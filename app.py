@@ -437,12 +437,23 @@ with col2:
                 )
             
             with col2:
-                app_name = st.text_input(
-                    "Application Name",
-                    value="",
-                    placeholder="e.g., Molis",
-                    help="Enter the application name (optional)"
-                )
+                # Automatically use the first application from Basic tab if available
+                auto_app_name = new_apps[0] if new_apps else ""
+                if auto_app_name:
+                    st.text_input(
+                        "Application Name",
+                        value=auto_app_name,
+                        disabled=True,
+                        help=f"Automatically taken from Applications in Basic tab: {auto_app_name}"
+                    )
+                    app_name = auto_app_name
+                else:
+                    app_name = st.text_input(
+                        "Application Name",
+                        value="",
+                        placeholder="e.g., Molis",
+                        help="Enter the application name (or add applications in Basic tab)"
+                    )
             
             # Construct the custom depend on value
             if depend_on_prefix == "Global":

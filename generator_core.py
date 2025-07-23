@@ -931,12 +931,12 @@ def run_generator(*,
         if parent_keywords:
             p = str(row["Parent Offering"]).lower()
             if parent_use_and:
-                # AND logic - all keywords must match
-                if not all(re.search(rf"\b{re.escape(k.lower())}\b", p) for k in parent_keywords):
+                # AND logic - all keywords must match (using simple substring search)
+                if not all(k.lower() in p for k in parent_keywords):
                     return False
             else:
-                # OR logic - any keyword must match
-                if not any(re.search(rf"\b{re.escape(k.lower())}\b", p) for k in parent_keywords):
+                # OR logic - any keyword must match (using simple substring search)
+                if not any(k.lower() in p for k in parent_keywords):
                     return False
         
         # Parse child keywords
@@ -946,12 +946,12 @@ def run_generator(*,
         if child_keywords:
             n = str(row["Name (Child Service Offering lvl 1)"]).lower()
             if child_use_and:
-                # AND logic - all keywords must match
-                if not all(re.search(rf"\b{re.escape(k.lower())}\b", n) for k in child_keywords):
+                # AND logic - all keywords must match (using simple substring search)
+                if not all(k.lower() in n for k in child_keywords):
                     return False
             else:
-                # OR logic - any keyword must match
-                if not any(re.search(rf"\b{re.escape(k.lower())}\b", n) for k in child_keywords):
+                # OR logic - any keyword must match (using simple substring search)
+                if not any(k.lower() in n for k in child_keywords):
                     return False
         
         return True
@@ -970,15 +970,15 @@ def run_generator(*,
         
         if excluded_use_and:
             # AND logic - if ALL excluded keywords are found, exclude the row
-            parent_has_all = all(re.search(rf"\b{re.escape(k.lower())}\b", p) for k in excluded_keywords)
-            child_has_all = all(re.search(rf"\b{re.escape(k.lower())}\b", n) for k in excluded_keywords)
+            parent_has_all = all(k.lower() in p for k in excluded_keywords)
+            child_has_all = all(k.lower() in n for k in excluded_keywords)
             # Exclude if either parent or child has all excluded keywords
             if parent_has_all or child_has_all:
                 return False
         else:
             # OR logic - if ANY excluded keyword is found, exclude the row
-            parent_has_any = any(re.search(rf"\b{re.escape(k.lower())}\b", p) for k in excluded_keywords)
-            child_has_any = any(re.search(rf"\b{re.escape(k.lower())}\b", n) for k in excluded_keywords)
+            parent_has_any = any(k.lower() in p for k in excluded_keywords)
+            child_has_any = any(k.lower() in n for k in excluded_keywords)
             # Exclude if either parent or child has any excluded keyword
             if parent_has_any or child_has_any:
                 return False

@@ -1284,11 +1284,6 @@ def run_generator(*,
                                 # Normalize the name for comparison (remove extra spaces)
                                 new_name_normalized = ' '.join(new_name.split())
                                 
-                                # Check for duplicates within this generation run
-                                if new_name_normalized in seen:
-                                    # Skip this one instead of raising error - it's already being created
-                                    continue
-                                
                                 # Check against existing offerings in source files
                                 found_in_existing = False
                                 for existing in existing_offerings:
@@ -1300,8 +1295,6 @@ def run_generator(*,
                                 if found_in_existing:
                                     raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
                                 
-                                seen.add(new_name_normalized)
-
                                 # Determine division for PL support groups
                                 division = None
                                 if country == "PL":
@@ -1363,9 +1356,19 @@ def run_generator(*,
                                 
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
+                                    # Skip duplicates based on name, receiver, app, schedule, support and managed groups
+                                    key = (
+                                        new_name_normalized,
+                                        recv,
+                                        app,
+                                        schedule_suffix,
+                                        support_group_for_country,
+                                        managed_by_group_for_country
+                                    )
+                                    if key in seen:
+                                        continue
+                                    seen.add(key)
                                     row = base_row_df.copy()
-                                    # track which receiver side generated this row
-                                    row.loc[:, "_recv"] = recv
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name

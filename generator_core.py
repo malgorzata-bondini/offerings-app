@@ -1508,6 +1508,10 @@ def run_generator(
                                     key = recv
                                     country_supports = support_groups_per_country.get(key, support_group)
                                     country_managed = managed_by_groups_per_country.get(key, managed_by_group)
+                                    
+                                    # Debug: Print PL support group info
+                                    print(f"DEBUG PL: recv={recv}, supports={country_supports}, managed={country_managed}")
+                                    
                                     # Parse multiple lines if present
                                     if country_supports and '\n' in str(country_supports):
                                         sg_list = [sg.strip() for sg in str(country_supports).split('\n') if sg.strip()]
@@ -1518,10 +1522,12 @@ def run_generator(
                                         while len(mg_list) < len(sg_list):
                                             mg_list.append(sg_list[len(mg_list)])
                                         support_groups_list = list(zip(sg_list, mg_list))
+                                        print(f"DEBUG PL: Multi-line groups: {support_groups_list}")
                                     else:
                                         sg = str(country_supports or support_group or "").strip()
                                         mg = str(country_managed or sg).strip()
                                         support_groups_list = [(sg, mg)] if sg else [("", "")]
+                                        print(f"DEBUG PL: Single group: {support_groups_list}")
                                 else:
                                     # Delegate to helper for other countries
                                     support_groups_list = get_support_groups_list_for_country(
@@ -1547,6 +1553,13 @@ def run_generator(
                                         support_group_for_country,
                                         managed_by_group_for_country
                                     )
+                                    
+                                    # Debug for PL
+                                    if country == "PL":
+                                        print(f"DEBUG PL: Generating key={key}")
+                                        if key in seen:
+                                            print(f"DEBUG PL: SKIPPING duplicate key")
+                                    
                                     if key in seen:
                                         continue
                                     seen.add(key)

@@ -940,6 +940,27 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
         single_managed = country_managed_groups or single_support or ""
         return [(single_support, single_managed)] if single_support else [("", "")]
 
+def get_schedule_suffixes_for_country(country, receiver, schedule_settings_per_country, default_schedule_suffixes):
+    """Get the appropriate schedule suffixes for a given country and receiver"""
+    # For countries that split into DS/HS (PL, CY), use receiver key
+    # For DE, it doesn't split in the same way, so use country directly
+    if country in ["PL", "CY"] and receiver:
+        key = receiver  # e.g., "HS PL", "DS PL", "HS CY", "DS CY"
+    else:
+        key = country  # e.g., "DE", "MD", "UA"
+    
+    # Check if there are custom schedules for this country/receiver
+    if key in schedule_settings_per_country:
+        custom_schedules = schedule_settings_per_country[key]
+        if isinstance(custom_schedules, str):
+            # Split on newlines if it's a string
+            return [s.strip() for s in custom_schedules.split('\n') if s.strip()]
+        elif isinstance(custom_schedules, list):
+            return custom_schedules
+    
+    # Fallback to default schedule suffixes
+    return default_schedule_suffixes
+
 def get_de_company_and_ldap(support_group, receiver, original_row=None):
     """Get the Subscribed by Company and LDAP values for DE based on support group"""
     # Normalize the support group name for comparison (remove extra spaces, normalize case)
@@ -978,13 +999,16 @@ def run_generator(
     use_new_parent=False, new_parent_offering="", new_parent="",
     keywords_excluded="",
     use_lvl2=False, service_type_lvl2="",
-    support_groups_per_country=None, managed_by_groups_per_country=None):
+    support_groups_per_country=None, managed_by_groups_per_country=None,
+    schedule_settings_per_country=None):
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
         support_groups_per_country = {}
     if managed_by_groups_per_country is None:
         managed_by_groups_per_country = {}
+    if schedule_settings_per_country is None:
+        schedule_settings_per_country = {}
 
     sheets, seen = {}, set()
     existing_offerings = set()  # Track existing offerings to detect duplicates
@@ -1258,8 +1282,13 @@ def run_generator(
                     original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
 
                     for app in all_apps:
-                        for schedule_suffix in schedule_suffixes:
-                            for recv in receivers:
+                        for recv in receivers:
+                            # Get country-specific schedule suffixes
+                            country_schedule_suffixes = get_schedule_suffixes_for_country(
+                                country, recv, schedule_settings_per_country, schedule_suffixes
+                            )
+                            
+                            for schedule_suffix in country_schedule_suffixes:
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:
                                     # Always attempt to pick matching row but do not skip if none found

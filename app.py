@@ -198,6 +198,36 @@ with col2:
             schedule_suffixes = [schedule_simple] if schedule_simple else []
         
         st.markdown("---")
+        
+        # Schedule Settings per Country
+        use_per_country_schedules = st.checkbox("Use different schedules per country/division", help="Define specific schedules for different countries or divisions")
+        schedule_settings_per_country = {}
+        
+        if use_per_country_schedules:
+            st.markdown("**Schedule Settings per Country/Division**")
+            
+            # Define available countries/divisions
+            available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "CY"]
+            
+            # Create tabs or columns for different countries
+            country_tabs = st.tabs(available_countries)
+            
+            for idx, country in enumerate(available_countries):
+                with country_tabs[idx]:
+                    st.markdown(f"**{country} Schedules**")
+                    
+                    country_schedules = st.text_area(
+                        f"Schedules for {country}",
+                        value="",
+                        placeholder="Mon-Fri 9-17\nMon-Fri 8-16\nMon-Sun 24/7",
+                        height=100,
+                        key=f"schedule_{country.replace(' ', '_')}"
+                    )
+                    
+                    if country_schedules.strip():
+                        schedule_settings_per_country[country] = country_schedules.strip()
+        
+        st.markdown("---")
         col_rsp, col_rsl = st.columns(2)
         with col_rsp:
             rsp_duration = st.text_input("RSP Duration", value="")
@@ -467,7 +497,9 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         service_type_lvl2=service_type if 'service_type' in locals() else "",
                         # Add per-country support groups
                         support_groups_per_country=support_groups_per_country if use_per_country_groups else {},
-                        managed_by_groups_per_country=managed_by_groups_per_country if use_per_country_groups else {}
+                        managed_by_groups_per_country=managed_by_groups_per_country if use_per_country_groups else {},
+                        # Add per-country schedule settings
+                        schedule_settings_per_country=schedule_settings_per_country if use_per_country_schedules else {}
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

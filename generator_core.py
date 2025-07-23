@@ -1328,12 +1328,32 @@ def run_generator(*,
                                             # Default to HS if cannot determine
                                             division = "HS"
                                 
-                                # Get support groups list (handles multiple groups for DE)
-                                support_groups_list = get_support_groups_list_for_country(
-                                    country, support_group, support_groups_per_country, 
-                                    managed_by_groups_per_country, division
-                                )
-                                
+                                # Get support groups list
+                                if country == "PL":
+                                    # Use support groups per division (receiver) for PL
+                                    key = recv
+                                    country_supports = support_groups_per_country.get(key, support_group)
+                                    country_managed = managed_by_groups_per_country.get(key, managed_by_group)
+                                    # Parse multiple lines if present
+                                    if country_supports and '\n' in str(country_supports):
+                                        sg_list = [sg.strip() for sg in str(country_supports).split('\n') if sg.strip()]
+                                        if country_managed and '\n' in str(country_managed):
+                                            mg_list = [mg.strip() for mg in str(country_managed).split('\n') if mg.strip()]
+                                        else:
+                                            mg_list = [country_managed.strip()] * len(sg_list) if country_managed else sg_list
+                                        while len(mg_list) < len(sg_list):
+                                            mg_list.append(sg_list[len(mg_list)])
+                                        support_groups_list = list(zip(sg_list, mg_list))
+                                    else:
+                                        sg = str(country_supports or support_group or "").strip()
+                                        mg = str(country_managed or sg).strip()
+                                        support_groups_list = [(sg, mg)] if sg else [("", "")]
+                                else:
+                                    # Delegate to helper for other countries
+                                    support_groups_list = get_support_groups_list_for_country(
+                                        country, support_group, support_groups_per_country, 
+                                        managed_by_groups_per_country, division
+                                    )
                                 # For DE, STRICTLY filter support groups based on receiver (HS DE vs DS DE)
                                 if country == "DE" and recv:
                                     filtered_groups = []
@@ -1385,7 +1405,7 @@ def run_generator(*,
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
                                     
-                                    # FIXED: PL "Subscribed by Company" - determine from generated name
+                                    # FIXED: For PL "Subscribed by Company" - determine from generated name
                                     if country == "PL":
                                         # Determine division from generated name more explicitly
                                         if "[DS PL" in new_name or " DS PL " in new_name:
@@ -1399,19 +1419,8 @@ def run_generator(*,
                                             else:
                                                 row.loc[:, "Subscribed by Company"] = "HS PL"  # Default to HS
                                     elif country == "DE":
-                                        # FIXED: For DE, set Subscribed by Company based on support group
-                                        support_group_normalized = support_group_for_country.strip()
-                                        
-                                        if support_group_normalized == "HS DE IT Service Desk HC":
-                                            row.loc[:, "Subscribed by Company"] = "DE Internal Patients"
-                                        elif managed_by_group_for_country and managed_by_group_for_country.strip() == "HS DE IT Service Desk - MCC" and recv == "HS DE":
-                                            row.loc[:, "Subscribed by Company"] = "DE External Patients"
-                                        elif support_group_normalized == "DS DE IT Service Desk -Labs" or support_group_normalized == "DS DE IT Service Desk Labs":
-                                            row.loc[:, "Subscribed by Company"] = "DE IFLB Laboratories\nDE IMD Laboratories"
-                                        else:
-                                            # Fallback to original value
-                                            original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
-                                            row.loc[:, "Subscribed by Company"] = original_subscribed
+                                        # Set Subscribed by Company directly from the support group entered
+                                        row.loc[:, "Subscribed by Company"] = support_group_for_country if support_group_for_country else ""
                                     elif country == "UA":
                                         row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
                                     elif country == "MD":

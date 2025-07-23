@@ -1303,13 +1303,28 @@ def run_generator(
                         df["LDAP"] = ""
                         ldap_cols = ["LDAP"]
 
+                    # Always initialize schedule checking variables before use
+                    all_country_names_for_schedules = pd.Series([], dtype=str)
+                    corp_names_for_schedules = pd.Series([], dtype=str)
+                    non_corp_names_for_schedules = pd.Series([], dtype=str)
+
                     # Debug: Check if we have the required columns
                     if "Parent Offering" in df.columns and "Name (Child Service Offering lvl 1)" in df.columns:
                         # Debug: Print first few rows to see the data
                         print(f"First few Parent Offerings: {df['Parent Offering'].head().tolist()}")
                         print(f"First few Names: {df['Name (Child Service Offering lvl 1)'].head().tolist()}")
                         
-                        # Apply pre-filtering with vectorized operations where possible
+                        # Store ALL names from the country file for schedule checking (before any filtering)
+                        all_country_names_for_schedules = df["Name (Child Service Offering lvl 1)"].astype(str).str.upper()
+                        corp_names_for_schedules = all_country_names_for_schedules[all_country_names_for_schedules.str.contains('CORP|DEDICATED|RECP', na=False)]
+                        non_corp_names_for_schedules = all_country_names_for_schedules[~all_country_names_for_schedules.str.contains('CORP|DEDICATED|RECP', na=False)]
+                    else:
+                        # Ensure variables are initialized even if columns are missing
+                        all_country_names_for_schedules = pd.Series([], dtype=str)
+                        corp_names_for_schedules = pd.Series([], dtype=str)
+                        non_corp_names_for_schedules = pd.Series([], dtype=str)
+                        
+                    # Apply pre-filtering with vectorized operations where possible
                     if keywords_parent.strip():
                         # Fast pre-filter using vectorized string operations
                         parent_col = df["Parent Offering"].astype(str).str.lower()
@@ -1353,11 +1368,31 @@ def run_generator(
                 if base_pool.empty:
                     continue
                 
-                # Pre-compute schedule availability to avoid nested loops
-                # Extract all names and check for CORP indicators once
-                all_names = base_pool["Name (Child Service Offering lvl 1)"].astype(str).str.upper()
-                corp_names = all_names[all_names.str.contains('CORP|DEDICATED|RECP', na=False)]
-                non_corp_names = all_names[~all_names.str.contains('CORP|DEDICATED|RECP', na=False)]
+                # Use the pre-stored names for schedule checking
+                if not use_new_parent:
+                    # Always initialize variables to avoid unbound errors
+                    all_country_names = pd.Series([], dtype=str)
+                    corp_names = pd.Series([], dtype=str)
+                    non_corp_names = pd.Series([], dtype=str)
+                    # We already have these from before filtering (if they exist)
+                    if 'all_country_names_for_schedules' in locals():
+                        try:
+                            all_country_names = all_country_names_for_schedules
+                        except Exception:
+                            pass
+                        try:
+                            corp_names = corp_names_for_schedules
+                        except Exception:
+                            pass
+                        try:
+                            non_corp_names = non_corp_names_for_schedules
+                        except Exception:
+                            pass
+                else:
+                    # For new parent, no existing names to check
+                    all_country_names = pd.Series([], dtype=str)
+                    corp_names = pd.Series([], dtype=str)
+                    non_corp_names = pd.Series([], dtype=str)
                 
                 # Pre-compute receivers by country (same for all base_rows)
                 tag_hs, tag_ds = f"HS {country}", f"DS {country}"
@@ -1440,24 +1475,24 @@ def run_generator(
                                     
                                     schedule_lower = schedule_str.lower()
                                     
-                                    # First check if schedule exists anywhere in names
-                                    all_names_combined = pd.concat([corp_names, non_corp_names]).str.lower()
-                                    schedule_exists_anywhere = all_names_combined.str.contains(schedule_lower, na=False).any()
+                                    # Check if schedule exists anywhere in ALL names in the country
+                                    schedule_exists_anywhere = all_country_names.str.lower().str.contains(schedule_lower, na=False).any()
                                     
                                     if not schedule_exists_anywhere:
-                                        # Schedule doesn't exist at all - skip it completely
+                                        # Schedule doesn't exist at all in this country - mark as missing
                                         continue
                                     
                                     # Check if schedule exists in corp vs non-corp names
-                                    exists_in_corp = corp_names.str.lower().str.contains(schedule_lower, na=False).any()
-                                    exists_in_non_corp = non_corp_names.str.lower().str.contains(schedule_lower, na=False).any()
+                                    exists_in_corp = corp_names.str.lower().str.contains(schedule_lower, na=False).any() if len(corp_names) > 0 else False
+                                    exists_in_non_corp = non_corp_names.str.lower().str.contains(schedule_lower, na=False).any() if len(non_corp_names) > 0 else False
                                     
-                                    # Schedule is valid if:
-                                    # - User selected CORP and it exists in CORP names, OR
-                                    # - User didn't select CORP and it exists in non-CORP names, OR  
-                                    # - It exists in both CORP and non-CORP names
-                                    if (is_corp_type and exists_in_corp) or (not is_corp_type and exists_in_non_corp) or (exists_in_corp and exists_in_non_corp):
-                                        valid_schedules.append(schedule)
+                                    # If schedule exists only in CORP names but user didn't select CORP -> will be marked as missing (red)
+                                    if exists_in_corp and not exists_in_non_corp and not is_corp_type:
+                                        # Schedule exists only in CORP but user generating non-CORP -> mark as missing for red formatting
+                                        continue
+                                    
+                                    # Schedule exists and is available for the current generation type
+                                    valid_schedules.append(schedule)
                                 
                                 country_schedule_suffixes = valid_schedules
                             
@@ -1474,7 +1509,7 @@ def run_generator(
                                     country_schedule_suffixes = original_schedules
                                 else:
                                     country_schedule_suffixes = [""]  # Empty schedule if really no schedules
-
+                            
                             for schedule_suffix in country_schedule_suffixes:
                                 # Flag to track if schedule is missing
                                 missing_schedule = schedule_missing
@@ -1580,6 +1615,9 @@ def run_generator(
                                     country_supports = support_groups_per_country.get(key, "")
                                     country_managed = managed_by_groups_per_country.get(key, "")
                                     
+                                    # Debug: Print PL support group info
+                                    print(f"DEBUG PL: recv={recv}, supports={country_supports}, managed={country_managed}")
+                                    
                                     # For PL, we expect only one support group per receiver
                                     # No need to parse multiple lines or filter later
                                     if country_supports:
@@ -1589,6 +1627,8 @@ def run_generator(
                                     else:
                                         # Fallback to empty if no support group configured for this receiver
                                         support_groups_list = [("", "")]
+                                    
+                                    print(f"DEBUG PL: Final groups for {recv}: {support_groups_list}")
                                 else:
                                     # Delegate to helper for other countries
                                     support_groups_list = get_support_groups_list_for_country(
@@ -1603,6 +1643,9 @@ def run_generator(
                                                 if sg.strip().startswith(prefix)]
                                     if matching:
                                         support_groups_list = matching
+                                
+                                # For PL, we already have the correct receiver-specific group from above
+                                # No additional filtering needed
                                 
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:

@@ -1506,7 +1506,11 @@ def run_generator(*,
             cc = sheet_name.split()[0]
             
             # Ensure unique names per sheet
-            df_final = dfc.drop_duplicates(subset=["Name (Child Service Offering lvl 1)"])
+            # Keep duplicates distinct by support/managed groups to preserve grouped rows
+            df_final = dfc.drop_duplicates(
+                subset=["Name (Child Service Offering lvl 1)", "Support group", "Managed by Group"],
+                keep="first"
+            )
             
             if "Number" in df_final.columns:
                 df_final = df_final.drop(columns=["Number"])

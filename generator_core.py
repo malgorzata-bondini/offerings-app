@@ -21,21 +21,69 @@ discard_lc  = {"retired", "retiring", "end of life", "end of support"}
 def ensure_incident_naming(name):
     """
     Ensure that if any keyword is 'incident', then 'solving' is right after 'incident' and then app name
-    Examples:
-    - "incident" → "incident solving"  
-    - "[IM HS PL IT] Software incident FDM Prod Mon-Fri 9-17" → "[IM HS PL IT] Software incident solving FDM Prod Mon-Fri 9-17"
+    This function reorganizes the name to ensure proper order: incident solving [app] [other parts]
     """
-    # Pattern to find 'incident' word boundaries
-    pattern = r'\b(incident)\b'
-    
-    # Check if 'incident solving' already exists (to avoid double solving)
+    # First, check if we already have "incident solving" in the correct order
     if re.search(r'\bincident\s+solving\b', name, re.IGNORECASE):
         return name
     
-    # Replace 'incident' with 'incident solving'
-    name = re.sub(pattern, r'\1 solving', name, flags=re.IGNORECASE)
+    # Split the name into parts
+    parts = name.split()
+    new_parts = []
+    i = 0
     
-    return name
+    while i < len(parts):
+        if parts[i].lower() == "incident":
+            # Add "incident solving"
+            new_parts.append(parts[i])
+            new_parts.append("solving")
+            
+            # Skip if the next word was already "solving"
+            if i + 1 < len(parts) and parts[i + 1].lower() == "solving":
+                i += 1
+        elif parts[i].lower() == "solving":
+            # Skip standalone "solving" as we'll add it after "incident"
+            pass
+        else:
+            new_parts.append(parts[i])
+        i += 1
+    
+    # Now we need to ensure app name comes AFTER "incident solving", not between
+    # Find if there's an app name that got placed between incident and solving
+    final_parts = []
+    i = 0
+    
+    while i < len(new_parts):
+        if i > 0 and new_parts[i-1].lower() == "incident" and new_parts[i].lower() == "solving":
+            # We found "incident solving" - good
+            final_parts.append(new_parts[i])
+        elif new_parts[i].lower() == "incident":
+            # Check if there's something between incident and solving
+            j = i + 1
+            app_parts = []
+            
+            # Collect everything until we find "solving"
+            while j < len(new_parts) and new_parts[j].lower() != "solving":
+                app_parts.append(new_parts[j])
+                j += 1
+            
+            # Add incident solving first
+            final_parts.append(new_parts[i])
+            if j < len(new_parts) and new_parts[j].lower() == "solving":
+                final_parts.append("solving")
+                # Then add the app parts that were in between
+                final_parts.extend(app_parts)
+                i = j
+            else:
+                # No solving found, just add solving after incident
+                final_parts.append("solving")
+                final_parts.extend(app_parts)
+                i = j - 1
+        else:
+            final_parts.append(new_parts[i])
+        i += 1
+    
+    return " ".join(final_parts)
 
 def extract_parent_info(parent_offering):
     """Extract the content between [Parent ...] from parent offering"""
@@ -1078,6 +1126,10 @@ def run_generator(*,
                     # ORIGINAL LOGIC - read from Excel file
                     df = pd.read_excel(wb, sheet_name=sheet_name)
                     
+                    # Debug: Print column names to check if they match
+                    print(f"Processing {wb.name}, sheet: {sheet_name}")
+                    print(f"Available columns: {list(df.columns)}")
+                    
                     # Add missing columns as empty
                     for col in need_cols:
                         if col not in df.columns:
@@ -1086,6 +1138,16 @@ def run_generator(*,
                     # Ensure Visibility group column exists
                     if "Visibility group" not in df.columns:
                         df["Visibility group"] = ""
+
+                    # Debug: Check if we have the required columns
+                    if "Parent Offering" in df.columns and "Name (Child Service Offering lvl 1)" in df.columns:
+                        # Debug: Print first few rows to see the data
+                        print(f"First few Parent Offerings: {df['Parent Offering'].head().tolist()}")
+                        print(f"First few Names: {df['Name (Child Service Offering lvl 1)'].head().tolist()}")
+                        
+                        # Debug: Check how many rows match keywords before other filters
+                        keyword_matches = df.apply(row_keywords_ok, axis=1).sum()
+                        print(f"Rows matching keywords: {keyword_matches}")
 
                     # For Lvl2, different filtering logic
                     if is_lvl2:
@@ -1102,6 +1164,7 @@ def run_generator(*,
                               & (df["Service Commitments"].astype(str).str.strip().replace({"nan":""})!="-"))
 
                     base_pool=df.loc[mask]
+                    print(f"Final matching rows: {len(base_pool)}")
                 
                 if base_pool.empty:
                     continue
@@ -1254,14 +1317,21 @@ def run_generator(*,
                                     managed_by_groups_per_country, division
                                 )
                                 
+                                # Debug: Print support group info
+                                if support_group or support_groups_per_country:
+                                    print(f"Support group assignment for {country}: {support_groups_list}")
+                                
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
                                     row=base_row_df.copy()
-                                    row["Name (Child Service Offering lvl 1)"]=new_name
-                                    row["Delivery Manager"]=delivery_manager
                                     
-                                    row["Support group"] = support_group_for_country
-                                    row["Managed by Group"] = managed_by_group_for_country
+                                    # Update the name
+                                    row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
+                                    row.loc[:, "Delivery Manager"] = delivery_manager
+                                    
+                                    # Apply support group and managed by group
+                                    row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
+                                    row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
                                     
                                     # Handle aliases - copy from original row if aliases_on is False
                                     if not aliases_on:
@@ -1270,46 +1340,45 @@ def run_generator(*,
                                     else:
                                         # Apply new alias value
                                         for c in [c for c in row.columns if "Aliases" in c]:
-                                            row[c]=aliases_value if aliases_value else "-"
+                                            row.loc[:, c] = aliases_value if aliases_value else "-"
                                     
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
-                                        row["Visibility group"] = ""
+                                        row.loc[:, "Visibility group"] = ""
                                     
                                     if country=="DE":
-                                        row["Subscribed by Company"]="DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
+                                        row.loc[:, "Subscribed by Company"] = "DE Internal Patients\nDE External Patients" if recv=="HS DE" else "DE IFLB Laboratories\nDE IMD Laboratories"
                                     elif country=="UA":
-                                        row["Subscribed by Company"]="Сiнево Україна"
+                                        row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
                                     elif country=="MD":
                                         if global_prod:
-                                            row["Subscribed by Company"]=recv or tag_hs
+                                            row.loc[:, "Subscribed by Company"] = recv or tag_hs
                                         else:
-                                            row["Subscribed by Company"]="DS MD"
+                                            row.loc[:, "Subscribed by Company"] = "DS MD"
                                     elif country=="CY":
-                                        row["Subscribed by Company"]="CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
+                                        row.loc[:, "Subscribed by Company"] = "CY Healthcare Services\nCY Medical Centers" if recv=="HS CY" else "CY Diagnostic Laboratories"
                                     else:
-                                        row["Subscribed by Company"]=recv or tag_hs
-                                        
+                                        row.loc[:, "Subscribed by Company"] = recv or tag_hs
                                     orig_comm=str(row.iloc[0]["Service Commitments"]).strip()
                                     
                                     # For Lvl2, keep empty commitments empty
                                     if is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
-                                        row["Service Commitments"] = ""
+                                        row.loc[:, "Service Commitments"] = ""
                                     else:
                                         # Handle custom commitments - use both approaches
                                         if use_custom_commitments and custom_commitments_str:
                                            # Use the direct string if provided
-                                           row["Service Commitments"] = custom_commitments_str
+                                           row.loc[:, "Service Commitments"] = custom_commitments_str
                                         elif use_custom_commitments and commitment_country:
                                             # Use custom_commit_block function if country provided
-                                            row["Service Commitments"] = custom_commit_block(
+                                            row.loc[:, "Service Commitments"] = custom_commit_block(
                                                 commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
                                                 rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
                                                 rsp_time, rsl_time
                                             )
                                         else:
                                            # Use existing logic
-                                           row["Service Commitments"]=commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
+                                           row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im) if not orig_comm or orig_comm=="-" else update_commitments(orig_comm,schedule_suffix,rsp_duration,rsl_duration,sr_or_im,country)
                                     
                                     # Special handling for IT with UA/MD - always use DS
                                     if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
@@ -1323,15 +1392,15 @@ def run_generator(*,
                                     if original_depend_on in ["-", "", "nan", "NaN", None]:
                                         # Preserve the original empty/dash value
                                         if original_depend_on == "-":
-                                            row["Service Offerings | Depend On (Application Service)"] = "-"
+                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = "-"
                                         else:
-                                            row["Service Offerings | Depend On (Application Service)"] = ""
+                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = ""
                                     else:
                                         # Only update if original had a real value
                                         if app:
-                                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}] {app}"
+                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}] {app}"
                                         else:
-                                            row["Service Offerings | Depend On (Application Service)"]=f"[{depend_tag}]"
+                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}]"
                                     
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"

@@ -920,49 +920,24 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
         country_support_groups = support_groups_per_country.get(country, support_group) if support_groups_per_country else support_group
         country_managed_groups = managed_by_groups_per_country.get(country, "") if managed_by_groups_per_country else ""
     
-    # Debug output for DE
-    if country == "DE":
-        print(f"DEBUG DE Support Groups:")
-        print(f"  support_groups_per_country: {support_groups_per_country}")
-        print(f"  managed_by_groups_per_country: {managed_by_groups_per_country}")
-        print(f"  country_support_groups: {repr(country_support_groups)}")
-        print(f"  country_managed_groups: {repr(country_managed_groups)}")
-        has_newlines_in_support_groups = '\n' in str(country_support_groups)
-        print(f"  Has newlines in support groups: {has_newlines_in_support_groups}")
-        has_newlines_in_managed_groups = '\n' in str(country_managed_groups)
-        print(f"  Has newlines in managed groups: {has_newlines_in_managed_groups}")
-    
     # Handle multiple groups (separated by newlines)
-    if country_support_groups and '\n' in country_support_groups:
-        support_list = [sg.strip() for sg in country_support_groups.split('\n') if sg.strip()]
+    if country_support_groups and '\n' in str(country_support_groups):
+        support_list = [sg.strip() for sg in str(country_support_groups).split('\n') if sg.strip()]
         managed_list = []
-        if country_managed_groups and '\n' in country_managed_groups:
-            managed_list = [mg.strip() for mg in country_managed_groups.split('\n') if mg.strip()]
+        if country_managed_groups and '\n' in str(country_managed_groups):
+            managed_list = [mg.strip() for mg in str(country_managed_groups).split('\n') if mg.strip()]
         else:
             managed_list = [country_managed_groups.strip()] * len(support_list) if country_managed_groups else support_list
         
         # Ensure managed_list has same length as support_list
         while len(managed_list) < len(support_list):
             managed_list.append(support_list[len(managed_list)])
-        
-        # Debug output for DE multiple groups
-        if country == "DE":
-            print(f"  support_list: {support_list}")
-            print(f"  managed_list: {managed_list}")
-            print(f"  Final pairs: {list(zip(support_list, managed_list))}")
             
         return list(zip(support_list, managed_list))
     else:
         # Single support group
         single_support = country_support_groups or support_group or ""
         single_managed = country_managed_groups or single_support or ""
-        
-        # Debug output for DE single group
-        if country == "DE":
-            print(f"  single_support: {single_support}")
-            print(f"  single_managed: {single_managed}")
-            print(f"  Final single pair: {[(single_support, single_managed)]}")
-            
         return [(single_support, single_managed)] if single_support else [("", "")]
 
 def run_generator(*,
@@ -1359,9 +1334,22 @@ def run_generator(*,
                                     managed_by_groups_per_country, division
                                 )
                                 
-                                # Debug: Print support group info
-                                if support_group or support_groups_per_country:
-                                    print(f"Support group assignment for {country}: {support_groups_list}")
+                                # For DE, filter support groups based on receiver (HS DE vs DS DE)
+                                if country == "DE" and recv:
+                                    filtered_groups = []
+                                    for sg, mg in support_groups_list:
+                                        # Only include groups that match the receiver division
+                                        if recv == "HS DE" and sg.startswith("HS DE"):
+                                            filtered_groups.append((sg, mg))
+                                        elif recv == "DS DE" and sg.startswith("DS DE"):
+                                            filtered_groups.append((sg, mg))
+                                    support_groups_list = filtered_groups if filtered_groups else support_groups_list
+                                
+                                # Debug: Print support group info for DE
+                                if country == "DE" and (support_group or support_groups_per_country):
+                                    print(f"DE Debug - Receiver: {recv}")
+                                    print(f"DE Debug - Number of support groups for {recv}: {len(support_groups_list)}")
+                                    print(f"DE Debug - Support groups: {support_groups_list}")
                                 
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
@@ -1391,18 +1379,28 @@ def run_generator(*,
                                     # FIXED: PL "Subscribed by Company" - determine from generated name
                                     if country == "PL":
                                         # Determine division from generated name more explicitly
-                                        if "DS PL" in new_name:
+                                        if "[DS PL" in new_name or " DS PL " in new_name:
                                             row.loc[:, "Subscribed by Company"] = "DS PL"
-                                        elif "HS PL" in new_name:
+                                        elif "[HS PL" in new_name or " HS PL " in new_name:
                                             row.loc[:, "Subscribed by Company"] = "HS PL"
                                         else:
-                                            # Fallback: keep original value
+                                            # More thorough check
+                                            if "DS" in new_name and "PL" in new_name:
+                                                row.loc[:, "Subscribed by Company"] = "DS PL"
+                                            else:
+                                                row.loc[:, "Subscribed by Company"] = "HS PL"  # Default to HS
+                                    elif country == "DE":
+                                        # FIXED: For DE, set Subscribed by Company based on support group
+                                        if support_group_for_country == "HS DE IT Service Desk HC":
+                                            row.loc[:, "Subscribed by Company"] = "DE Internal Patients"
+                                        elif managed_by_group_for_country == "HS DE IT Service Desk - MCC" and recv == "HS DE":
+                                            row.loc[:, "Subscribed by Company"] = "DE External Patients"
+                                        elif support_group_for_country == "DS DE IT Service Desk Labs":
+                                            row.loc[:, "Subscribed by Company"] = "DE IMD Laboratories\nDE IFLB Laboratories"
+                                        else:
+                                            # Fallback to original value
                                             original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
                                             row.loc[:, "Subscribed by Company"] = original_subscribed
-                                    elif country == "DE":
-                                        # For DE, preserve the original "Subscribed by Company" based on division
-                                        original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
-                                        row.loc[:, "Subscribed by Company"] = original_subscribed
                                     elif country == "UA":
                                         row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
                                     elif country == "MD":
@@ -1450,18 +1448,17 @@ def run_generator(*,
                                             # For DE and CY with receivers, use the receiver's division
                                             depend_tag = f"{recv} Prod"
                                         elif country == "PL":
-                                            # FIXED: For PL, determine from the new name more explicitly
-                                            if "DS PL" in new_name:
+                                            # FIXED: For PL, ALWAYS check the generated name first
+                                            if "[DS PL" in new_name or " DS PL " in new_name:
                                                 depend_tag = "DS PL Prod"
-                                            elif "HS PL" in new_name:
+                                            elif "[HS PL" in new_name or " HS PL " in new_name:
                                                 depend_tag = "HS PL Prod"
                                             else:
-                                                # Fallback: check original name
-                                                orig_name = str(base_row.get("Name (Child Service Offering lvl 1)", ""))
-                                                if "DS PL" in orig_name:
+                                                # More thorough check
+                                                if "DS" in new_name and "PL" in new_name:
                                                     depend_tag = "DS PL Prod"
                                                 else:
-                                                    depend_tag = "HS PL Prod"
+                                                    depend_tag = "HS PL Prod"  # Default to HS
                                         else:
                                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
                                     

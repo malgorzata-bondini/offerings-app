@@ -437,17 +437,27 @@ with col2:
                 )
             
             with col2:
-                # Automatically use the first application from Basic tab if available
-                auto_app_name = new_apps[0] if new_apps else ""
-                if auto_app_name:
-                    st.text_input(
-                        "Application Name",
-                        value=auto_app_name,
-                        disabled=True,
-                        help=f"Automatically taken from Applications in Basic tab: {auto_app_name}"
-                    )
-                    app_name = auto_app_name
+                # Handle multiple applications from Basic tab
+                if new_apps:
+                    if len(new_apps) == 1:
+                        # Single app - auto-fill and disable
+                        st.text_input(
+                            "Application Name",
+                            value=new_apps[0],
+                            disabled=True,
+                            help=f"Automatically taken from Applications in Basic tab: {new_apps[0]}"
+                        )
+                        app_name = new_apps[0]
+                    else:
+                        # Multiple apps - let user choose
+                        app_name = st.selectbox(
+                            "Select Application",
+                            options=new_apps,
+                            index=0,
+                            help=f"Choose from applications in Basic tab: {', '.join(new_apps)}"
+                        )
                 else:
+                    # No apps in Basic tab - manual entry
                     app_name = st.text_input(
                         "Application Name",
                         value="",

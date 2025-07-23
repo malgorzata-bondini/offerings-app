@@ -1580,9 +1580,6 @@ def run_generator(
                                     country_supports = support_groups_per_country.get(key, "")
                                     country_managed = managed_by_groups_per_country.get(key, "")
                                     
-                                    # Debug: Print PL support group info
-                                    print(f"DEBUG PL: recv={recv}, supports={country_supports}, managed={country_managed}")
-                                    
                                     # For PL, we expect only one support group per receiver
                                     # No need to parse multiple lines or filter later
                                     if country_supports:
@@ -1592,8 +1589,6 @@ def run_generator(
                                     else:
                                         # Fallback to empty if no support group configured for this receiver
                                         support_groups_list = [("", "")]
-                                    
-                                    print(f"DEBUG PL: Final groups for {recv}: {support_groups_list}")
                                 else:
                                     # Delegate to helper for other countries
                                     support_groups_list = get_support_groups_list_for_country(
@@ -1608,19 +1603,6 @@ def run_generator(
                                                 if sg.strip().startswith(prefix)]
                                     if matching:
                                         support_groups_list = matching
-                                
-                                # For PL, limit groups to those matching the current receiver division
-                                elif country == "PL" and recv:
-                                    # Extract division from receiver (HS from "HS PL", DS from "DS PL")
-                                    recv_division = recv.split()[0] if recv else ""  # "HS" or "DS"
-                                    if recv_division:
-                                        matching = [(sg, mg) for sg, mg in support_groups_list
-                                                   if sg.strip().startswith(recv_division)]
-                                        if matching:
-                                            support_groups_list = matching
-                                        print(f"DEBUG PL: Filtered groups for {recv} ({recv_division}): {support_groups_list}")
-                                    else:
-                                        print(f"DEBUG PL: No division found for receiver {recv}, keeping all groups")
                                 
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:

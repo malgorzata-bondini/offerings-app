@@ -1445,25 +1445,18 @@ def run_generator(
                                     schedule_exists_anywhere = all_names_combined.str.contains(schedule_lower, na=False).any()
                                     
                                     if not schedule_exists_anywhere:
-                                        # Schedule doesn't exist at all - skip it
+                                        # Schedule doesn't exist at all - skip it completely
                                         continue
                                     
                                     # Check if schedule exists in corp vs non-corp names
                                     exists_in_corp = corp_names.str.lower().str.contains(schedule_lower, na=False).any()
                                     exists_in_non_corp = non_corp_names.str.lower().str.contains(schedule_lower, na=False).any()
                                     
-                                    # If schedule exists only in CORP names but user didn't select CORP -> will be marked as missing (red)
-                                    if exists_in_corp and not exists_in_non_corp and not is_corp_type:
-                                        # Schedule exists only in CORP but user generating non-CORP -> mark as missing for red formatting
-                                        continue
-                                    
-                                    # If schedule is available for current generation type or exists in both -> OK to use
-                                    if is_corp_type and exists_in_corp:
-                                        valid_schedules.append(schedule)
-                                    elif not is_corp_type and exists_in_non_corp:
-                                        valid_schedules.append(schedule)
-                                    elif exists_in_corp and exists_in_non_corp:
-                                        # Available in both types -> always OK
+                                    # Schedule is valid if:
+                                    # - User selected CORP and it exists in CORP names, OR
+                                    # - User didn't select CORP and it exists in non-CORP names, OR  
+                                    # - It exists in both CORP and non-CORP names
+                                    if (is_corp_type and exists_in_corp) or (not is_corp_type and exists_in_non_corp) or (exists_in_corp and exists_in_non_corp):
                                         valid_schedules.append(schedule)
                                 
                                 country_schedule_suffixes = valid_schedules
@@ -1481,7 +1474,7 @@ def run_generator(
                                     country_schedule_suffixes = original_schedules
                                 else:
                                     country_schedule_suffixes = [""]  # Empty schedule if really no schedules
-                            
+
                             for schedule_suffix in country_schedule_suffixes:
                                 # Flag to track if schedule is missing
                                 missing_schedule = schedule_missing

@@ -1401,19 +1401,9 @@ def run_generator(*,
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
                                     
-                                    # FIXED: For PL "Subscribed by Company" - determine from generated name
+                                    # PL subscription splits: use receiver directly
                                     if country == "PL":
-                                        # Determine division from generated name more explicitly
-                                        if "[DS PL" in new_name or " DS PL " in new_name:
-                                            row.loc[:, "Subscribed by Company"] = "DS PL"
-                                        elif "[HS PL" in new_name or " HS PL " in new_name:
-                                            row.loc[:, "Subscribed by Company"] = "HS PL"
-                                        else:
-                                            # More thorough check
-                                            if "DS" in new_name and "PL" in new_name:
-                                                row.loc[:, "Subscribed by Company"] = "DS PL"
-                                            else:
-                                                row.loc[:, "Subscribed by Company"] = "HS PL"  # Default to HS
+                                        row.loc[:, "Subscribed by Company"] = recv
                                     elif country == "DE":
                                         # Set Subscribed by Company directly from the support group entered
                                         row.loc[:, "Subscribed by Company"] = support_group_for_country if support_group_for_country else ""

@@ -1459,8 +1459,8 @@ def run_generator(*,
                                             # For DE and CY with receivers, use the receiver's division
                                             depend_tag = f"{recv} Prod"
                                         elif country == "PL":
-                                            # For PL, derive from generated name
-                                            if re.search(r'\[\w+\s+HS\s+PL', new_name) or " HS PL " in new_name:
+                                            # For PL, derive depend_tag from generated name substring
+                                            if "HS PL" in new_name:
                                                 depend_tag = "HS PL Prod"
                                             else:
                                                 depend_tag = "DS PL Prod"

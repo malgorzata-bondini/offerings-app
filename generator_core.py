@@ -1574,8 +1574,11 @@ def run_generator(
                                     
                                     # Always update Service Offerings | Depend On based on computed depend_tag and app
                                     if use_custom_depend_on and custom_depend_on_value:
-                                        # Use custom value if specified
-                                        row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
+                                        # Use custom prefix but still include app name automatically
+                                        if app:
+                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{custom_depend_on_value} {app}"
+                                        else:
+                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
                                     elif app:
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}] {app}"
                                     else:

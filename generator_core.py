@@ -1401,19 +1401,14 @@ def run_generator(*,
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
                                     
-                                    # FIXED: For PL "Subscribed by Company" - determine from generated name
+                                    # PL subscription splits: determine based on actual generated name new_name
                                     if country == "PL":
-                                        # Determine division from generated name more explicitly
-                                        if "[DS PL" in new_name or " DS PL " in new_name:
-                                            row.loc[:, "Subscribed by Company"] = "DS PL"
-                                        elif "[HS PL" in new_name or " HS PL " in new_name:
+                                        # Check for HS PL pattern in generated name
+                                        if re.search(r'\[\w+\s+HS\s+PL', new_name) or " HS PL " in new_name:
                                             row.loc[:, "Subscribed by Company"] = "HS PL"
                                         else:
-                                            # More thorough check
-                                            if "DS" in new_name and "PL" in new_name:
-                                                row.loc[:, "Subscribed by Company"] = "DS PL"
-                                            else:
-                                                row.loc[:, "Subscribed by Company"] = "HS PL"  # Default to HS
+                                            # Default to DS PL
+                                            row.loc[:, "Subscribed by Company"] = "DS PL"
                                     elif country == "DE":
                                         # Set Subscribed by Company directly from the support group entered
                                         row.loc[:, "Subscribed by Company"] = support_group_for_country if support_group_for_country else ""
@@ -1459,25 +1454,16 @@ def run_generator(*,
                                     elif global_prod:
                                         depend_tag = "Global Prod"
                                     else:
-                                        # Determine the correct division tag based on receiver or name
+                                        # Determine the correct division tag based on receiver or country logic
                                         if recv:
                                             # For DE and CY with receivers, use the receiver's division
                                             depend_tag = f"{recv} Prod"
                                         elif country == "PL":
-                                            # FIXED: For PL, check the actual generated name very explicitly
-                                            # Check for the pattern in brackets like [IM HS PL IT] or [SR DS PL]
-                                            if re.search(r'\[\w+\s+HS\s+PL', new_name):
+                                            # For PL, derive from generated name
+                                            if re.search(r'\[\w+\s+HS\s+PL', new_name) or " HS PL " in new_name:
                                                 depend_tag = "HS PL Prod"
-                                            elif re.search(r'\[\w+\s+DS\s+PL', new_name):
-                                                depend_tag = "DS PL Prod"
-                                            # Secondary check for cases without brackets
-                                            elif " HS PL " in new_name:
-                                                depend_tag = "HS PL Prod"
-                                            elif " DS PL " in new_name:
-                                                depend_tag = "DS PL Prod"
                                             else:
-                                                # Default based on division determined earlier
-                                                depend_tag = f"{division} PL Prod" if division else "HS PL Prod"
+                                                depend_tag = "DS PL Prod"
                                         else:
                                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
                                     

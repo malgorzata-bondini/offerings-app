@@ -1364,7 +1364,10 @@ def run_generator(
                             # Check if schedules are actually available for our generation type
                             is_corp_type = require_corp or require_recp or require_corp_it or require_corp_dedicated
                             
-                            # Filter schedules to only include those that are actually available for our generation type
+                            # Filter schedules based on improved logic:
+                            # 1. Check if schedule exists in names at all
+                            # 2. If exists only in CORP but user didn't select CORP -> red formatting
+                            # 3. Otherwise OK to use
                             if country_schedule_suffixes and not use_new_parent:
                                 valid_schedules = []
                                 
@@ -1374,19 +1377,32 @@ def run_generator(
                                         valid_schedules.append(schedule)
                                         continue
                                     
-                                    # Use pre-computed names for faster validation
-                                    schedule_available = False
                                     schedule_lower = schedule_str.lower()
                                     
-                                    # Check appropriate name set based on generation type
-                                    if is_corp_type:
-                                        # Check if any corp name contains this schedule
-                                        schedule_available = corp_names.str.lower().str.contains(schedule_lower, na=False).any()
-                                    else:
-                                        # Check if any non-corp name contains this schedule  
-                                        schedule_available = non_corp_names.str.lower().str.contains(schedule_lower, na=False).any()
+                                    # First check if schedule exists anywhere in names
+                                    all_names_combined = pd.concat([corp_names, non_corp_names]).str.lower()
+                                    schedule_exists_anywhere = all_names_combined.str.contains(schedule_lower, na=False).any()
                                     
-                                    if schedule_available:
+                                    if not schedule_exists_anywhere:
+                                        # Schedule doesn't exist at all - skip it
+                                        continue
+                                    
+                                    # Check if schedule exists in corp vs non-corp names
+                                    exists_in_corp = corp_names.str.lower().str.contains(schedule_lower, na=False).any()
+                                    exists_in_non_corp = non_corp_names.str.lower().str.contains(schedule_lower, na=False).any()
+                                    
+                                    # If schedule exists only in CORP names but user didn't select CORP -> will be marked as missing (red)
+                                    if exists_in_corp and not exists_in_non_corp and not is_corp_type:
+                                        # Schedule exists only in CORP but user generating non-CORP -> mark as missing for red formatting
+                                        continue
+                                    
+                                    # If schedule is available for current generation type or exists in both -> OK to use
+                                    if is_corp_type and exists_in_corp:
+                                        valid_schedules.append(schedule)
+                                    elif not is_corp_type and exists_in_non_corp:
+                                        valid_schedules.append(schedule)
+                                    elif exists_in_corp and exists_in_non_corp:
+                                        # Available in both types -> always OK
                                         valid_schedules.append(schedule)
                                 
                                 country_schedule_suffixes = valid_schedules
@@ -1534,6 +1550,7 @@ def run_generator(
                                         country, support_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
                                     )
+                                
                                 # For DE, limit groups to those matching the current receiver if any, else keep all
                                 if country == "DE" and recv:
                                     prefix = recv
@@ -1541,6 +1558,19 @@ def run_generator(
                                                 if sg.strip().startswith(prefix)]
                                     if matching:
                                         support_groups_list = matching
+                                
+                                # For PL, limit groups to those matching the current receiver division
+                                elif country == "PL" and recv:
+                                    # Extract division from receiver (HS from "HS PL", DS from "DS PL")
+                                    recv_division = recv.split()[0] if recv else ""  # "HS" or "DS"
+                                    if recv_division:
+                                        matching = [(sg, mg) for sg, mg in support_groups_list
+                                                   if sg.strip().startswith(recv_division)]
+                                        if matching:
+                                            support_groups_list = matching
+                                        print(f"DEBUG PL: Filtered groups for {recv} ({recv_division}): {support_groups_list}")
+                                    else:
+                                        print(f"DEBUG PL: No division found for receiver {recv}, keeping all groups")
                                 
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:

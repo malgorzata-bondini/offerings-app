@@ -1485,19 +1485,11 @@ def run_generator(*,
                                         else:
                                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
                                     
-                                    # Handle Service Offerings | Depend On - preserve original values
-                                    if original_depend_on in ["-", "", "nan", "NaN", None]:
-                                        # Preserve the original empty/dash value
-                                        if original_depend_on == "-":
-                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = "-"
-                                        else:
-                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = ""
+                                    # Always update Service Offerings | Depend On based on computed depend_tag and app
+                                    if app:
+                                        row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}] {app}"
                                     else:
-                                        # Only update if original had a real value
-                                        if app:
-                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}] {app}"
-                                        else:
-                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}]"
+                                        row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}]"
                                     
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"

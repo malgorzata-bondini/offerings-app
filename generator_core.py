@@ -517,7 +517,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Special handling for UA and MD - always use DS
         if country in ["UA", "MD"]:
-            prefix_parts.extend(["DS", country"])
+            prefix_parts.extend(["DS", country])
         else:
             if division:
                 prefix_parts.append(division)
@@ -953,13 +953,13 @@ def get_de_company_and_ldap(support_group, receiver):
         # For other support groups, return the support group as company and empty LDAP
         return support_group, ""
 
-def run_generator(*,
+def run_generator(
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
     rsp_duration, rsl_duration,
     sr_or_im, require_corp, require_recp, delivering_tag,
     support_group, managed_by_group, aliases_on, aliases_value,
-    src_dir: Path, out_dir: Path,
+    src_dir, out_dir,
     special_it=False, special_hr=False, special_medical=False, special_dak=False,
     use_custom_commitments=False, custom_commitments_str="", commitment_country=None,
     rsp_enabled=False, rsl_enabled=False,

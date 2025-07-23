@@ -440,12 +440,51 @@ with col2:
         st.markdown("### Aliases")
         aliases_on = st.checkbox("Enable Aliases", value=False)
         
+        # Initialize variables
+        use_per_country_aliases = False
+        aliases_per_country = {}
+        
         if aliases_on:
-            aliases_value = st.text_input(
-                "Alias Value",
-                value="",
-                help="Enter the value to use for aliases"
-            )
+            # Option for global or per-country aliases
+            use_per_country_aliases = st.checkbox("Use different aliases per country/division", 
+                                                 value=False, 
+                                                 help="Define specific aliases for different countries or divisions")
+            
+            if use_per_country_aliases:
+                st.markdown("**Aliases per Country/Division**")
+                st.info("Configure aliases for specific countries/divisions. Unconfigured countries will use empty aliases.")
+                
+                # Define available countries/divisions
+                available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "CY"]
+                aliases_per_country = {}
+                
+                # Create tabs for different countries
+                alias_country_tabs = st.tabs(available_countries)
+                
+                for idx, country in enumerate(available_countries):
+                    with alias_country_tabs[idx]:
+                        st.markdown(f"**{country} Aliases**")
+                        
+                        country_alias = st.text_input(
+                            f"Alias Value for {country}",
+                            value="",
+                            key=f"alias_{country.replace(' ', '_')}",
+                            placeholder=f"e.g., {country}_ALIAS",
+                            help=f"Alias value to use specifically for {country}"
+                        )
+                        
+                        if country_alias.strip():
+                            aliases_per_country[country] = country_alias.strip()
+                
+                # Set global alias to empty when using per-country
+                aliases_value = ""
+            else:
+                # Global alias value
+                aliases_value = st.text_input(
+                    "Global Alias Value",
+                    value="",
+                    help="Enter the value to use for aliases (same for all countries)"
+                )
         else:
             aliases_value = ""
 
@@ -493,6 +532,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         managed_by_group=managed_by_group,
                         aliases_on=aliases_on,
                         aliases_value=aliases_value,
+                        aliases_per_country=aliases_per_country if use_per_country_aliases else {},
                         src_dir=src_dir,
                         out_dir=out_dir,
                         special_it=special_it if 'special_it' in locals() else False,

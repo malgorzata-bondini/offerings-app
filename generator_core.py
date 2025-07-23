@@ -1347,18 +1347,6 @@ def run_generator(*,
                                         country, support_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
                                     )
-                                # For DE, filter by side but keep unlabeled and fallback to all
-                                if country == "DE" and recv:
-                                    filtered_groups = []
-                                    for sg, mg in support_groups_list:
-                                        side = "HS" if sg.strip().startswith("HS DE") else "DS" if sg.strip().startswith("DS DE") else None
-                                        # include if no side label or matches current recv
-                                        if side is None or side in recv:
-                                            filtered_groups.append((sg, mg))
-                                    # fallback to all if nothing matched
-                                    if not filtered_groups:
-                                        filtered_groups = support_groups_list
-                                    support_groups_list = filtered_groups
                                 
                                 # Debug: Print support group info for DE
                                 if country == "DE" and (support_group or support_groups_per_country):

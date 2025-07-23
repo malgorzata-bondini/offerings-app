@@ -220,7 +220,7 @@ with col2:
                         f"Schedules for {country}",
                         value="",
                         placeholder="Mon-Fri 9-17\nMon-Fri 8-16\nMon-Sun 24/7",
-                        height=100,
+                        height=150,
                         key=f"schedule_{country.replace(' ', '_')}"
                     )
                     

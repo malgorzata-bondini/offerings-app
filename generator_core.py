@@ -1124,16 +1124,16 @@ def run_generator(*,
                     # Collect LDAP data for DE
                     if wb.stem.endswith("_DE") and "Support group" in df.columns:
                         # Look for LDAP columns
-                        ldap_cols = [col for col in df.columns if "LDAP" in col or "Ldap" in col or "ldap" in col]
+                        ldap_cols = [col for col in df.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
                         if ldap_cols and "Support group" in df.columns:
                             for idx, row in df.iterrows():
                                 sg = str(row.get("Support group", "")).strip()
-                                if sg:
+                                if sg and sg not in ["nan", "NaN", ""]:
                                     # Store all LDAP values for this support group
                                     ldap_values = {}
                                     for ldap_col in ldap_cols:
                                         ldap_val = str(row.get(ldap_col, "")).strip()
-                                        if ldap_val and ldap_val not in ["nan", "NaN", ""]:
+                                        if ldap_val and ldap_val not in ["nan", "NaN", "", "None", "none"]:
                                             ldap_values[ldap_col] = ldap_val
                                     if ldap_values:
                                         original_ldap_data[sg] = ldap_values
@@ -1181,10 +1181,11 @@ def run_generator(*,
                         df["Visibility group"] = ""
                     
                     # Add LDAP columns if they don't exist
-                    ldap_cols = [col for col in df.columns if "LDAP" in col or "Ldap" in col or "ldap" in col]
-                    if not ldap_cols:
-                        # Add a default LDAP column
+                    ldap_cols = [col for col in df.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
+                    if not ldap_cols and country == "DE":
+                        # Add a default LDAP column for DE
                         df["LDAP"] = ""
+                        ldap_cols = ["LDAP"]
 
                     # Debug: Check if we have the required columns
                     if "Parent Offering" in df.columns and "Name (Child Service Offering lvl 1)" in df.columns:
@@ -1434,14 +1435,14 @@ def run_generator(*,
                                         row.loc[:, "Subscribed by Company"] = company
                                         
                                         # Handle LDAP columns
-                                        ldap_cols = [col for col in row.columns if "LDAP" in col or "Ldap" in col or "ldap" in col]
+                                        ldap_cols = [col for col in row.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
                                         if ldap_cols:
                                             # Clear all LDAP columns first
                                             for ldap_col in ldap_cols:
                                                 row.loc[:, ldap_col] = ""
                                             
                                             # Set the special LDAP value if we have one
-                                            if ldap:
+                                            if ldap and ldap not in ["", "nan", "NaN", "None"]:
                                                 # Use the first LDAP column
                                                 row.loc[:, ldap_cols[0]] = ldap
                                             else:
@@ -1449,7 +1450,7 @@ def run_generator(*,
                                                 if support_group_for_country in original_ldap_data:
                                                     ldap_data = original_ldap_data[support_group_for_country]
                                                     for ldap_col, ldap_val in ldap_data.items():
-                                                        if ldap_col in row.columns:
+                                                        if ldap_col in row.columns and ldap_val not in ["", "nan", "NaN", "None"]:
                                                             row.loc[:, ldap_col] = ldap_val
                                     # PL subscription splits: determine based on actual generated name new_name
                                     elif country == "PL":
@@ -1548,10 +1549,12 @@ def run_generator(*,
         sorted_sheets = sorted(sheets.keys())
         
         for sheet_name in sorted_sheets:
-            dfc = sheets[sheet_name]
+            dfc = sheets[sheet_name].copy()  # Make a copy to avoid modifying original
+            
             # Remove helper column tracking receiver side
             if "_recv" in dfc.columns:
                 dfc = dfc.drop(columns=["_recv"])
+            
             # Extract country code from sheet name (e.g., "PL lvl1" -> "PL")
             cc = sheet_name.split()[0]
             
@@ -1560,53 +1563,88 @@ def run_generator(*,
             df_final = dfc.drop_duplicates(
                 subset=["Name (Child Service Offering lvl 1)", "Support group", "Managed by Group"],
                 keep="first"
-            )
+            ).copy()
             
             if "Number" in df_final.columns:
                 df_final = df_final.drop(columns=["Number"])
+            
             # Remove Visibility group column for PL
             if cc == "PL" and "Visibility group" in df_final.columns:
                 df_final = df_final.drop(columns=["Visibility group"])
-            # Replace all forms of empty/null values with empty string
-            df_final = df_final.fillna('')
             
+            # Clean data before writing to Excel
             for col in df_final.columns:
-                if df_final[col].dtype == 'bool':
-                    df_final[col] = df_final[col].map({True: 'true', False: 'false'})
-                elif df_final[col].dtype == 'object':
-                    # Replace all variants of empty values
-                    df_final[col] = df_final[col].astype(str).replace({
-                        'nan': '', 
-                        'NaN': '', 
-                        'None': '', 
+                try:
+                    # Convert column to string type first to handle mixed types
+                    df_final[col] = df_final[col].astype(str)
+                    
+                    # Replace problematic values
+                    df_final[col] = df_final[col].replace({
+                        'nan': '',
+                        'NaN': '',
+                        'None': '',
                         'none': '',
                         'NULL': '',
                         'null': '',
                         '<NA>': '',
-                        'True': 'true', 
-                        'False': 'false'
+                        'True': 'true',
+                        'TRUE': 'true',
+                        'False': 'false',
+                        'FALSE': 'false'
                     })
-                    # normalize any True/False (any case) to lowercase
-                    df_final[col] = df_final[col].replace({
-                        'True': 'true', 'TRUE': 'true',
-                        'False': 'false', 'FALSE': 'false'
-                    })
-                    # Also handle when the string is literally "nan"
-                    df_final[col] = df_final[col].apply(lambda x: '' if str(x).lower() == 'nan' else x)
+                    
+                    # Handle cells that are literally "nan" (case insensitive)
+                    df_final[col] = df_final[col].apply(
+                        lambda x: '' if str(x).lower() in ['nan', 'none', 'null', '<na>'] else str(x)
+                    )
+                    
+                    # Remove any leading/trailing whitespace
+                    df_final[col] = df_final[col].str.strip()
+                    
+                except Exception as e:
+                    print(f"Warning: Error processing column {col}: {e}")
+                    # If there's an error, try to convert to string at minimum
+                    df_final[col] = df_final[col].astype(str)
             
+            # Write to Excel
             df_final.to_excel(w, sheet_name=sheet_name, index=False)
     
-    # Apply formatting
-    wb = load_workbook(outfile)
-    for ws in wb.worksheets:
-        # get_column_letter is already imported at the top
-        for col_idx, col in enumerate(ws.columns, start=1):
-            col_letter = get_column_letter(col_idx)
-            ws.column_dimensions[col_letter].width = max(len(str(c.value)) if c.value else 0 for c in col) + 2
-            for c in col:
-                c.alignment = Alignment(wrap_text=True)
-                # Ensure empty cells stay empty in Excel
-                if c.value in ['nan', 'NaN', 'None', None, 'none', 'NULL', 'null', '<NA>']:
-                    c.value = None
-    wb.save(outfile)
+    # Apply formatting with error handling
+    try:
+        wb = load_workbook(outfile)
+        for ws in wb.worksheets:
+            # Apply column widths and formatting
+            for col_idx, col in enumerate(ws.columns, start=1):
+                col_letter = get_column_letter(col_idx)
+                
+                # Calculate column width more safely
+                max_length = 10  # minimum width
+                for cell in col:
+                    try:
+                        cell_length = len(str(cell.value)) if cell.value else 0
+                        if cell_length > max_length:
+                            max_length = min(cell_length, 100)  # cap at 100 to prevent issues
+                    except:
+                        pass
+                
+                ws.column_dimensions[col_letter].width = max_length + 2
+                
+                # Apply text wrapping
+                for cell in col:
+                    try:
+                        cell.alignment = Alignment(wrap_text=True)
+                        # Clean up cell values
+                        if cell.value in ['nan', 'NaN', 'None', None, 'none', 'NULL', 'null', '<NA>']:
+                            cell.value = None
+                        elif isinstance(cell.value, str) and cell.value.lower() in ['nan', 'none', 'null']:
+                            cell.value = ''
+                    except Exception as e:
+                        print(f"Warning: Error formatting cell: {e}")
+                        pass
+        
+        wb.save(outfile)
+    except Exception as e:
+        print(f"Warning: Error applying formatting: {e}")
+        # If formatting fails, the file should still be valid without formatting
+    
     return outfile

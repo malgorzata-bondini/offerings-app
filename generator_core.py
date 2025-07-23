@@ -1634,10 +1634,12 @@ def run_generator(
                     try:
                         cell.alignment = Alignment(wrap_text=True)
                         # Clean up cell values
-                        if cell.value in ['nan', 'NaN', 'None', None, 'none', 'NULL', 'null', '<NA>']:
-                            cell.value = None
-                        elif isinstance(cell.value, str) and cell.value.lower() in ['nan', 'none', 'null']:
-                            cell.value = ''
+                        from openpyxl.cell.cell import MergedCell
+                        if not isinstance(cell, MergedCell):
+                            if cell.value in ['nan', 'NaN', 'None', None, 'none', 'NULL', 'null', '<NA>']:
+                                cell.value = None
+                            elif isinstance(cell.value, str) and cell.value.lower() in ['nan', 'none', 'null']:
+                                cell.value = ''
                     except Exception as e:
                         print(f"Warning: Error formatting cell: {e}")
                         pass

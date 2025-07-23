@@ -1454,16 +1454,12 @@ def run_generator(*,
                                     elif global_prod:
                                         depend_tag = "Global Prod"
                                     else:
-                                        # Determine the correct division tag based on receiver or country logic
-                                        if recv:
+                                        # PL: always use receiver for depend_tag, ignore generic recv branch
+                                        if country == "PL":
+                                            depend_tag = "HS PL Prod" if recv == "HS PL" else "DS PL Prod"
+                                        elif recv:
                                             # For DE and CY with receivers, use the receiver's division
                                             depend_tag = f"{recv} Prod"
-                                        elif country == "PL":
-                                            # For PL, derive depend_tag from generated name substring
-                                            if "HS PL" in new_name:
-                                                depend_tag = "HS PL Prod"
-                                            else:
-                                                depend_tag = "DS PL Prod"
                                         else:
                                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
                                     

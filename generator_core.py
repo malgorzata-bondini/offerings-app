@@ -1340,14 +1340,6 @@ def run_generator(*,
                                         country, support_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
                                     )
-                                # For DE, limit groups to those matching the current receiver if any, else keep all
-                                if country == "DE" and recv:
-                                    prefix = recv
-                                    matching = [(sg, mg) for sg, mg in support_groups_list
-                                                if sg.strip().startswith(prefix)]
-                                    if matching:
-                                        support_groups_list = matching
-                                
                                 # Debug: Print support group info for DE
                                 if country == "DE" and (support_group or support_groups_per_country):
                                     print(f"DE Debug - Receiver: {recv}")

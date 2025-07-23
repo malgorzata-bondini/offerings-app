@@ -1015,8 +1015,11 @@ def run_generator(
         aliases_per_country = {}
 
     sheets, seen = {}, set()
+    sheets_data = {}  # Store rows as lists for batch concatenation
     existing_offerings = set()  # Track existing offerings to detect duplicates
     original_ldap_data = {}  # Store LDAP data from original files
+    excel_cache = {}  # Cache for Excel file reads
+    missing_schedule_info = {}  # Track rows with missing schedules for red formatting
 
     def parse_keywords(keyword_string):
         """Parse keywords - returns (keywords_list, use_and_logic)"""
@@ -1148,31 +1151,38 @@ def run_generator(
     # First, collect all existing offerings and LDAP data from the source files
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         try:
+            # Cache Excel file to avoid multiple reads
+            if wb not in excel_cache:
+                excel_cache[wb] = pd.ExcelFile(wb)
+            excel_file = excel_cache[wb]
+            
             # Check BOTH sheets for existing offerings
             for sheet_name in ["Child SO lvl1", "Child SO lvl2"]:
                 try:
-                    df = pd.read_excel(wb, sheet_name=sheet_name)
-                    if "Name (Child Service Offering lvl 1)" in df.columns:
-                        # Clean the names before adding to set - remove extra whitespace and convert to string
-                        existing_names = df["Name (Child Service Offering lvl 1)"].dropna().astype(str).str.strip()
-                        existing_offerings.update(existing_names)
-                    
-                    # Collect LDAP data for DE
-                    if wb.stem.endswith("_DE") and "Support group" in df.columns:
-                        # Look for LDAP columns
-                        ldap_cols = [col for col in df.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
-                        if ldap_cols and "Support group" in df.columns:
-                            for idx, row in df.iterrows():
-                                sg = str(row.get("Support group", "")).strip()
-                                if sg and sg not in ["nan", "NaN", ""]:
-                                    # Store all LDAP values for this support group
-                                    ldap_values = {}
-                                    for ldap_col in ldap_cols:
-                                        ldap_val = str(row.get(ldap_col, "")).strip()
-                                        if ldap_val and ldap_val not in ["nan", "NaN", "", "None", "none"]:
-                                            ldap_values[ldap_col] = ldap_val
-                                    if ldap_values:
-                                        original_ldap_data[sg] = ldap_values
+                    if sheet_name in excel_file.sheet_names:
+                        df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                        if "Name (Child Service Offering lvl 1)" in df.columns:
+                            # Clean and normalize the names before adding to set
+                            existing_names = df["Name (Child Service Offering lvl 1)"].dropna().astype(str)
+                            normalized_names = existing_names.apply(lambda x: ' '.join(str(x).split()))
+                            existing_offerings.update(normalized_names)
+                        
+                        # Collect LDAP data for DE
+                        if wb.stem.endswith("_DE") and "Support group" in df.columns:
+                            # Look for LDAP columns
+                            ldap_cols = [col for col in df.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
+                            if ldap_cols and "Support group" in df.columns:
+                                for idx, row in df.iterrows():
+                                    sg = str(row.get("Support group", "")).strip()
+                                    if sg and sg not in ["nan", "NaN", ""]:
+                                        # Store all LDAP values for this support group
+                                        ldap_values = {}
+                                        for ldap_col in ldap_cols:
+                                            ldap_val = str(row.get(ldap_col, "")).strip()
+                                            if ldap_val and ldap_val not in ["nan", "NaN", "", "None", "none"]:
+                                                ldap_values[ldap_col] = ldap_val
+                                        if ldap_values:
+                                            original_ldap_data[sg] = ldap_values
                 except Exception:
                     # Skip if sheet doesn't exist
                     continue
@@ -1181,8 +1191,13 @@ def run_generator(
             continue
 
     # Process the files
+    total_files = len(list(src_dir.glob("ALL_Service_Offering_*.xlsx")))
+    processed_files = 0
+    
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
+        processed_files += 1
         country = wb.stem.split("_")[-1].upper()
+        print(f"Processing file {processed_files}/{total_files}: {wb.name}")
         
         # Process BOTH lvl1 and lvl2 sheets when use_lvl2 is True
         # Process only lvl1 when use_lvl2 is False
@@ -1200,12 +1215,15 @@ def run_generator(
                     base_pool = pd.DataFrame([new_row])
                     # For new parent, we can process both levels with the same synthetic data
                 else:
-                    # ORIGINAL LOGIC - read from Excel file
-                    df = pd.read_excel(wb, sheet_name=sheet_name)
+                    # ORIGINAL LOGIC - read from cached Excel file
+                    if wb not in excel_cache:
+                        excel_cache[wb] = pd.ExcelFile(wb)
+                    excel_file = excel_cache[wb]
                     
-                    # Debug: Print column names to check if they match
-                    print(f"Processing {wb.name}, sheet: {sheet_name}")
-                    print(f"Available columns: {list(df.columns)}")
+                    if sheet_name not in excel_file.sheet_names:
+                        continue  # Skip if sheet doesn't exist
+                        
+                    df = pd.read_excel(excel_file, sheet_name=sheet_name)
                     
                     # Add missing columns as empty
                     for col in need_cols:
@@ -1351,10 +1369,6 @@ def run_generator(
                                 # Flag to track if schedule is missing
                                 missing_schedule = schedule_missing
                                 
-                                # Debug: Print schedule missing info
-                                if schedule_missing:
-                                    print(f"DEBUG: Schedule missing for {country}, {recv}, is_corp_type={is_corp_type}, schedule='{schedule_suffix}'")
-                                
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:
                                     # Always attempt to pick matching row but do not skip if none found
@@ -1426,14 +1440,7 @@ def run_generator(
                                 new_name_normalized = ' '.join(new_name.split())
                                 
                                 # Check against existing offerings in source files
-                                found_in_existing = False
-                                for existing in existing_offerings:
-                                    existing_normalized = ' '.join(str(existing).split())
-                                    if existing_normalized == new_name_normalized:
-                                        found_in_existing = True
-                                        break
-                                
-                                if found_in_existing:
+                                if new_name_normalized in existing_offerings:
                                     raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
                                 
                                 # Determine division for PL support groups
@@ -1489,12 +1496,6 @@ def run_generator(
                                     if matching:
                                         support_groups_list = matching
                                 
-                                # Debug: Print support group info for DE
-                                if country == "DE" and (support_group or support_groups_per_country):
-                                    print(f"DE Debug - Receiver: {recv}")
-                                    print(f"DE Debug - Number of support groups for {recv}: {len(support_groups_list)}")
-                                    print(f"DE Debug - Support groups: {support_groups_list}")
-                                
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
                                     # Skip duplicates based on name, receiver, app, schedule, support and managed groups
@@ -1513,10 +1514,6 @@ def run_generator(
                                     
                                     # Add flag for missing schedule (for red formatting later)
                                     row.loc[:, "_missing_schedule"] = missing_schedule
-                                    
-                                    # Debug: Print flag assignment
-                                    if missing_schedule:
-                                        print(f"DEBUG: Setting _missing_schedule=True for name: {new_name[:50]}...")
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
@@ -1663,14 +1660,44 @@ def run_generator(
                                     
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"
-                                    sheets.setdefault(sheet_key, pd.DataFrame())
-                                    sheets[sheet_key] = pd.concat([sheets[sheet_key], row], ignore_index=True)
+                                    
+                                    # Store row index for potential red formatting
+                                    if missing_schedule:
+                                        if sheet_key not in missing_schedule_info:
+                                            missing_schedule_info[sheet_key] = []
+                                        # We'll update the index after batch concatenation
+                                    
+                                    # Accumulate rows in lists for batch concatenation
+                                    sheets_data.setdefault(sheet_key, [])
+                                    if isinstance(row, pd.DataFrame):
+                                        row_dict = row.iloc[0].to_dict()
+                                    else:
+                                        row_dict = row.to_dict()
+                                    sheets_data[sheet_key].append(row_dict)
                             
             except Exception as e:
                 # Skip if sheet doesn't exist or other error
                 if "Worksheet" not in str(e):  # Only skip worksheet not found errors silently
                     print(f"Error processing {sheet_name} in {wb}: {e}")
                 continue
+
+    # Convert lists to DataFrames once - major performance improvement!
+    print(f"Converting {len(sheets_data)} sheet lists to DataFrames...")
+    for sheet_key, rows_list in sheets_data.items():
+        if rows_list:
+            print(f"  Processing {sheet_key}: {len(rows_list)} rows")
+            sheets[sheet_key] = pd.DataFrame(rows_list)
+            
+            # Update missing_schedule_info with correct row indices
+            if sheet_key in missing_schedule_info:
+                # Find rows with missing schedules and record their indices
+                missing_indices = []
+                for idx, row_dict in enumerate(rows_list):
+                    if row_dict.get('_missing_schedule', False):
+                        missing_indices.append(idx)
+                missing_schedule_info[sheet_key] = missing_indices
+            
+    print("Batch concatenation completed!")
 
     if not sheets:
         raise ValueError("No matching rows found with the specified keywords.")
@@ -1833,4 +1860,12 @@ def run_generator(
         print(f"Warning: Error applying formatting: {e}")
         # If formatting fails, the file should still be valid without formatting
     
+    # Clean up Excel cache to free memory
+    for excel_file in excel_cache.values():
+        try:
+            excel_file.close()
+        except:
+            pass
+    
+    print(f"Successfully generated: {outfile}")
     return outfile

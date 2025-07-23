@@ -940,17 +940,25 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
         single_managed = country_managed_groups or single_support or ""
         return [(single_support, single_managed)] if single_support else [("", "")]
 
-def get_de_company_and_ldap(support_group, receiver):
+def get_de_company_and_ldap(support_group, receiver, original_row=None):
     """Get the Subscribed by Company and LDAP values for DE based on support group"""
-    # Special mappings for DE support groups
-    if support_group == "HS DE IT Service Desk HC" and receiver == "HS DE":
+    # Normalize the support group name for comparison (remove extra spaces, normalize case)
+    normalized_sg = ' '.join(support_group.strip().split()) if support_group else ""
+    
+    # Special mappings for DE support groups - using normalized comparison
+    if "HS DE IT Service Desk HC" in normalized_sg and receiver == "HS DE":
         return "DE Internal Patients", "CALDOM1.DE [Hospital Calbe]"
-    elif support_group == "HS DE IT Service Desk - MCC" and receiver == "HS DE":
+    elif "HS DE IT Service Desk - MCC" in normalized_sg and receiver == "HS DE":
         return "DE External Patients", "mednet-de.world [Medicover Clinics]"
-    elif support_group == "DS DE IT Service Desk -Labs" and receiver == "DS DE":
+    elif ("DS DE IT Service Desk -Labs" in normalized_sg or "DS DE IT Service Desk - Labs" in normalized_sg) and receiver == "DS DE":
         return "DE IFLB Laboratories\nDE IMD Laboratories", "imd-labore.intern [General]"
     else:
-        # For other support groups, return the support group as company and empty LDAP
+        # For other support groups, return the original "Subscribed by Company" value if available
+        if original_row is not None and "Subscribed by Company" in original_row.index:
+            original_company = str(original_row["Subscribed by Company"]).strip()
+            if original_company and original_company not in ["nan", "NaN", "", "None"]:
+                return original_company, ""
+        # Fallback to support group name if no original value available
         return support_group, ""
 
 def run_generator(
@@ -1431,7 +1439,7 @@ def run_generator(
                                     
                                     # Handle DE special cases
                                     if country == "DE":
-                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv)
+                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
                                         row.loc[:, "Subscribed by Company"] = company
                                         
                                         # Handle LDAP columns

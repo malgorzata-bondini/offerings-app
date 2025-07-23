@@ -1217,15 +1217,13 @@ def run_generator(*,
                             for recv in receivers:
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:
-                                    # Search for the specific receiver in the base pool
+                                    # Always attempt to pick matching row but do not skip if none found
                                     recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(
                                         rf"\b{re.escape(recv)}\b", case=False
                                     )
-                                    matching_rows = base_pool[recv_mask]
-                                
-                                    if not matching_rows.empty:
+                                    if recv_mask.any():
                                         # Use the first matching row as base
-                                        base_row = matching_rows.iloc[0]
+                                        base_row = base_pool[recv_mask].iloc[0]
                                         base_row_df = base_row.to_frame().T.copy()
                                         original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
                         
@@ -1350,24 +1348,17 @@ def run_generator(*,
                                         country, support_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
                                     )
-                                # For DE, STRICTLY filter support groups based on receiver (HS DE vs DS DE)
+                                # For DE, filter by side but keep unlabeled and fallback to all
                                 if country == "DE" and recv:
                                     filtered_groups = []
                                     for sg, mg in support_groups_list:
-                                        # STRICT filtering - only include if group matches receiver
-                                        sg_stripped = sg.strip()
-                                        if recv == "HS DE":
-                                            # Only include if it starts with "HS DE" or doesn't start with DS/HS
-                                            if sg_stripped.startswith("HS DE") or (not sg_stripped.startswith("DS DE") and not sg_stripped.startswith("HS DE")):
-                                                filtered_groups.append((sg, mg))
-                                        elif recv == "DS DE":
-                                            # Only include if it starts with "DS DE" or doesn't start with DS/HS
-                                            if sg_stripped.startswith("DS DE") or (not sg_stripped.startswith("DS DE") and not sg_stripped.startswith("HS DE")):
-                                                filtered_groups.append((sg, mg))
-                                    
-                                    # If no groups match, skip this combination entirely
+                                        side = "HS" if sg.strip().startswith("HS DE") else "DS" if sg.strip().startswith("DS DE") else None
+                                        # include if no side label or matches current recv
+                                        if side is None or side in recv:
+                                            filtered_groups.append((sg, mg))
+                                    # fallback to all if nothing matched
                                     if not filtered_groups:
-                                        continue
+                                        filtered_groups = support_groups_list
                                     support_groups_list = filtered_groups
                                 
                                 # Debug: Print support group info for DE
@@ -1379,6 +1370,8 @@ def run_generator(*,
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
                                     row = base_row_df.copy()
+                                    # track which receiver side generated this row
+                                    row.loc[:, "_recv"] = recv
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
@@ -1502,6 +1495,9 @@ def run_generator(*,
         
         for sheet_name in sorted_sheets:
             dfc = sheets[sheet_name]
+            # Remove helper column tracking receiver side
+            if "_recv" in dfc.columns:
+                dfc = dfc.drop(columns=["_recv"])
             # Extract country code from sheet name (e.g., "PL lvl1" -> "PL")
             cc = sheet_name.split()[0]
             

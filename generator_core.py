@@ -575,10 +575,6 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         if country == "DE" and receiver:
             recv_division = receiver.split()[0]  # Extract HS or DS
             prefix_parts.append(recv_division)
-        # For PL with receiver (for IT department), extract division from receiver
-        elif country == "PL" and receiver:
-            recv_division = receiver.split()[0]  # Extract HS or DS
-            prefix_parts.append(recv_division)
         # Special handling for UA and MD - always use DS
         elif country in ["UA", "MD"]:
             prefix_parts.append("DS")
@@ -911,12 +907,6 @@ def get_managed_by_group_for_country(country, managed_by_group, managed_by_group
 
 def get_support_groups_list_for_country(country, support_group, support_groups_per_country, managed_by_groups_per_country, division=None):
     """Get list of support groups for a country (handles multiple groups for DE)"""
-    # Debug output
-    if country == "DE":
-        print(f"DEBUG get_support_groups_list_for_country for DE:")
-        print(f"  support_groups_per_country: {support_groups_per_country}")
-        print(f"  DE value: {support_groups_per_country.get('DE', 'Not found') if support_groups_per_country else 'Dict is None'}")
-    
     # Get support groups
     if country == "PL" and division:
         division_key = f"{division} PL"
@@ -926,36 +916,24 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
         country_support_groups = support_groups_per_country.get(country, support_group) if support_groups_per_country else support_group
         country_managed_groups = managed_by_groups_per_country.get(country, "") if managed_by_groups_per_country else ""
     
-    # Debug output for DE
-    if country == "DE":
-        print(f"  country_support_groups: {repr(country_support_groups)}")
-        print(f"  Has newlines: {'\\n' in str(country_support_groups)}")
-    
     # Handle multiple groups (separated by newlines)
-    if country_support_groups and '\n' in str(country_support_groups):
-        support_list = [sg.strip() for sg in str(country_support_groups).split('\n') if sg.strip()]
+    if country_support_groups and '\n' in country_support_groups:
+        support_list = [sg.strip() for sg in country_support_groups.split('\n') if sg.strip()]
         managed_list = []
-        if country_managed_groups and '\n' in str(country_managed_groups):
-            managed_list = [mg.strip() for mg in str(country_managed_groups).split('\n') if mg.strip()]
+        if country_managed_groups and '\n' in country_managed_groups:
+            managed_list = [mg.strip() for mg in country_managed_groups.split('\n') if mg.strip()]
         else:
-            managed_list = [str(country_managed_groups).strip()] * len(support_list) if country_managed_groups else support_list
+            managed_list = [country_managed_groups.strip()] * len(support_list) if country_managed_groups else support_list
         
         # Ensure managed_list has same length as support_list
         while len(managed_list) < len(support_list):
             managed_list.append(support_list[len(managed_list)])
-        
-        if country == "DE":
-            print(f"  Final support_list: {support_list}")
-            print(f"  Final managed_list: {managed_list}")
-            print(f"  Returning {len(support_list)} groups")
             
         return list(zip(support_list, managed_list))
     else:
         # Single support group
         single_support = country_support_groups or support_group or ""
         single_managed = country_managed_groups or single_support or ""
-        if country == "DE":
-            print(f"  Single group mode - returning: {[(single_support, single_managed)]}")
         return [(single_support, single_managed)] if single_support else [("", "")]
 
 def run_generator(*,
@@ -1223,11 +1201,7 @@ def run_generator(*,
                             receivers=[f"DS {country}"]
                     else:
                         # For standard naming (IT, HR, Medical, etc.) - non-DE countries
-                        if country == "PL" and special_dept == "IT":
-                            # For PL IT department, create both DS PL and HS PL
-                            receivers = ["DS PL", "HS PL"]
-                        else:
-                            receivers=[""]
+                        receivers=[""]
 
                     parent_full=str(base_row["Parent Offering"])
                     
@@ -1237,11 +1211,6 @@ def run_generator(*,
                     for app in all_apps:
                         for schedule_suffix in schedule_suffixes:
                             for recv in receivers:
-                                # Store the original base_row for DE processing
-                                current_base_row = base_row
-                                current_base_row_df = base_row_df.copy()
-                                current_original_depend_on = original_depend_on
-                                
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:
                                     # Search for the specific receiver in the base pool
@@ -1250,9 +1219,9 @@ def run_generator(*,
                                 
                                     if not matching_rows.empty:
                                         # Use the first matching row as base
-                                        current_base_row = matching_rows.iloc[0]
-                                        current_base_row_df = current_base_row.to_frame().T.copy()
-                                        current_original_depend_on = str(current_base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
+                                        base_row = matching_rows.iloc[0]
+                                        base_row_df = base_row.to_frame().T.copy()
+                                        original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
                         
                                 # Build name based on type
                                 if is_lvl2:
@@ -1276,7 +1245,7 @@ def run_generator(*,
                                         parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
                                 else:
-                                    # For standard names, handle DE split naming and PL split for IT
+                                    # For standard names, handle DE split naming
                                     if country == "DE" and recv:
                                         # Extract parent content to build proper name with DS/HS
                                         parent_content = extract_parent_info(parent_full)
@@ -1297,33 +1266,6 @@ def run_generator(*,
                                             elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
                                                 new_parts.append(part)  # Add country
                                             elif part in ["IT", "HR", "Medical", "Business Services"] or (part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper())):
-                                                new_parts.append(part)  # Add dept or other parts
-                                        
-                                        # Build new parent offering with updated division
-                                        new_parent_offering = f"[Parent {' '.join(new_parts)}] {catalog_name}"
-                                        new_name = build_standard_name(
-                                            new_parent_offering, sr_or_im, app, schedule_suffix, special_dept, recv
-                                        )
-                                    elif country == "PL" and recv and special_dept == "IT":
-                                        # For PL IT with receivers, handle division properly
-                                        parent_content = extract_parent_info(parent_full)
-                                        catalog_name = extract_catalog_name(parent_full)
-                                        
-                                        # Replace parent division with receiver division
-                                        parts = parent_content.split()
-                                        new_parts = [sr_or_im]
-                                        
-                                        # Add receiver division (DS or HS from recv)
-                                        recv_division = recv.split()[0]  # Extract DS or HS from "DS PL" or "HS PL"
-                                        new_parts.append(recv_division)
-                                        
-                                        # Add country and other parts
-                                        for part in parts:
-                                            if part in ["HS", "DS"]:
-                                                continue  # Skip original division
-                                            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
-                                                new_parts.append(part)  # Add country
-                                            elif part in ["IT", "HR", "Medical", "Business Services", "RecP", "Software"] or (part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper())):
                                                 new_parts.append(part)  # Add dept or other parts
                                         
                                         # Build new parent offering with updated division
@@ -1361,9 +1303,9 @@ def run_generator(*,
                                 division = None
                                 if country == "PL":
                                     # Try to determine division from the new_name or original data
-                                    if "HS PL" in new_name or "HS PL" in str(current_base_row.get("Name (Child Service Offering lvl 1)", "")):
+                                    if "HS PL" in new_name or "HS PL" in str(base_row.get("Name (Child Service Offering lvl 1)", "")):
                                         division = "HS"
-                                    elif "DS PL" in new_name or "DS PL" in str(current_base_row.get("Name (Child Service Offering lvl 1)", "")):
+                                    elif "DS PL" in new_name or "DS PL" in str(base_row.get("Name (Child Service Offering lvl 1)", "")):
                                         division = "DS"
                                     else:
                                         # Try to determine from parent offering
@@ -1383,15 +1325,12 @@ def run_generator(*,
                                 )
                                 
                                 # Debug: Print support group info
-                                if country == "DE" and (support_group or support_groups_per_country):
-                                    print(f"DE receiver: {recv}")
-                                    print(f"DE support groups from config: {support_groups_per_country.get('DE', 'Not found')}")
-                                    print(f"DE support groups list generated: {support_groups_list}")
-                                    print(f"Number of support groups for DE: {len(support_groups_list)}")
+                                if support_group or support_groups_per_country:
+                                    print(f"Support group assignment for {country}: {support_groups_list}")
                                 
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
-                                    row=current_base_row_df.copy()
+                                    row=base_row_df.copy()
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
@@ -1414,26 +1353,15 @@ def run_generator(*,
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
                                     
-                                    # For PL, set "Subscribed by Company" based on the division in the new name
+                                    # For PL, preserve the original "Subscribed by Company" value
                                     if country == "PL":
-                                        if "DS PL" in new_name:
-                                            row.loc[:, "Subscribed by Company"] = "DS PL"
-                                        elif "HS PL" in new_name:
-                                            row.loc[:, "Subscribed by Company"] = "HS PL"
-                                        else:
-                                            # Fallback to original
-                                            original_subscribed = str(current_base_row.get("Subscribed by Company", "")).strip()
-                                            row.loc[:, "Subscribed by Company"] = original_subscribed
+                                        # Keep the original value from the source file
+                                        original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
+                                        row.loc[:, "Subscribed by Company"] = original_subscribed
                                     elif country == "DE":
-                                        # For DE, set based on receiver (which determines division)
-                                        if recv == "DS DE":
-                                            row.loc[:, "Subscribed by Company"] = "DE IFLB Laboratories\nDE IMD Laboratories"
-                                        elif recv == "HS DE":
-                                            row.loc[:, "Subscribed by Company"] = "DE Internal Patients\nDE External Patients"
-                                        else:
-                                            # Fallback to original
-                                            original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
-                                            row.loc[:, "Subscribed by Company"] = original_subscribed
+                                        # For DE, preserve the original "Subscribed by Company" based on division
+                                        original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
+                                        row.loc[:, "Subscribed by Company"] = original_subscribed
                                     elif country=="UA":
                                         row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
                                     elif country=="MD":
@@ -1477,14 +1405,14 @@ def run_generator(*,
                                             # For DE and CY with receivers, use the receiver's division
                                             depend_tag = f"{recv} Prod"
                                         elif country == "PL":
-                                            # For PL, determine from the new name - be very explicit
-                                            if "[IM DS PL" in new_name or "[SR DS PL" in new_name:
+                                            # For PL, determine from the new name or original name
+                                            if "DS PL" in new_name:
                                                 depend_tag = "DS PL Prod"
-                                            elif "[IM HS PL" in new_name or "[SR HS PL" in new_name:
+                                            elif "HS PL" in new_name:
                                                 depend_tag = "HS PL Prod"
                                             else:
                                                 # Fallback: check original name
-                                                orig_name = str(current_base_row.get("Name (Child Service Offering lvl 1)", ""))
+                                                orig_name = str(base_row.get("Name (Child Service Offering lvl 1)", ""))
                                                 if "DS PL" in orig_name:
                                                     depend_tag = "DS PL Prod"
                                                 else:
@@ -1493,9 +1421,9 @@ def run_generator(*,
                                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
                                     
                                     # Handle Service Offerings | Depend On - preserve original values
-                                    if current_original_depend_on in ["-", "", "nan", "NaN", None]:
+                                    if original_depend_on in ["-", "", "nan", "NaN", None]:
                                         # Preserve the original empty/dash value
-                                        if current_original_depend_on == "-":
+                                        if original_depend_on == "-":
                                             row.loc[:, "Service Offerings | Depend On (Application Service)"] = "-"
                                         else:
                                             row.loc[:, "Service Offerings | Depend On (Application Service)"] = ""

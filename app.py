@@ -427,12 +427,36 @@ with col2:
                                           help="Override automatic generation with a custom value for all rows")
         
         if use_custom_depend_on:
-            custom_depend_on_value = st.text_input(
-                "Custom Depend On Value",
-                value="",
-                placeholder="e.g., [Global Prod] Application Name",
-                help="This value will be used for ALL generated rows instead of the automatic generation"
-            )
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                depend_on_prefix = st.selectbox(
+                    "Select Prefix",
+                    options=["HS PL", "DS PL", "HS DE", "DS DE", "UA", "MD", "CY", "Global"],
+                    index=0,
+                    help="Choose the service prefix"
+                )
+            
+            with col2:
+                app_name = st.text_input(
+                    "Application Name",
+                    value="",
+                    placeholder="e.g., Molis",
+                    help="Enter the application name (optional)"
+                )
+            
+            # Construct the custom depend on value
+            if depend_on_prefix == "Global":
+                prefix_tag = "Global Prod"
+            else:
+                prefix_tag = f"{depend_on_prefix} Prod"
+            
+            if app_name.strip():
+                custom_depend_on_value = f"[{prefix_tag}] {app_name.strip()}"
+            else:
+                custom_depend_on_value = f"[{prefix_tag}]"
+                
+            # Show preview
+            st.info(f"Preview: `{custom_depend_on_value}`")
         else:
             custom_depend_on_value = ""
         

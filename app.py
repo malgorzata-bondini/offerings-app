@@ -437,33 +437,32 @@ with col2:
                 )
             
             with col2:
-                # Handle multiple applications from Basic tab
+                # Show which apps will be used automatically
                 if new_apps:
                     if len(new_apps) == 1:
-                        # Single app - auto-fill and disable
                         st.text_input(
                             "Application Name",
                             value=new_apps[0],
                             disabled=True,
-                            help=f"Automatically taken from Applications in Basic tab: {new_apps[0]}"
+                            help=f"Will automatically use: {new_apps[0]}"
                         )
-                        app_name = new_apps[0]
                     else:
-                        # Multiple apps - let user choose
-                        app_name = st.selectbox(
-                            "Select Application",
-                            options=new_apps,
-                            index=0,
-                            help=f"Choose from applications in Basic tab: {', '.join(new_apps)}"
+                        st.text_area(
+                            "Application Names",
+                            value="\n".join(new_apps),
+                            disabled=True,
+                            height=80,
+                            help=f"Will automatically use each app: {', '.join(new_apps)}"
                         )
+                    app_names_display = new_apps
                 else:
-                    # No apps in Basic tab - manual entry
-                    app_name = st.text_input(
+                    st.text_input(
                         "Application Name",
-                        value="",
-                        placeholder="e.g., Molis",
-                        help="Enter the application name (or add applications in Basic tab)"
+                        value="(no apps specified)",
+                        disabled=True,
+                        help="Add applications in Basic tab to see them here"
                     )
+                    app_names_display = ["(no app)"]
             
             # Construct the custom depend on value
             if depend_on_prefix == "Global":
@@ -471,13 +470,20 @@ with col2:
             else:
                 prefix_tag = f"{depend_on_prefix} Prod"
             
-            if app_name.strip():
-                custom_depend_on_value = f"[{prefix_tag}] {app_name.strip()}"
+            # Show preview(s) for the custom depend on values
+            if new_apps:
+                if len(new_apps) == 1:
+                    custom_depend_on_value = f"[{prefix_tag}] {new_apps[0]}"
+                    st.info(f"Preview: `{custom_depend_on_value}`")
+                else:
+                    st.info("Preview for each app:")
+                    for app in new_apps:
+                        st.text(f"• `[{prefix_tag}] {app}`")
+                    # Store prefix only - the backend will handle app names automatically
+                    custom_depend_on_value = f"[{prefix_tag}]"
             else:
                 custom_depend_on_value = f"[{prefix_tag}]"
-                
-            # Show preview
-            st.info(f"Preview: `{custom_depend_on_value}`")
+                st.info(f"Preview: `{custom_depend_on_value}`")
         else:
             custom_depend_on_value = ""
         

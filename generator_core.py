@@ -1454,11 +1454,15 @@ def run_generator(*,
                                     elif global_prod:
                                         depend_tag = "Global Prod"
                                     else:
-                                        # PL: always use receiver for depend_tag, ignore generic recv branch
                                         if country == "PL":
-                                            depend_tag = "HS PL Prod" if recv == "HS PL" else "DS PL Prod"
+                                            # Regex-based PL Prod determination (case-insensitive)
+                                            if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
+                                                depend_tag = "HS PL Prod"
+                                            elif re.search(r'\bDS\s+PL\b', new_name, re.IGNORECASE):
+                                                depend_tag = "DS PL Prod"
+                                            else:
+                                                depend_tag = "DS PL Prod"  # safe default
                                         elif recv:
-                                            # For DE and CY with receivers, use the receiver's division
                                             depend_tag = f"{recv} Prod"
                                         else:
                                             depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"

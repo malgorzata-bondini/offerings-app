@@ -1340,15 +1340,41 @@ def run_generator(*,
                                         country, support_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
                                     )
-                                # For DE, limit groups to those matching the current receiver if any, else keep all
-                                if country == "DE" and recv:
-                                    prefix = recv
-                                    matching = [(sg, mg) for sg, mg in support_groups_list
-                                                if sg.strip().startswith(prefix)]
-                                    if matching:
-                                        support_groups_list = matching
-                                
-                                # Debug: Print support group info for DE
+                                    # For DE, regenerate groups per receiver to ensure each suffix has DS and HS rows
+                                    if country == "DE" and recv:
+                                        # Extract raw suffixes (remove any existing side prefix)
+                                        suffixes = []
+                                        for sg, mg in support_groups_list:
+                                            parts = sg.strip().split()
+                                            if "DE" in parts:
+                                                idx = parts.index("DE")
+                                                suffix = " ".join(parts[idx+1:]).strip()
+                                            else:
+                                                suffix = " ".join(parts[2:]).strip()
+                                            suffixes.append(suffix)
+                                        # Build support groups for this receiver
+                                        support_groups_list = [(f"{recv} {suf}", f"{recv} {suf}")
+                                                              for suf in suffixes if suf]
+                                    # Expand DE support groups across both DS and HS sides
+                                    if country == "DE":
+                                        suffixes = []
+                                        for sg, mg in support_groups_list:
+                                            parts = sg.strip().split()
+                                            suffix = ' '.join(parts[2:]) if len(parts) > 2 else sg
+                                            mg_parts = mg.strip().split()
+                                            mg_suffix = ' '.join(mg_parts[2:]) if len(mg_parts) > 2 else mg
+                                            suffixes.append((suffix, mg_suffix))
+                                        expanded = []
+                                        for suffix, mg_suffix in suffixes:
+                                            for side in ["DS DE", "HS DE"]:
+                                                expanded.append((f"{side} {suffix}", f"{side} {mg_suffix}"))
+                                        support_groups_list = expanded
+                                    # Filter DE support groups for current receiver
+                                    if country == "DE" and recv:
+                                        support_groups_list = [
+                                            (sg, mg) for sg, mg in support_groups_list if sg.startswith(recv)
+                                        ]
+                                 # Debug: Print support group info for DE
                                 if country == "DE" and (support_group or support_groups_per_country):
                                     print(f"DE Debug - Receiver: {recv}")
                                     print(f"DE Debug - Number of support groups for {recv}: {len(support_groups_list)}")

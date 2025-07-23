@@ -1581,30 +1581,26 @@ def run_generator(
                                 
                                 # Get support groups list
                                 if country == "PL":
-                                    # Use support groups per division (receiver) for PL
+                                    # For PL, directly use the receiver-specific support group
+                                    # The receiver is the key (e.g., "HS PL" or "DS PL")
                                     key = recv
-                                    country_supports = support_groups_per_country.get(key, support_group)
-                                    country_managed = managed_by_groups_per_country.get(key, managed_by_group)
+                                    country_supports = support_groups_per_country.get(key, "")
+                                    country_managed = managed_by_groups_per_country.get(key, "")
                                     
                                     # Debug: Print PL support group info
                                     print(f"DEBUG PL: recv={recv}, supports={country_supports}, managed={country_managed}")
                                     
-                                    # Parse multiple lines if present
-                                    if country_supports and '\n' in str(country_supports):
-                                        sg_list = [sg.strip() for sg in str(country_supports).split('\n') if sg.strip()]
-                                        if country_managed and '\n' in str(country_managed):
-                                            mg_list = [mg.strip() for mg in str(country_managed).split('\n') if mg.strip()]
-                                        else:
-                                            mg_list = [country_managed.strip()] * len(sg_list) if country_managed else sg_list
-                                        while len(mg_list) < len(sg_list):
-                                            mg_list.append(sg_list[len(mg_list)])
-                                        support_groups_list = list(zip(sg_list, mg_list))
-                                        print(f"DEBUG PL: Multi-line groups: {support_groups_list}")
-                                    else:
-                                        sg = str(country_supports or support_group or "").strip()
+                                    # For PL, we expect only one support group per receiver
+                                    # No need to parse multiple lines or filter later
+                                    if country_supports:
+                                        sg = str(country_supports).strip()
                                         mg = str(country_managed or sg).strip()
-                                        support_groups_list = [(sg, mg)] if sg else [("", "")]
-                                        print(f"DEBUG PL: Single group: {support_groups_list}")
+                                        support_groups_list = [(sg, mg)]
+                                    else:
+                                        # Fallback to empty if no support group configured for this receiver
+                                        support_groups_list = [("", "")]
+                                    
+                                    print(f"DEBUG PL: Final groups for {recv}: {support_groups_list}")
                                 else:
                                     # Delegate to helper for other countries
                                     support_groups_list = get_support_groups_list_for_country(

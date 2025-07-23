@@ -943,12 +943,12 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
 def get_de_company_and_ldap(support_group, receiver):
     """Get the Subscribed by Company and LDAP values for DE based on support group"""
     # Special mappings for DE support groups
-    if support_group == "DS DE IT Service Desk -Labs" and receiver == "DS DE":
-        return "DE IFLB Laboratories DE IMD Laboratories", "imd-labore.intern [General]"
+    if support_group == "HS DE IT Service Desk HC" and receiver == "HS DE":
+        return "DE Internal Patients", "CALDOM1.DE [Hospital Calbe]"
     elif support_group == "HS DE IT Service Desk - MCC" and receiver == "HS DE":
         return "DE External Patients", "mednet-de.world [Medicover Clinics]"
-    elif support_group == "HS DE IT Service Desk HC" and receiver == "HS DE":
-        return "DE Internal Patients", "CALDOM1.DE [Hospital Calbe]"
+    elif support_group == "DS DE IT Service Desk -Labs" and receiver == "DS DE":
+        return "DE IFLB Laboratories\nDE IMD Laboratories", "imd-labore.intern [General]"
     else:
         # For other support groups, return the support group as company and empty LDAP
         return support_group, ""

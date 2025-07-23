@@ -1292,36 +1292,35 @@ def run_generator(
                                 country, recv, schedule_settings_per_country, schedule_suffixes
                             )
                             
-                            # Filter schedules based on what type of names we're generating
-                            # Check if we're generating CORP/RecP names or standard names
+                            # Check if we have matching names in base_pool for our generation type
+                            # This determines if schedules are available for the type of names we're generating
                             is_corp_type = require_corp or require_recp or require_corp_it or require_corp_dedicated
                             
-                            if country_schedule_suffixes:
-                                # Filter schedules to match the type of names we're generating
-                                matching_schedules = []
-                                for schedule in country_schedule_suffixes:
-                                    schedule_str = str(schedule).strip()
-                                    if not schedule_str:
-                                        matching_schedules.append(schedule)
-                                        continue
-                                    
-                                    # Check if schedule contains CORP indicators
-                                    schedule_has_corp = any(indicator in schedule_str.upper() 
-                                                          for indicator in ["CORP", "DEDICATED", "RECP"])
-                                    
-                                    # Include schedule if it matches our generation type
-                                    if is_corp_type and schedule_has_corp:
-                                        matching_schedules.append(schedule)
-                                    elif not is_corp_type and not schedule_has_corp:
-                                        matching_schedules.append(schedule)
+                            schedule_missing = False
+                            if country_schedule_suffixes and not use_new_parent:
+                                # Check if base_pool has names that match our generation type
+                                has_matching_names = False
                                 
-                                country_schedule_suffixes = matching_schedules
-                            
-                            # Check if schedule is missing (no schedules found after filtering)
-                            schedule_missing = not country_schedule_suffixes or all(not s.strip() for s in country_schedule_suffixes)
-                            
-                            # If no schedules found, create one entry with empty schedule and flag
-                            if not country_schedule_suffixes:
+                                for _, row in base_pool.iterrows():
+                                    name = str(row.get("Name (Child Service Offering lvl 1)", "")).upper()
+                                    
+                                    # Check if name contains CORP indicators
+                                    name_has_corp = any(indicator in name for indicator in ["CORP", "DEDICATED", "RECP"])
+                                    
+                                    # Check if this name matches our generation type
+                                    if is_corp_type and name_has_corp:
+                                        has_matching_names = True
+                                        break
+                                    elif not is_corp_type and not name_has_corp:
+                                        has_matching_names = True
+                                        break
+                                
+                                # If no matching names found, schedules are missing for our type
+                                if not has_matching_names:
+                                    schedule_missing = True
+                                    country_schedule_suffixes = [""]  # Empty schedule
+                            elif not country_schedule_suffixes:
+                                schedule_missing = True
                                 country_schedule_suffixes = [""]  # Empty schedule
                             
                             for schedule_suffix in country_schedule_suffixes:

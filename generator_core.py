@@ -916,6 +916,16 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
         country_support_groups = support_groups_per_country.get(country, support_group) if support_groups_per_country else support_group
         country_managed_groups = managed_by_groups_per_country.get(country, "") if managed_by_groups_per_country else ""
     
+    # Debug output for DE
+    if country == "DE":
+        print(f"DEBUG DE Support Groups:")
+        print(f"  support_groups_per_country: {support_groups_per_country}")
+        print(f"  managed_by_groups_per_country: {managed_by_groups_per_country}")
+        print(f"  country_support_groups: {repr(country_support_groups)}")
+        print(f"  country_managed_groups: {repr(country_managed_groups)}")
+        print(f"  Has newlines in support groups: {'\\n' in str(country_support_groups)}")
+        print(f"  Has newlines in managed groups: {'\\n' in str(country_managed_groups)}")
+    
     # Handle multiple groups (separated by newlines)
     if country_support_groups and '\n' in country_support_groups:
         support_list = [sg.strip() for sg in country_support_groups.split('\n') if sg.strip()]
@@ -928,12 +938,25 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
         # Ensure managed_list has same length as support_list
         while len(managed_list) < len(support_list):
             managed_list.append(support_list[len(managed_list)])
+        
+        # Debug output for DE multiple groups
+        if country == "DE":
+            print(f"  support_list: {support_list}")
+            print(f"  managed_list: {managed_list}")
+            print(f"  Final pairs: {list(zip(support_list, managed_list))}")
             
         return list(zip(support_list, managed_list))
     else:
         # Single support group
         single_support = country_support_groups or support_group or ""
         single_managed = country_managed_groups or single_support or ""
+        
+        # Debug output for DE single group
+        if country == "DE":
+            print(f"  single_support: {single_support}")
+            print(f"  single_managed: {single_managed}")
+            print(f"  Final single pair: {[(single_support, single_managed)]}")
+            
         return [(single_support, single_managed)] if single_support else [("", "")]
 
 def run_generator(*,
@@ -1182,9 +1205,13 @@ def run_generator(*,
                     tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
                     # FIXED: Always determine receivers for DE based on naming settings
+                    # FIXED: For PL with IT department, create both DS PL and HS PL receivers
                     if country == "DE":
                         # DE ALWAYS gets split into DS DE and HS DE regardless of naming tab selection
                         receivers = ["DS DE", "HS DE"]
+                    elif special_dept == "IT" and country == "PL":
+                        # FIXED: For PL IT department, create both DS PL and HS PL receivers
+                        receivers = ["DS PL", "HS PL"]
                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                         # Other countries when CORP/RecP/CORP IT/CORP Dedicated is selected
                         if country in {"UA","MD"}: 
@@ -1353,11 +1380,17 @@ def run_generator(*,
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
                                     
-                                    # For PL, preserve the original "Subscribed by Company" value
+                                    # FIXED: PL "Subscribed by Company" - determine from generated name
                                     if country == "PL":
-                                        # Keep the original value from the source file
-                                        original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
-                                        row.loc[:, "Subscribed by Company"] = original_subscribed
+                                        # Determine division from generated name more explicitly
+                                        if "DS PL" in new_name:
+                                            row.loc[:, "Subscribed by Company"] = "DS PL"
+                                        elif "HS PL" in new_name:
+                                            row.loc[:, "Subscribed by Company"] = "HS PL"
+                                        else:
+                                            # Fallback: keep original value
+                                            original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
+                                            row.loc[:, "Subscribed by Company"] = original_subscribed
                                     elif country == "DE":
                                         # For DE, preserve the original "Subscribed by Company" based on division
                                         original_subscribed = str(base_row.get("Subscribed by Company", "")).strip()
@@ -1405,7 +1438,7 @@ def run_generator(*,
                                             # For DE and CY with receivers, use the receiver's division
                                             depend_tag = f"{recv} Prod"
                                         elif country == "PL":
-                                            # For PL, determine from the new name or original name
+                                            # FIXED: For PL, determine from the new name more explicitly
                                             if "DS PL" in new_name:
                                                 depend_tag = "DS PL Prod"
                                             elif "HS PL" in new_name:

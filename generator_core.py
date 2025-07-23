@@ -1292,8 +1292,7 @@ def run_generator(
                                 country, recv, schedule_settings_per_country, schedule_suffixes
                             )
                             
-                            # Check if we have matching names in base_pool for our generation type
-                            # This determines if schedules are available for the type of names we're generating
+                            # Check if schedules are actually available for our generation type
                             is_corp_type = require_corp or require_recp or require_corp_it or require_corp_dedicated
                             
                             # Filter schedules to only include those that are actually available for our generation type
@@ -1344,6 +1343,10 @@ def run_generator(
                             for schedule_suffix in country_schedule_suffixes:
                                 # Flag to track if schedule is missing
                                 missing_schedule = schedule_missing
+                                
+                                # Debug: Print schedule missing info
+                                if schedule_missing:
+                                    print(f"DEBUG: Schedule missing for {country}, {recv}, is_corp_type={is_corp_type}, schedule='{schedule_suffix}'")
                                 
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:
@@ -1503,6 +1506,10 @@ def run_generator(
                                     
                                     # Add flag for missing schedule (for red formatting later)
                                     row.loc[:, "_missing_schedule"] = missing_schedule
+                                    
+                                    # Debug: Print flag assignment
+                                    if missing_schedule:
+                                        print(f"DEBUG: Setting _missing_schedule=True for name: {new_name[:50]}...")
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name

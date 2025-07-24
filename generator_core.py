@@ -846,7 +846,7 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Visibility group": "",
         "Business Criticality": business_criticality,
         "Record view": "",  # Will be set based on SR/IM
-        "Approval required": approval_required_value if approval_required else "false"  # Changed from "empty" to "false"
+        "Approval required": "false" if not approval_required else approval_required_value  # Changed logic
     }
     
     # Set Subscribed by Location based on user choice
@@ -1945,15 +1945,16 @@ def run_generator(
                 if "Approval required" in df_final.columns:
                     # Keep custom values, but standardize boolean representations
                     df_final["Approval required"] = df_final["Approval required"].replace({
-                        True: 'true',
+                        True: 'false',  # Changed: True should map to 'false' when checkbox not ticked
                         False: 'false', 
-                        'True': 'true',
+                        'True': 'false',  # Changed: string 'True' should also map to 'false'
                         'False': 'false',
-                        'TRUE': 'true',
+                        'TRUE': 'false',  # Changed: uppercase 'TRUE' should map to 'false'
                         'FALSE': 'false',
-                        '': 'empty',
-                        'nan': 'empty'
-                    }).fillna('empty')
+                        '': 'false',  # Changed: empty should be 'false', not 'empty'
+                        'nan': 'false',  # Changed: 'nan' should be 'false', not 'empty'
+                        'empty': 'empty'  # Only explicit 'empty' stays as 'empty'
+                    }).fillna('false')  # Changed: fillna with 'false' instead of 'empty'
                 
                 # Store the final DataFrame for later formatting use
                 sheets[sheet_key] = df_final

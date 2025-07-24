@@ -1861,8 +1861,8 @@ def run_generator(
                     # Add missing columns from original, preserving their values
                     for col in original_order:
                         if col not in df.columns:
-                            # Skip the Number column - don't add it
-                            if col.lower() == "number" or "number" in col.lower():
+                            # Skip the Number column - don't add it (exact match only)
+                            if col == "Number":
                                 continue
                                 
                             if original_df is not None and col in original_df.columns:
@@ -1879,6 +1879,19 @@ def run_generator(
                                     df[col] = padded_data[:len(df)]
                             else:
                                 df[col] = ''
+                    
+                    # Reorder columns to match original order, excluding Number column
+                    ordered_cols = []
+                    for col in original_order:
+                        if col in df.columns and col != "Number":
+                            ordered_cols.append(col)
+                    
+                    # Add any new columns that weren't in original
+                    new_cols = [col for col in df.columns if col not in original_order]
+                    
+                    # Reorder DataFrame
+                    df = df[ordered_cols + new_cols]
+                
                 # Extract country code from sheet_key (e.g., "PL lvl1" -> "PL")
                 cc = sheet_key.split()[0]
                 
@@ -1993,9 +2006,9 @@ def run_generator(
     # Clean up Excel cache to free memory
     for excel_file in excel_cache.values():
         try:
-            excel_file.close()
+            if isinstance(excel_file, pd.ExcelFile):
+                excel_file.close()
         except:
             pass
-    
-    print(f"Successfully generated: {outfile}")
-    return outfile
+
+    print("Processing complete. Output saved to:", outfile)

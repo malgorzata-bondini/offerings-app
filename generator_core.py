@@ -2012,3 +2012,5 @@ def run_generator(
             pass
 
     print("Processing complete. Output saved to:", outfile)
+    # Return the output file path
+    return outfile

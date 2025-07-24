@@ -94,6 +94,24 @@ with col2:
         else:
             approval_required_value = "empty"
         
+        # Add Subscribed by Location control
+        st.markdown("---")
+        change_subscribed_location = st.checkbox(
+            "Change Subscribed by Location",
+            value=False,
+            help="By default, Subscribed by Location will be set to 'Global'. Check this to specify a custom value."
+        )
+        
+        if change_subscribed_location:
+            custom_subscribed_location = st.text_input(
+                "Subscribed by Location",
+                value="",
+                placeholder="Enter custom location (e.g., 'DE', 'PL', 'Regional')",
+                help="Custom value for Subscribed by Location column"
+            )
+        else:
+            custom_subscribed_location = "Global"
+        
         # Add Lvl2 checkbox
         st.markdown("---")
         use_lvl2 = st.checkbox(
@@ -678,7 +696,9 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         # Add business criticality
                         business_criticality=business_criticality,
                         # Add approval required
-                        approval_required=approval_required
+                        approval_required=approval_required,
+                        # Add approval required value
+                        approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty"
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

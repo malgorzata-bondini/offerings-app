@@ -825,7 +825,7 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
     
     return "\n".join(lines) if lines else ""
 
-def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality="", approval_required=False, approval_required_value="empty"):
+def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality="", approval_required=False, approval_required_value="empty", change_subscribed_location=False, custom_subscribed_location="Global"):
     """Create a new row with the specified parent offering and parent values"""
     # Create a basic row structure with required columns
     new_row = {
@@ -835,35 +835,25 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Service Offerings | Depend On (Application Service)": "",
         "Service Commitments": "",
         "Delivery Manager": "",
-        "Subscribed by Location": "",
+        "Subscribed by Location": "",  # Will be set below
         "Phase": "Catalog",
         "Status": "Operational",
         "Life Cycle Stage": "Operational",
         "Life Cycle Status": "In Use",
         "Support group": "",
         "Managed by Group": "",
-        "Subscribed by Company": "",
+        "Subscribed by Company": "",  # Will be set during processing based on receiver and CORP type
         "Visibility group": "",
         "Business Criticality": business_criticality,
         "Record view": "",  # Will be set based on SR/IM
-        "Approval required": approval_required_value if approval_required else "empty"  # Use conditional value
+        "Approval required": approval_required_value if approval_required else "empty"
     }
     
-    # Set default values based on country
-    if country == "DE":
-        new_row["Subscribed by Location"] = "DE"
-    elif country == "UA":
-        new_row["Subscribed by Location"] = "UA"
-    elif country == "MD":
-        new_row["Subscribed by Location"] = "MD"
-    elif country == "CY":
-        new_row["Subscribed by Location"] = "CY"
-    elif country == "PL":
-        new_row["Subscribed by Location"] = "PL"
-    elif country == "RO":
-        new_row["Subscribed by Location"] = "RO"
-    elif country == "TR":
-        new_row["Subscribed by Location"] = "TR"
+    # Set Subscribed by Location based on user choice
+    if change_subscribed_location:
+        new_row["Subscribed by Location"] = custom_subscribed_location
+    else:
+        new_row["Subscribed by Location"] = "Global"
     
     return pd.Series(new_row)
 
@@ -1057,7 +1047,9 @@ def run_generator(
     aliases_per_country=None,
     business_criticality="",
     approval_required=False,
-    approval_required_value="empty"):  # Add this parameter
+    approval_required_value="empty",
+    change_subscribed_location=False,
+    custom_subscribed_location="Global"):  # Add these parameters
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
@@ -1274,7 +1266,7 @@ def run_generator(
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
                     # Create a new synthetic row with the specified parent offering and parent
-                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality, approval_required, approval_required_value)
+                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                     base_pool = pd.DataFrame([new_row])
                     # For new parent, we can process both levels with the same synthetic data
                     # Initialize schedule checking variables
@@ -1612,6 +1604,12 @@ def run_generator(
                                     else:
                                         row.loc[:, "Approval required"] = "empty"
                                     
+                                    # Set Subscribed by Location based on user choice
+                                    if change_subscribed_location:
+                                        row.loc[:, "Subscribed by Location"] = custom_subscribed_location
+                                    else:
+                                        row.loc[:, "Subscribed by Location"] = "Global"
+                                    
                                     # Apply support group and managed by group
                                     row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
                                     row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
@@ -1668,12 +1666,27 @@ def run_generator(
                                                     for ldap_col, ldap_val in ldap_data.items():
                                                         if ldap_col in row.columns and ldap_val not in ["", "nan", "NaN", "None"]:
                                                             row.loc[:, ldap_col] = ldap_val
-                                    # Handle Subscribed by Company based on type
+                                    # Handle Subscribed by Company based on type and mode
+                                    if use_new_parent:
+                                        # NEW PARENT MODE - special logic
+                                        if require_corp or require_recp or require_corp_it or require_corp_dedicated:
+                                            # For CORP offerings, extract what comes after CORP
+                                            # Example: [SR DS CY CORP HS DE Dedicated Services] -> "HS DE"
+                                            match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
+                                            if match:
+                                                row.loc[:, "Subscribed by Company"] = match.group(1)
+                                            else:
+                                                # Fallback to receiver if pattern not found
+                                                row.loc[:, "Subscribed by Company"] = recv
+                                        else:
+                                            # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
+                                            row.loc[:, "Subscribed by Company"] = recv
                                     elif country == "DE":
+                                        # Existing DE logic
                                         company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
                                         row.loc[:, "Subscribed by Company"] = company
                                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                                        # For CORP offerings, extract from the second part of the name
+                                        # For CORP offerings in normal mode, extract from the second part of the name
                                         # Example: [SR DS CY CORP DS CY IT] -> "DS CY"
                                         match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
                                         if match:
@@ -1682,16 +1695,16 @@ def run_generator(
                                             # Fallback to receiver if pattern not found
                                             row.loc[:, "Subscribed by Company"] = recv
                                     else:
-                                        # For standard offerings, ALWAYS preserve original value from source file
+                                        # For standard offerings in normal mode, ALWAYS preserve original value from source file
                                         if "Subscribed by Company" in base_row.index:
                                             original_company = str(base_row["Subscribed by Company"]).strip()
                                             if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:
                                                 row.loc[:, "Subscribed by Company"] = original_company
                                             else:
-                                                # Leave empty if original was empty - DON'T use recv or tag_hs
+                                                # Leave empty if original was empty
                                                 row.loc[:, "Subscribed by Company"] = ""
                                         else:
-                                            # Leave empty if column doesn't exist - DON'T use recv or tag_hs  
+                                            # Leave empty if column doesn't exist
                                             row.loc[:, "Subscribed by Company"] = ""
                                     
                                     orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
@@ -1751,11 +1764,14 @@ def run_generator(
                                         if app:
                                             row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{custom_depend_on_value} {app}"
                                         else:
+                                            # If no app and using custom depend on, use the custom value only if it's meant to be used without app
                                             row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
                                     elif app:
+                                        # Only set depend on if app is provided
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}] {app}"
                                     else:
-                                        row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}]"
+                                        # If no app provided, leave the column empty
+                                        row.loc[:, "Service Offerings | Depend On (Application Service)"] = ""
                                 
 
                                     

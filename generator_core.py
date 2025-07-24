@@ -824,7 +824,7 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
     
     return "\n".join(lines) if lines else ""
 
-def create_new_parent_row(new_parent_offering, new_parent, country):
+def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality=""):
     """Create a new row with the specified parent offering and parent values"""
     # Create a basic row structure with required columns
     new_row = {
@@ -835,15 +835,15 @@ def create_new_parent_row(new_parent_offering, new_parent, country):
         "Service Commitments": "",
         "Delivery Manager": "",
         "Subscribed by Location": "",
-        "Phase": "Live",
-        "Status": "Active",
-        "Life Cycle Stage": "Live",
-        "Life Cycle Status": "Active",
+        "Phase": "Catalog",
+        "Status": "Operational",
+        "Life Cycle Stage": "Operational",
+        "Life Cycle Status": "In Use",
         "Support group": "",
         "Managed by Group": "",
         "Subscribed by Company": "",
         "Visibility group": "",
-        "Business Criticality": ""
+        "Business Criticality": business_criticality,  # Use provided value instead of ""
     }
     
     # Set default values based on country
@@ -1029,6 +1029,7 @@ class GeneratorConfig:
     service_type_lvl2: str = ""
     use_custom_depend_on: bool = False
     custom_depend_on_value: str = ""
+    business_criticality: str = ""
 
 def run_generator(
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
@@ -1050,7 +1051,8 @@ def run_generator(
     support_groups_per_country=None, managed_by_groups_per_country=None,
     schedule_settings_per_country=None,
     use_custom_depend_on=False, custom_depend_on_value="",
-    aliases_per_country=None):
+    aliases_per_country=None,
+    business_criticality=""):  # Add this parameter
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
@@ -1267,7 +1269,7 @@ def run_generator(
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
                     # Create a new synthetic row with the specified parent offering and parent
-                    new_row = create_new_parent_row(new_parent_offering, new_parent, country)
+                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality)
                     base_pool = pd.DataFrame([new_row])
                     # For new parent, we can process both levels with the same synthetic data
                     # Initialize schedule checking variables
@@ -1588,6 +1590,11 @@ def run_generator(
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
                                     row.loc[:, "Delivery Manager"] = delivery_manager
                                     
+                                    # Apply business criticality if provided
+                                    if business_criticality:
+                                        row.loc[:, "Business Criticality"] = business_criticality
+                                    # Otherwise, keep the original value from source file
+                                    
                                     # Apply support group and managed by group
                                     row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
                                     row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
@@ -1745,7 +1752,7 @@ def run_generator(
                                     if isinstance(row, pd.DataFrame):
                                         row_dict = row.iloc[0].to_dict()
                                     else:
-                                        row_dict = row.to_dict()
+                                                                               row_dict = row.to_dict()
                                     
                                     # Add missing schedule flag to the row dictionary
                                     if missing_schedule:

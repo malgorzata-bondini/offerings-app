@@ -806,20 +806,6 @@ def update_commitments(orig, sched, rsp, rsl, sr_or_im, country):
             line = re.sub(r"(P\d+-P\d+)\s+.*$", f"{p_values} {rsl}", line)
         out.append(line)
     
-    # For IM, never add OLA
-    # For SR, only add OLA if not already present
-    if sr_or_im == "SR" and not has_ola:
-        # Find the last RSL line to copy its format
-        rsl_line = None
-        for line in out:
-            if "RSL" in line and "SLA" in line:
-                rsl_line = line
-        
-        if rsl_line:
-            # Create OLA by replacing SLA with OLA in the RSL line
-            ola_line = rsl_line.replace("SLA", "OLA")
-            out.append(ola_line)
-    
     return "\n".join(out)
 
 def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rsl_schedule, 
@@ -1764,6 +1750,7 @@ def run_generator(
                                     # Add missing schedule flag to the row dictionary
                                     if missing_schedule:
                                         row_dict["_missing_schedule"] = True
+                                   
                                     else:
                                         row_dict["_missing_schedule"] = False
                                     

@@ -750,6 +750,23 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     
     return ensure_incident_naming(final_name)
 
+def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
+    """Create commitment block with OLA for all countries"""
+    if sr_or_im == "IM":
+        # For IM, no OLA
+        lines = [
+            f"[{cc}] SLA IM RSP {schedule_suffix} P1-P4 {rsp_duration}",
+            f"[{cc}] SLA IM RSL {schedule_suffix} P1-P4 {rsl_duration}"
+        ]
+    else:
+        # For SR, include OLA (but only once)
+        lines = [
+            f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
+            f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
+            f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
+        ]
+    return "\n".join(lines)
+
 def update_commitments(orig, sched, rsp, rsl, sr_or_im, country):
     """Update existing commitments and ensure OLA is present"""
     out = []
@@ -790,8 +807,8 @@ def update_commitments(orig, sched, rsp, rsl, sr_or_im, country):
         out.append(line)
     
     # For IM, never add OLA
-    # For SR, only add OLA if not PL (HS PL and DS PL already have OLA)
-    if sr_or_im == "SR" and not has_ola and country_code and country != "PL":
+    # For SR, only add OLA if not already present
+    if sr_or_im == "SR" and not has_ola:
         # Find the last RSL line to copy its format
         rsl_line = None
         for line in out:
@@ -804,30 +821,6 @@ def update_commitments(orig, sched, rsp, rsl, sr_or_im, country):
             out.append(ola_line)
     
     return "\n".join(out)
-
-def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
-    """Create commitment block with OLA for all countries"""
-    if sr_or_im == "IM":
-        # For IM, no OLA
-        lines = [
-            f"[{cc}] SLA IM RSP {schedule_suffix} P1-P4 {rsp_duration}",
-            f"[{cc}] SLA IM RSL {schedule_suffix} P1-P4 {rsl_duration}"
-        ]
-    elif cc == "PL":
-        # For SR and PL, include OLA (PL already has OLA in source data)
-        lines = [
-            f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
-            f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
-            f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
-        ]
-    else:
-        # For SR and other countries (including RO and TR), include OLA
-        lines = [
-            f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
-            f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
-            f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
-        ]
-    return "\n".join(lines)
 
 def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rsl_schedule, 
                        rsp_priority, rsl_priority, rsp_time, rsl_time):
@@ -1753,6 +1746,7 @@ def run_generator(
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}] {app}"
                                     else:
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}]"
+                                
                                     
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"

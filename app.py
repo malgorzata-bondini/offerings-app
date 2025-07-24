@@ -73,6 +73,13 @@ with col2:
             help="Set Business Criticality for all generated offerings. If empty, original values from source files will be preserved."
         )
         
+        # Add Approval Required control - MOVE THIS HERE
+        approval_required = st.checkbox(
+            "Approval Required",
+            value=False,
+            help="Set Approval Required to true for all generated offerings. Default is false."
+        )
+        
         # Add Lvl2 checkbox
         st.markdown("---")
         use_lvl2 = st.checkbox(
@@ -91,13 +98,6 @@ with col2:
             service_type = ""
         
         delivery_manager = st.text_input("Delivery Manager", value="")
-    
-        # Add Approval Required control
-        approval_required = st.checkbox(
-            "Approval Required",
-            value=False,
-            help="Set Approval Required to true for all generated offerings. Default is false."
-        )
     
     with tab2:
         st.subheader("Direct Parent Offering Selection")
@@ -592,10 +592,6 @@ with col2:
                 )
         else:
             aliases_value = ""
-
-# Add this with your other variable definitions
-if 'approval_required' not in locals():
-    approval_required = False
 
 st.markdown("---")
 

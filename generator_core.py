@@ -1802,149 +1802,95 @@ def run_generator(
 
     # Convert lists to DataFrames once - major performance improvement!
     print(f"Converting {len(sheets_data)} sheet lists to DataFrames...")
-    for sheet_key, rows_list in sheets_data.items():
-        if rows_list:
-            print(f"  Processing {sheet_key}: {len(rows_list)} rows")
-            df = pd.DataFrame(rows_list)
-            
-            # Get the column order key from the first row
-            column_order_key = None
-            if "_column_order_key" in df.columns and len(df) > 0:
-                column_order_key = df.iloc[0]["_column_order_key"]
-            
-            # Track which rows have missing schedules BEFORE dropping the column
-            missing_schedule_rows = []
-            if "_missing_schedule" in df.columns:
-                missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
-                # Store this info for later use
-                missing_schedule_info[sheet_key] = missing_schedule_rows
-            
-            # Remove helper columns
-            for col in ["_missing_schedule", "_column_order_key"]:
-                if col in df.columns:
-                    df = df.drop(columns=[col])
-            
-            # Reorder columns to match original order if we have it
-            if column_order_key and column_order_key in column_order_cache:
-                original_order = column_order_cache[column_order_key]
-                # Get all columns that exist in both original and current dataframe
-                common_cols = [col for col in original_order if col in df.columns]
-                # Add any new columns that weren't in original (shouldn't happen but be safe)
-                new_cols = [col for col in df.columns if col not in common_cols]
-                # Reorder
-                df = df[common_cols + new_cols]
-            
-            sheets[sheet_key] = df
-            
-    print("Batch concatenation completed!")
-
-    if not sheets:
-        raise ValueError("No matching rows found with the specified keywords.")
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    # Update filename to indicate which levels are included
-    if use_lvl2:
-        suffix = "lvl1_and_lvl2"
-    else:
-        suffix = "lvl1"
-    outfile = out_dir / f"Offerings_NEW_{suffix}_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
+    
+    # Create output file path
+    outfile = out_dir / f"Generated_Service_Offerings_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile, engine="openpyxl") as w:
-        # Sort sheet names alphabetically
-        sorted_sheets = sorted(sheets.keys())
+        sheets = {}  # Store final DataFrames for later use
         
-        for sheet_name in sorted_sheets:
-            dfc = sheets[sheet_name].copy()  # Make a copy to avoid modifying original
-            
-            # Get missing schedule rows for this sheet
-            sheet_missing_rows = missing_schedule_info.get(sheet_name, [])
-            
-            # Remove the _missing_schedule column before writing
-            if "_missing_schedule" in dfc.columns:
-                dfc = dfc.drop(columns=["_missing_schedule"])
-            
-            # Remove helper column tracking receiver side
-            if "_recv" in dfc.columns:
-                dfc = dfc.drop(columns=["_recv"])
-            
-            # Extract country code from sheet name (e.g., "PL lvl1" -> "PL")
-            cc = sheet_name.split()[0]
-            
-            # Ensure unique names per sheet
-            # Keep duplicates distinct by support/managed groups to preserve grouped rows
-            df_final = dfc.drop_duplicates(
-                subset=["Name (Child Service Offering lvl 1)", "Support group", "Managed by Group"],
-                keep="first"
-            ).copy()
-            
-            # Update missing schedule rows indices after deduplication
-            if sheet_missing_rows:
-                # Map old indices to new indices after deduplication
-                old_indices = dfc.index.tolist()
-                new_indices = df_final.index.tolist()
+        for sheet_key, rows_list in sheets_data.items():
+            if rows_list:
+                print(f"  Processing {sheet_key}: {len(rows_list)} rows")
+                df = pd.DataFrame(rows_list)
                 
-                # Create mapping from old to new indices
-                old_to_new = {}
-                for new_idx, old_idx in enumerate(new_indices):
-                    old_pos = old_indices.index(old_idx)
-                    old_to_new[old_pos] = new_idx
+                # Get the column order key from the first row
+                column_order_key = None
+                if "_column_order_key" in df.columns and len(df) > 0:
+                    column_order_key = df.iloc[0]["_column_order_key"]
                 
-                # Update missing schedule rows with new indices
-                new_missing_rows = []
-                for old_row in sheet_missing_rows:
-                    if old_row in old_to_new:
-                        new_missing_rows.append(old_to_new[old_row])
+                # Track which rows have missing schedules BEFORE dropping the column
+                missing_schedule_rows = []
+                if "_missing_schedule" in df.columns:
+                    missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
+                    # Store this info for later use
+                    missing_schedule_info[sheet_key] = missing_schedule_rows
                 
-                missing_schedule_info[sheet_name] = new_missing_rows
-            
-            if "Number" in df_final.columns:
-                df_final = df_final.drop(columns=["Number"])
-            
-            # Remove Visibility group column for PL only if it wasn't in the original
-            cc = sheet_name.split()[0]
-            column_key = f"{cc}_Child SO {sheet_name.split()[-1]}"  # e.g., "PL_Child SO lvl1"
-            if cc == "PL" and "Visibility group" in df_final.columns:
-                original_cols = column_order_cache.get(column_key, [])
-                if "Visibility group" not in original_cols:
-                    df_final = df_final.drop(columns=["Visibility group"])
-            
-            # Clean data before writing to Excel
-            for col in df_final.columns:
-                try:
-                    # Convert column to string type first to handle mixed types
-                    df_final[col] = df_final[col].astype(str)
-                    
-                    # Replace problematic values
-                    df_final[col] = df_final[col].replace({
-                        'nan': '',
-                        'NaN': '',
-                        'None': '',
-                        'none': '',
-                        'NULL': '',
-                        'null': '',
-                        '<NA>': '',
-                        'True': 'true',
-                        'TRUE': 'true',
-                        'False': 'false',
-                        'FALSE': 'false'
-                    })
-                    
-                    # Handle cells that are literally "nan" (case insensitive)
-                    df_final[col] = df_final[col].apply(
-                        lambda x: '' if str(x).lower() in ['nan', 'none', 'null', '<na>'] else str(x)
-                    )
-                    
-                    # Remove any leading/trailing whitespace
-                    df_final[col] = df_final[col].str.strip()
-                    
-                except Exception as e:
-                    print(f"Warning: Error processing column {col}: {e}")
-                    # If there's an error, try to convert to string at minimum
-                    df_final[col] = df_final[col].astype(str)
-            
-            # Write to Excel
-            df_final.to_excel(w, sheet_name=sheet_name, index=False)
+                # Remove helper columns
+                for col in ["_missing_schedule", "_column_order_key"]:
+                    if col in df.columns:
+                        df = df.drop(columns=[col])
+                
+                # Reorder columns to match original order if we have it
+                if column_order_key and column_order_key in column_order_cache:
+                    original_order = column_order_cache[column_order_key]
+                    # Get all columns that exist in both original and current dataframe
+                    common_cols = [col for col in original_order if col in df.columns]
+                    # Add any new columns that weren't in original (shouldn't happen but be safe)
+                    new_cols = [col for col in df.columns if col not in common_cols]
+                    # Reorder
+                    df = df[common_cols + new_cols]
+                
+                # Extract country code from sheet_key (e.g., "PL lvl1" -> "PL")
+                cc = sheet_key.split()[0]
+                
+                # Remove Visibility group column for PL only if it wasn't in the original
+                if cc == "PL" and "Visibility group" in df.columns:
+                    original_cols = column_order_cache.get(column_order_key, [])
+                    if "Visibility group" not in original_cols:
+                        df = df.drop(columns=["Visibility group"])
+                
+                # Clean data before writing to Excel
+                df_final = df.copy()
+                for col in df_final.columns:
+                    try:
+                        # Convert column to string type first to handle mixed types
+                        df_final[col] = df_final[col].astype(str)
+                        
+                        # Replace problematic values
+                        df_final[col] = df_final[col].replace({
+                            'nan': '',
+                            'NaN': '',
+                            'None': '',
+                            'none': '',
+                            'NULL': '',
+                            'null': '',
+                            '<NA>': '',
+                            'True': 'true',
+                            'TRUE': 'true',
+                            'False': 'false',
+                            'FALSE': 'false'
+                        })
+                        
+                        # Handle cells that are literally "nan" (case insensitive)
+                        df_final[col] = df_final[col].apply(
+                            lambda x: '' if str(x).lower() in ['nan', 'none', 'null', '<na>'] else str(x)
+                        )
+                        
+                        # Remove any leading/trailing whitespace
+                        df_final[col] = df_final[col].str.strip()
+                        
+                    except Exception as e:
+                        print(f"Warning: Error processing column {col}: {e}")
+                        # If there's an error, try to convert to string at minimum
+                        df_final[col] = df_final[col].astype(str)
+                
+                # Store the final DataFrame for later formatting use
+                sheets[sheet_key] = df_final
+                
+                # Write to Excel
+                df_final.to_excel(w, sheet_name=sheet_key, index=False)
     
     # Apply formatting with red highlighting for missing schedules
     try:

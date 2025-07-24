@@ -1679,15 +1679,17 @@ def run_generator(
                                             # Fallback to receiver if pattern not found
                                             row.loc[:, "Subscribed by Company"] = recv
                                     else:
-                                        # For standard offerings, preserve original if it exists
+                                        # For standard offerings, ALWAYS preserve original value from source file
                                         if "Subscribed by Company" in base_row.index:
                                             original_company = str(base_row["Subscribed by Company"]).strip()
-                                            if original_company and original_company not in ["nan", "NaN", "", "None"]:
+                                            if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:
                                                 row.loc[:, "Subscribed by Company"] = original_company
                                             else:
-                                                row.loc[:, "Subscribed by Company"] = recv or tag_hs
+                                                # Leave empty if original was empty - DON'T use recv or tag_hs
+                                                row.loc[:, "Subscribed by Company"] = ""
                                         else:
-                                            row.loc[:, "Subscribed by Company"] = recv or tag_hs
+                                            # Leave empty if column doesn't exist - DON'T use recv or tag_hs  
+                                            row.loc[:, "Subscribed by Company"] = ""
                                     
                                     orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
                                     

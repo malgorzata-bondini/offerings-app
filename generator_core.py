@@ -1862,24 +1862,19 @@ def run_generator(
                     for col in original_order:
                         if col not in df.columns:
                             if original_df is not None and col in original_df.columns:
+                                # Get original column data and ensure it matches df length
                                 original_col_data = original_df[col]
-                                # Use ALL original column data, not just first value
+                                
+                                # Safely handle length mismatch
                                 if len(original_col_data) >= len(df):
-                                    df[col] = original_col_data.iloc[:len(df)].values
+                                    # Take exactly the number we need
+                                    df[col] = original_col_data.iloc[:len(df)].reset_index(drop=True)
                                 else:
-                                    df[col] = original_col_data.reindex(range(len(df)), method='ffill').fillna('')
+                                    # Fill missing values with empty strings
+                                    padded_data = list(original_col_data) + [''] * (len(df) - len(original_col_data))
+                                    df[col] = padded_data[:len(df)]
                             else:
                                 df[col] = ''
-
-                    # Get all columns that exist in original order
-                    ordered_cols = [col for col in original_order if col in df.columns]
-
-                    # Add any new columns that weren't in original (shouldn't happen but be safe)
-                    new_cols = [col for col in df.columns if col not in original_order]
-
-                    # Reorder to match original exactly
-                    df = df[ordered_cols + new_cols]
-                
                 # Extract country code from sheet_key (e.g., "PL lvl1" -> "PL")
                 cc = sheet_key.split()[0]
                 
@@ -1889,12 +1884,12 @@ def run_generator(
                     if "Visibility group" not in original_cols:
                         df = df.drop(columns=["Visibility group"])
                 
-                # Clean data before writing to Excel
+                # Clean data before writing to Excel - SAFER VERSION
                 df_final = df.copy()
                 for col in df_final.columns:
                     try:
-                        # Convert column to string type first to handle mixed types
-                        df_final[col] = df_final[col].astype(str)
+                        # Handle mixed types more safely
+                        df_final[col] = df_final[col].fillna('').astype(str)
                         
                         # Replace problematic values
                         df_final[col] = df_final[col].replace({
@@ -1911,18 +1906,10 @@ def run_generator(
                             'FALSE': 'false'
                         })
                         
-                        # Handle cells that are literally "nan" (case insensitive)
-                        df_final[col] = df_final[col].apply(
-                            lambda x: '' if str(x).lower() in ['nan', 'none', 'null', '<na>'] else str(x)
-                        )
-                        
-                        # Remove any leading/trailing whitespace
-                        df_final[col] = df_final[col].str.strip()
-                        
                     except Exception as e:
                         print(f"Warning: Error processing column {col}: {e}")
-                        # If there's an error, try to convert to string at minimum
-                        df_final[col] = df_final[col].astype(str)
+                        # Fallback: convert everything to string
+                        df_final[col] = df_final[col].astype(str).fillna('')
                 
                 # Store the final DataFrame for later formatting use
                 sheets[sheet_key] = df_final
@@ -1973,7 +1960,7 @@ def run_generator(
                     try:
                         cell_length = len(str(cell.value)) if cell.value else 0
                         if cell_length > max_length:
-                            max_length = min(cell_length, 100)  # cap at 100 to prevent issues
+                          max_length = min(cell_length, 100)  # cap at 100 to prevent issues
                     except:
                         pass
                 

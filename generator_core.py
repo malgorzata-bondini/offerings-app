@@ -5,8 +5,9 @@ import warnings
 from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment
+from openpyxl.styles import Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl.comments import Comment
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
 
@@ -1276,6 +1277,10 @@ def run_generator(
                     new_row = create_new_parent_row(new_parent_offering, new_parent, country)
                     base_pool = pd.DataFrame([new_row])
                     # For new parent, we can process both levels with the same synthetic data
+                    # Initialize schedule checking variables
+                    all_country_names_for_schedules = pd.Series([], dtype=str)
+                    corp_names_for_schedules = pd.Series([], dtype=str)
+                    non_corp_names_for_schedules = pd.Series([], dtype=str)
                 else:
                     # ORIGINAL LOGIC - read from cached Excel file
                     if wb not in excel_cache:
@@ -1303,26 +1308,17 @@ def run_generator(
                         df["LDAP"] = ""
                         ldap_cols = ["LDAP"]
 
-                    # Always initialize schedule checking variables before use
+                    # Initialize schedule checking variables
                     all_country_names_for_schedules = pd.Series([], dtype=str)
                     corp_names_for_schedules = pd.Series([], dtype=str)
                     non_corp_names_for_schedules = pd.Series([], dtype=str)
 
                     # Debug: Check if we have the required columns
                     if "Parent Offering" in df.columns and "Name (Child Service Offering lvl 1)" in df.columns:
-                        # Debug: Print first few rows to see the data
-                        print(f"First few Parent Offerings: {df['Parent Offering'].head().tolist()}")
-                        print(f"First few Names: {df['Name (Child Service Offering lvl 1)'].head().tolist()}")
-                        
                         # Store ALL names from the country file for schedule checking (before any filtering)
                         all_country_names_for_schedules = df["Name (Child Service Offering lvl 1)"].astype(str).str.upper()
                         corp_names_for_schedules = all_country_names_for_schedules[all_country_names_for_schedules.str.contains('CORP|DEDICATED|RECP', na=False)]
                         non_corp_names_for_schedules = all_country_names_for_schedules[~all_country_names_for_schedules.str.contains('CORP|DEDICATED|RECP', na=False)]
-                    else:
-                        # Ensure variables are initialized even if columns are missing
-                        all_country_names_for_schedules = pd.Series([], dtype=str)
-                        corp_names_for_schedules = pd.Series([], dtype=str)
-                        non_corp_names_for_schedules = pd.Series([], dtype=str)
                         
                     # Apply pre-filtering with vectorized operations where possible
                     if keywords_parent.strip():
@@ -1368,46 +1364,6 @@ def run_generator(
                 if base_pool.empty:
                     continue
                 
-                # Use the pre-stored names for schedule checking
-                if not use_new_parent:
-                    # Always initialize variables to avoid unbound errors
-                    all_country_names = pd.Series([], dtype=str)
-                    corp_names = pd.Series([], dtype=str)
-                    non_corp_names = pd.Series([], dtype=str)
-                    # We already have these from before filtering (if they exist)
-                    if 'all_country_names_for_schedules' in locals():
-                        try:
-                            all_country_names = all_country_names_for_schedules
-                        except Exception:
-                            pass
-                        try:
-                            corp_names = corp_names_for_schedules
-                        except Exception:
-                            pass
-                        try:
-                            non_corp_names = non_corp_names_for_schedules
-                        except Exception:
-                            pass
-                else:
-                    # For new parent, no existing names to check
-                    all_country_names = pd.Series([], dtype=str)
-                    corp_names = pd.Series([], dtype=str)
-                    non_corp_names = pd.Series([], dtype=str)
-                
-                # Pre-compute receivers by country (same for all base_rows)
-                tag_hs, tag_ds = f"HS {country}", f"DS {country}"
-                if country == "DE":
-                    receivers = ["DS DE", "HS DE"]
-                elif country == "PL":
-                    receivers = ["DS PL", "HS PL"]
-                elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                    if country in {"UA", "MD"}:
-                        receivers = [f"DS {country}"]
-                    else:
-                        receivers = [tag_ds]
-                else:
-                    receivers = [""]
-                
                 # Process ALL matching rows, not just the first one
                 total_base_rows = len(base_pool)
                 print(f"Processing {total_base_rows} base rows...")
@@ -1423,27 +1379,19 @@ def run_generator(
                     base_row_df = base_row.to_frame().T.copy()
                     tag_hs, tag_ds = f"HS {country}", f"DS {country}"
 
-                    # Determine receivers by country
-                    if country == "DE":
-                        # DE always splits into DS and HS
-                        receivers = ["DS DE", "HS DE"]
-                    elif country == "PL":
-                        # PL always splits into DS and HS
-                        receivers = ["DS PL", "HS PL"]
-                    elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                        # CORP/RecP cases use DS by default for supported countries
-                        if country in {"UA", "MD"}:
-                            receivers = [f"DS {country}"]
-                        else:
-                            receivers = [f"DS {country}"]
+                    # Define receivers ONLY ONCE based on country and context
+                    if country == "PL":
+                        receivers = ["HS PL", "DS PL"]
                     elif country == "CY":
-                        receivers = ["DS CY", "HS CY"]
-                    elif country in {"UA", "MD"}:
-                        # Standard naming for UA/MD
-                        receivers = [f"DS {country}"]
+                        receivers = ["HS CY", "DS CY"]
+                    elif country == "DE":
+                        receivers = ["HS DE", "DS DE"]
+                    elif country == "UA":
+                        receivers = ["DS UA"]  # Only DS for UA
+                    elif country == "MD":
+                        receivers = ["DS MD"]  # Only DS for MD
                     else:
-                        # Standard single receiver for other countries
-                        receivers = [""]
+                        receivers = [f"HS {country}", f"DS {country}"]
 
                     parent_full = str(base_row["Parent Offering"])
                     
@@ -1451,68 +1399,46 @@ def run_generator(
                     original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
 
                     for app in all_apps:
+                        # DO NOT RECALCULATE receivers here! Use the ones defined above
                         for recv in receivers:
                             # Get country-specific schedule suffixes
                             country_schedule_suffixes = get_schedule_suffixes_for_country(
                                 country, recv, schedule_settings_per_country, schedule_suffixes
                             )
                             
-                            # Check if schedules are actually available for our generation type
-                            is_corp_type = require_corp or require_recp or require_corp_it or require_corp_dedicated
-                            
-                            # Filter schedules based on improved logic:
-                            # 1. Check if schedule exists in names at all
-                            # 2. If exists only in CORP but user didn't select CORP -> red formatting
-                            # 3. Otherwise OK to use
-                            if country_schedule_suffixes and not use_new_parent:
-                                valid_schedules = []
-                                
-                                for schedule in country_schedule_suffixes:
-                                    schedule_str = str(schedule).strip()
-                                    if not schedule_str:
-                                        valid_schedules.append(schedule)
-                                        continue
-                                    
-                                    schedule_lower = schedule_str.lower()
-                                    
-                                    # Check if schedule exists anywhere in ALL names in the country
-                                    schedule_exists_anywhere = all_country_names.str.lower().str.contains(schedule_lower, na=False).any()
-                                    
-                                    if not schedule_exists_anywhere:
-                                        # Schedule doesn't exist at all in this country - mark as missing
-                                        continue
-                                    
-                                    # Check if schedule exists in corp vs non-corp names
-                                    exists_in_corp = corp_names.str.lower().str.contains(schedule_lower, na=False).any() if len(corp_names) > 0 else False
-                                    exists_in_non_corp = non_corp_names.str.lower().str.contains(schedule_lower, na=False).any() if len(non_corp_names) > 0 else False
-                                    
-                                    # If schedule exists only in CORP names but user didn't select CORP -> will be marked as missing (red)
-                                    if exists_in_corp and not exists_in_non_corp and not is_corp_type:
-                                        # Schedule exists only in CORP but user generating non-CORP -> mark as missing for red formatting
-                                        continue
-                                    
-                                    # Schedule exists and is available for the current generation type
-                                    valid_schedules.append(schedule)
-                                
-                                country_schedule_suffixes = valid_schedules
-                            
-                            # Check if schedule is missing (no valid schedules found)
-                            schedule_missing = not country_schedule_suffixes or all(not str(s).strip() for s in country_schedule_suffixes)
-                            
-                            # If no schedules found, still use original schedules for naming but mark as missing
-                            if schedule_missing:
-                                # Get original schedules back for naming purposes
-                                original_schedules = get_schedule_suffixes_for_country(
-                                    country, recv, schedule_settings_per_country, schedule_suffixes
-                                )
-                                if original_schedules:
-                                    country_schedule_suffixes = original_schedules
-                                else:
-                                    country_schedule_suffixes = [""]  # Empty schedule if really no schedules
-                            
                             for schedule_suffix in country_schedule_suffixes:
-                                # Flag to track if schedule is missing
-                                missing_schedule = schedule_missing
+                                # Check if schedule exists in the source data
+                                missing_schedule = False
+                                
+                                # Prepare search patterns based on whether it's CORP or not
+                                is_corp_type = (require_corp or require_recp or require_corp_it or require_corp_dedicated)
+                                
+                                # Only check schedules if we have data to check against
+                                if len(all_country_names_for_schedules) > 0:
+                                    # Normalize schedule for comparison
+                                    schedule_pattern = schedule_suffix.strip()
+                                    
+                                    # Check based on CORP type
+                                    if is_corp_type:
+                                        # For CORP types, check only in CORP names
+                                        if len(corp_names_for_schedules) > 0:
+                                            # Look for exact schedule match in CORP offerings
+                                            schedule_found = any(schedule_pattern in name for name in corp_names_for_schedules)
+                                            if not schedule_found:
+                                                missing_schedule = True
+                                        else:
+                                            # No CORP offerings exist, so schedule is missing
+                                            missing_schedule = True
+                                    else:
+                                        # For non-CORP, check only in non-CORP names
+                                        if len(non_corp_names_for_schedules) > 0:
+                                            # Look for exact schedule match in non-CORP offerings
+                                            schedule_found = any(schedule_pattern in name for name in non_corp_names_for_schedules)
+                                            if not schedule_found:
+                                                missing_schedule = True
+                                        else:
+                                            # No non-CORP offerings exist, so schedule is missing
+                                            missing_schedule = True
                                 
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:
@@ -1611,15 +1537,11 @@ def run_generator(
                                 if country == "PL":
                                     # For PL, directly use the receiver-specific support group
                                     # The receiver is the key (e.g., "HS PL" or "DS PL")
-                                    key = recv
+                                    key = recv  # recv is already correctly set to "HS PL" or "DS PL"
                                     country_supports = support_groups_per_country.get(key, "")
                                     country_managed = managed_by_groups_per_country.get(key, "")
                                     
-                                    # Debug: Print PL support group info
-                                    print(f"DEBUG PL: recv={recv}, supports={country_supports}, managed={country_managed}")
-                                    
                                     # For PL, we expect only one support group per receiver
-                                    # No need to parse multiple lines or filter later
                                     if country_supports:
                                         sg = str(country_supports).strip()
                                         mg = str(country_managed or sg).strip()
@@ -1627,10 +1549,8 @@ def run_generator(
                                     else:
                                         # Fallback to empty if no support group configured for this receiver
                                         support_groups_list = [("", "")]
-                                    
-                                    print(f"DEBUG PL: Final groups for {recv}: {support_groups_list}")
                                 else:
-                                    # Delegate to helper for other countries
+                                    # For other countries, use the existing logic
                                     support_groups_list = get_support_groups_list_for_country(
                                         country, support_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
@@ -1644,9 +1564,6 @@ def run_generator(
                                     if matching:
                                         support_groups_list = matching
                                 
-                                # For PL, we already have the correct receiver-specific group from above
-                                # No additional filtering needed
-                                
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
                                     # Skip duplicates based on name, receiver, app, schedule, support and managed groups
@@ -1659,19 +1576,10 @@ def run_generator(
                                         managed_by_group_for_country
                                     )
                                     
-                                    # Debug for PL
-                                    if country == "PL":
-                                        print(f"DEBUG PL: Generating key={key}")
-                                        if key in seen:
-                                            print(f"DEBUG PL: SKIPPING duplicate key")
-                                    
                                     if key in seen:
                                         continue
                                     seen.add(key)
                                     row = base_row_df.copy()
-                                    
-                                    # Add flag for missing schedule (for red formatting later)
-                                    row.loc[:, "_missing_schedule"] = missing_schedule
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
@@ -1819,18 +1727,19 @@ def run_generator(
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"
                                     
-                                    # Store row index for potential red formatting
-                                    if missing_schedule:
-                                        if sheet_key not in missing_schedule_info:
-                                            missing_schedule_info[sheet_key] = []
-                                        # We'll update the index after batch concatenation
-                                    
                                     # Accumulate rows in lists for batch concatenation
                                     sheets_data.setdefault(sheet_key, [])
                                     if isinstance(row, pd.DataFrame):
                                         row_dict = row.iloc[0].to_dict()
                                     else:
                                         row_dict = row.to_dict()
+                                    
+                                    # Add missing schedule flag to the row dictionary
+                                    if missing_schedule:
+                                        row_dict["_missing_schedule"] = True
+                                    else:
+                                        row_dict["_missing_schedule"] = False
+                                    
                                     sheets_data[sheet_key].append(row_dict)
                             
             except Exception as e:
@@ -1850,16 +1759,16 @@ def run_generator(
     for sheet_key, rows_list in sheets_data.items():
         if rows_list:
             print(f"  Processing {sheet_key}: {len(rows_list)} rows")
-            sheets[sheet_key] = pd.DataFrame(rows_list)
+            df = pd.DataFrame(rows_list)
             
-            # Update missing_schedule_info with correct row indices
-            if sheet_key in missing_schedule_info:
-                # Find rows with missing schedules and record their indices
-                missing_indices = []
-                for idx, row_dict in enumerate(rows_list):
-                    if row_dict.get('_missing_schedule', False):
-                        missing_indices.append(idx)
-                missing_schedule_info[sheet_key] = missing_indices
+            # Track which rows have missing schedules BEFORE dropping the column
+            missing_schedule_rows = []
+            if "_missing_schedule" in df.columns:
+                missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
+                # Store this info for later use
+                missing_schedule_info[sheet_key] = missing_schedule_rows
+            
+            sheets[sheet_key] = df
             
     print("Batch concatenation completed!")
 
@@ -1874,9 +1783,6 @@ def run_generator(
         suffix = "lvl1"
     outfile = out_dir / f"Offerings_NEW_{suffix}_{dt.datetime.now():%Y%m%d_%H%M%S}.xlsx"
     
-    # Store missing schedule info for formatting
-    missing_schedule_info = {}
-    
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile, engine="openpyxl") as w:
         # Sort sheet names alphabetically
@@ -1885,10 +1791,11 @@ def run_generator(
         for sheet_name in sorted_sheets:
             dfc = sheets[sheet_name].copy()  # Make a copy to avoid modifying original
             
-            # Track rows with missing schedules for red formatting
-            missing_schedule_rows = []
+            # Get missing schedule rows for this sheet
+            sheet_missing_rows = missing_schedule_info.get(sheet_name, [])
+            
+            # Remove the _missing_schedule column before writing
             if "_missing_schedule" in dfc.columns:
-                missing_schedule_rows = dfc[dfc["_missing_schedule"] == True].index.tolist()
                 dfc = dfc.drop(columns=["_missing_schedule"])
             
             # Remove helper column tracking receiver side
@@ -1906,13 +1813,24 @@ def run_generator(
             ).copy()
             
             # Update missing schedule rows indices after deduplication
-            if missing_schedule_rows:
+            if sheet_missing_rows:
                 # Map old indices to new indices after deduplication
-                old_to_new_mapping = {old_idx: new_idx for new_idx, old_idx in enumerate(dfc.index) 
-                                     if old_idx in df_final.index}
-                missing_schedule_rows = [old_to_new_mapping.get(idx) for idx in missing_schedule_rows 
-                                       if idx in old_to_new_mapping]
-                missing_schedule_rows = [idx for idx in missing_schedule_rows if idx is not None]
+                old_indices = dfc.index.tolist()
+                new_indices = df_final.index.tolist()
+                
+                # Create mapping from old to new indices
+                old_to_new = {}
+                for new_idx, old_idx in enumerate(new_indices):
+                    old_pos = old_indices.index(old_idx)
+                    old_to_new[old_pos] = new_idx
+                
+                # Update missing schedule rows with new indices
+                new_missing_rows = []
+                for old_row in sheet_missing_rows:
+                    if old_row in old_to_new:
+                        new_missing_rows.append(old_to_new[old_row])
+                
+                missing_schedule_info[sheet_name] = new_missing_rows
             
             if "Number" in df_final.columns:
                 df_final = df_final.drop(columns=["Number"])
@@ -1920,9 +1838,6 @@ def run_generator(
             # Remove Visibility group column for PL
             if cc == "PL" and "Visibility group" in df_final.columns:
                 df_final = df_final.drop(columns=["Visibility group"])
-            
-            # Store missing schedule info for this sheet for later formatting
-            missing_schedule_info[sheet_name] = missing_schedule_rows
             
             # Clean data before writing to Excel
             for col in df_final.columns:
@@ -1961,32 +1876,60 @@ def run_generator(
             # Write to Excel
             df_final.to_excel(w, sheet_name=sheet_name, index=False)
     
-    # Apply formatting with error handling
+    # Apply formatting with red highlighting for missing schedules
     try:
         wb = load_workbook(outfile)
+        red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+        
         for ws in wb.worksheets:
             sheet_name = ws.title
-            
+
+            # Try to get the schedule_suffix for this sheet from the first row, if available
+            schedule_suffix_for_comment = ""
+            try:
+                df_for_comment = sheets.get(sheet_name)
+                if df_for_comment is not None and not df_for_comment.empty:
+                    # Try to get the schedule suffix from the first row's Name (Child Service Offering lvl 1)
+                    first_name = str(df_for_comment.iloc[0].get("Name (Child Service Offering lvl 1)", ""))
+                    # Try to extract the schedule suffix (last word)
+                    if first_name:
+                        schedule_suffix_for_comment = first_name.split()[-1]
+            except Exception:
+                schedule_suffix_for_comment = ""
+
+            # Determine if this sheet is CORP type for comment purposes
+            is_corp_type = False
+            sheet_name_upper = sheet_name.upper()
+            if any(x in sheet_name_upper for x in ["CORP", "DEDICATED", "RECP"]):
+                is_corp_type = True
+
             # Apply red formatting to Name column for rows with missing schedules
-            if sheet_name in missing_schedule_info:
-                from openpyxl.styles import PatternFill
-                red_fill = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
-                
+            if sheet_name in missing_schedule_info and missing_schedule_info[sheet_name]:
                 # Find Name column
                 name_col_idx = None
                 for col_idx, cell in enumerate(ws[1], start=1):  # Header row
                     if cell.value == "Name (Child Service Offering lvl 1)":
                         name_col_idx = col_idx
                         break
-                
+
                 if name_col_idx:
                     name_col_letter = get_column_letter(name_col_idx)
+
+                    # Apply red formatting to each row with missing schedule
                     for row_idx in missing_schedule_info[sheet_name]:
-                        # +2 because: +1 for header row, +1 for 1-based indexing
+                        # Excel rows are 1-based, and we need to account for header
                         excel_row_idx = row_idx + 2
+
+                        # Check if row exists
                         if excel_row_idx <= ws.max_row:
                             cell = ws[f"{name_col_letter}{excel_row_idx}"]
                             cell.fill = red_fill
+
+                            # Add a comment explaining why it's red
+                            cell.comment = Comment(
+                                f"Schedule '{schedule_suffix_for_comment}' not found in source data for {'CORP' if is_corp_type else 'non-CORP'} offerings",
+                                "Service Offering Generator"
+                            )
             
             # Apply column widths and formatting
             for col_idx, col in enumerate(ws.columns, start=1):
@@ -2033,15 +1976,3 @@ def run_generator(
     
     print(f"Successfully generated: {outfile}")
     return outfile
-
-def _filter_support_groups_by_receiver(support_groups_list, receiver):
-    """CRITICAL FIX: Filter support groups by receiver prefix"""
-    receiver_prefix = receiver.split()[0]  # "HS" or "DS"
-    filtered_groups = []
-    
-    for sg, mg in support_groups_list:
-        # Only include groups that match the receiver prefix
-        if sg.strip().startswith(receiver_prefix):
-            filtered_groups.append((sg, mg))
-    
-    return filtered_groups if filtered_groups else support_groups_list

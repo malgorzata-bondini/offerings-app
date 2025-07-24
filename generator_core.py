@@ -1666,30 +1666,18 @@ def run_generator(
                                                         if ldap_col in row.columns and ldap_val not in ["", "nan", "NaN", "None"]:
                                                             row.loc[:, ldap_col] = ldap_val
                                     # Handle Subscribed by Company based on type
+                                    elif country == "DE":
+                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
+                                        row.loc[:, "Subscribed by Company"] = company
                                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                                        # For CORP offerings, use the receiver
-                                        row.loc[:, "Subscribed by Company"] = recv
-                                    # PL subscription splits: determine based on actual generated name new_name
-                                    elif country == "PL":
-                                        # Check for HS PL pattern in generated name
-                                        if re.search(r'\[\w+\s+HS\s+PL', new_name) or " HS PL " in new_name:
-                                            row.loc[:, "Subscribed by Company"] = "HS PL"
+                                        # For CORP offerings, extract from the second part of the name
+                                        # Example: [SR DS CY CORP DS CY IT] -> "DS CY"
+                                        match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
+                                        if match:
+                                            row.loc[:, "Subscribed by Company"] = match.group(1)
                                         else:
-                                            # Default to DS PL
-                                            row.loc[:, "Subscribed by Company"] = "DS PL"
-                                    elif country == "UA":
-                                        row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
-                                    elif country == "MD":
-                                        if global_prod:
-                                            row.loc[:, "Subscribed by Company"] = recv or tag_hs
-                                        else:
-                                            row.loc[:, "Subscribed by Company"] = "DS MD"
-                                    elif country == "CY":
-                                        row.loc[:, "Subscribed by Company"] = "CY Diagnostic Laboratories"  # CY now has only DS
-                                    elif country == "RO":
-                                        row.loc[:, "Subscribed by Company"] = "DS RO"
-                                    elif country == "TR":
-                                        row.loc[:, "Subscribed by Company"] = "DS TR"
+                                            # Fallback to receiver if pattern not found
+                                            row.loc[:, "Subscribed by Company"] = recv
                                     else:
                                         # For standard offerings, preserve original if it exists
                                         if "Subscribed by Company" in base_row.index:

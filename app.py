@@ -92,6 +92,13 @@ with col2:
         
         delivery_manager = st.text_input("Delivery Manager", value="")
     
+        # Add Approval Required control
+        approval_required = st.checkbox(
+            "Approval Required",
+            value=False,
+            help="Set Approval Required to true for all generated offerings. Default is false."
+        )
+    
     with tab2:
         st.subheader("Direct Parent Offering Selection")
         
@@ -586,6 +593,10 @@ with col2:
         else:
             aliases_value = ""
 
+# Add this with your other variable definitions
+if 'approval_required' not in locals():
+    approval_required = False
+
 st.markdown("---")
 
 # MODIFY THIS VALIDATION SECTION
@@ -657,7 +668,9 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         use_custom_depend_on=use_custom_depend_on if 'use_custom_depend_on' in locals() else False,
                         custom_depend_on_value=custom_depend_on_value if 'custom_depend_on_value' in locals() else "",
                         # Add business criticality
-                        business_criticality=business_criticality
+                        business_criticality=business_criticality,
+                        # Add approval required
+                        approval_required=approval_required
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

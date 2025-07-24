@@ -83,6 +83,17 @@ with col2:
             help="Set Approval Required to true for all generated offerings. Default is false."
         )
         
+        # Add conditional text field for approval required details
+        if approval_required:
+            approval_required_value = st.text_input(
+                "Approval Required Details",
+                value="",
+                placeholder="Enter approval details (e.g., 'Manager approval needed')",
+                help="Optional details for when approval is required"
+            )
+        else:
+            approval_required_value = "empty"
+        
         # Add Lvl2 checkbox
         st.markdown("---")
         use_lvl2 = st.checkbox(

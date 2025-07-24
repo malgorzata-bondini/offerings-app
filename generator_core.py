@@ -105,9 +105,9 @@ def extract_catalog_name(parent_offering):
     return ""
 
 def get_division_and_country(parent_content, country, delivering_tag):
-    """Get division and country with special handling for MD and UA"""
-    # Special handling for UA and MD - always use DS
-    if country in ["UA", "MD"]:
+    """Get division and country with special handling for MD, UA, RO, and TR"""
+    # Special handling for UA, MD, RO, and TR - always use DS
+    if country in ["UA", "MD", "RO", "TR"]:
         return "DS", country
     
     # Extract parts from parent content
@@ -166,8 +166,8 @@ def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_typ
     # Build the prefix - use the SR/IM from parent or the one provided
     prefix_parts = [sr_im_pos if sr_im_pos else sr_or_im]
     
-    # Special handling for UA and MD - always use DS
-    if country in ["UA", "MD"]:
+    # Special handling for UA, MD, RO, and TR - always use DS
+    if country in ["UA", "MD", "RO", "TR"]:
         prefix_parts.append("DS")
     elif division:
         prefix_parts.append(division)
@@ -226,14 +226,14 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     # Build CORP IT name - always ends with IT
     prefix_parts = [sr_or_im]
     
-    # Get division and country with special handling for MD/UA
+    # Get division and country with special handling for MD/UA/RO/TR
     division, country_code = get_division_and_country(parent_content, country, delivering_tag)
     
     # Add delivering tag parts (who delivers the service - from user input)
     if delivering_tag:
         delivering_parts = delivering_tag.split()
-        # For MD/UA, override with DS
-        if country in ["UA", "MD"]:
+        # For MD/UA/RO/TR, override with DS
+        if country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.extend(["DS", country])
         else:
             prefix_parts.extend(delivering_parts)
@@ -294,14 +294,14 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     # Build CORP Dedicated Services name
     prefix_parts = [sr_or_im]
     
-    # Get division and country with special handling for MD/UA
+    # Get division and country with special handling for MD/UA/RO/TR
     division, country_code = get_division_and_country(parent_content, country, delivering_tag)
     
     # Add delivering tag parts (who delivers the service - from user input)
     if delivering_tag:
         delivering_parts = delivering_tag.split()
-        # For MD/UA, override with DS
-        if country in ["UA", "MD"]:
+        # For MD/UA/RO/TR, override with DS
+        if country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.extend(["DS", country])
         else:
             prefix_parts.extend(delivering_parts)
@@ -354,7 +354,7 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     # Build RecP name - always ends with IT
     prefix_parts = [sr_or_im]
     
-    # Get division and country with special handling for MD/UA
+    # Get division and country with special handling for MD/UA/RO/TR
     division, country_code = get_division_and_country(parent_content, country, delivering_tag)
     
     # Extract division and country from parent
@@ -364,8 +364,8 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
             parent_division = part
             break
     
-    # For MD/UA, always use DS
-    if country in ["UA", "MD"]:
+    # For MD/UA/RO/TR, always use DS
+    if country in ["UA", "MD", "RO", "TR"]:
         prefix_parts.extend(["DS", country])
     else:
         if parent_division:
@@ -378,14 +378,14 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     # Add delivering tag parts
     if delivering_tag:
         delivering_parts = delivering_tag.split()
-        # For MD/UA, override with DS
-        if country in ["UA", "MD"]:
+        # For MD/UA/RO/TR, override with DS
+        if country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.extend(["DS", country])
         else:
             prefix_parts.extend(delivering_parts)
     else:
-        # For MD/UA, use DS
-        if country in ["UA", "MD"]:
+        # For MD/UA/RO/TR, use DS
+        if country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.extend(["DS", country])
         else:
             prefix_parts.extend([division, country])
@@ -459,8 +459,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         # Build Medical name - NO PROD
         prefix_parts = [sr_or_im]
         
-        # Special handling for UA and MD - always use DS
-        if country in ["UA", "MD"]:
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.extend(["DS", country])
         else:
             if division:
@@ -488,8 +488,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         prefix_parts = [sr_or_im]
         
-        # Special handling for UA and MD - always use DS
-        if country in ["UA", "MD"]:
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.extend(["DS", country])
         else:
             if division:
@@ -519,8 +519,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         prefix_parts = [sr_or_im]
         
-        # Special handling for UA and MD - always use DS
-        if country in ["UA", "MD"]:
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.extend(["DS", country])
         else:
             if division:
@@ -581,8 +581,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         if country == "DE" and receiver:
             recv_division = receiver.split()[0]  # Extract HS or DS
             prefix_parts.append(recv_division)
-        # Special handling for UA and MD - always use DS
-        elif country in ["UA", "MD"]:
+        # Special handling for UA, MD, RO, and TR - always use DS
+        elif country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.append("DS")
         elif division:
             prefix_parts.append(division)
@@ -650,8 +650,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         # Build the new name components
         name_parts = [sr_or_im]
         
-        # Special handling for UA and MD - always use DS
-        if country in ["UA", "MD"]:
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
             name_parts.append("DS")
         elif division:
             name_parts.append(division)
@@ -716,14 +716,14 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     # Build CORP name
     prefix_parts = [sr_or_im]
     
-    # Get division and country with special handling for MD/UA
+    # Get division and country with special handling for MD/UA/RO/TR
     division, country_code = get_division_and_country(parent_content, country, delivering_tag)
     
     # Add delivering tag parts (who delivers the service - from user input)
     if delivering_tag:
         delivering_parts = delivering_tag.split()
-        # For MD/UA, override with DS
-        if country in ["UA", "MD"]:
+        # For MD/UA/RO/TR, override with DS
+        if country in ["UA", "MD", "RO", "TR"]:
             prefix_parts.extend(["DS", country])
         else:
             prefix_parts.extend(delivering_parts[:2])  # Take division and country from delivering tag
@@ -821,7 +821,7 @@ def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
             f"[{cc}] OLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}"
         ]
     else:
-        # For SR and other countries, include OLA
+        # For SR and other countries (including RO and TR), include OLA
         lines = [
             f"[{cc}] SLA SR RSP {schedule_suffix} P1-P4 {rsp_duration}",
             f"[{cc}] SLA SR RSL {schedule_suffix} P1-P4 {rsl_duration}",
@@ -877,6 +877,10 @@ def create_new_parent_row(new_parent_offering, new_parent, country):
         new_row["Subscribed by Location"] = "CY"
     elif country == "PL":
         new_row["Subscribed by Location"] = "PL"
+    elif country == "RO":
+        new_row["Subscribed by Location"] = "RO"
+    elif country == "TR":
+        new_row["Subscribed by Location"] = "TR"
     
     return pd.Series(new_row)
 
@@ -946,12 +950,13 @@ def get_support_groups_list_for_country(country, support_group, support_groups_p
 
 def get_schedule_suffixes_for_country(country, receiver, schedule_settings_per_country, default_schedule_suffixes):
     """Get the appropriate schedule suffixes for a given country and receiver"""
-    # For countries that split into DS/HS (PL, CY), use receiver key
+    # For countries that split into DS/HS (PL), use receiver key
     # For DE, it doesn't split in the same way, so use country directly
-    if country in ["PL", "CY"] and receiver:
-        key = receiver  # e.g., "HS PL", "DS PL", "HS CY", "DS CY"
+    # For CY (now DS-only), RO, TR, use country directly
+    if country in ["PL"] and receiver:
+        key = receiver  # e.g., "HS PL", "DS PL"
     else:
-        key = country  # e.g., "DE", "MD", "UA"
+        key = country  # e.g., "DE", "MD", "UA", "CY", "RO", "TR"
     
     # Check if there are custom schedules for this country/receiver
     if key in schedule_settings_per_country:
@@ -1383,13 +1388,17 @@ def run_generator(
                     if country == "PL":
                         receivers = ["HS PL", "DS PL"]
                     elif country == "CY":
-                        receivers = ["HS CY", "DS CY"]
+                        receivers = ["DS CY"]  # CY now has only DS
                     elif country == "DE":
                         receivers = ["HS DE", "DS DE"]
                     elif country == "UA":
                         receivers = ["DS UA"]  # Only DS for UA
                     elif country == "MD":
                         receivers = ["DS MD"]  # Only DS for MD
+                    elif country == "RO":
+                        receivers = ["DS RO"]  # Only DS for RO
+                    elif country == "TR":
+                        receivers = ["DS TR"]  # Only DS for TR
                     else:
                         receivers = [f"HS {country}", f"DS {country}"]
 
@@ -1657,7 +1666,11 @@ def run_generator(
                                         else:
                                             row.loc[:, "Subscribed by Company"] = "DS MD"
                                     elif country == "CY":
-                                        row.loc[:, "Subscribed by Company"] = "CY Healthcare Services\nCY Medical Centers" if recv == "HS CY" else "CY Diagnostic Laboratories"
+                                        row.loc[:, "Subscribed by Company"] = "CY Diagnostic Laboratories"  # CY now has only DS
+                                    elif country == "RO":
+                                        row.loc[:, "Subscribed by Company"] = "DS RO"
+                                    elif country == "TR":
+                                        row.loc[:, "Subscribed by Company"] = "DS TR"
                                     else:
                                         row.loc[:, "Subscribed by Company"] = recv or tag_hs
                                     
@@ -1693,8 +1706,8 @@ def run_generator(
                                             else:
                                                 row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
                                     
-                                    # Special handling for IT with UA/MD - always use DS
-                                    if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD"]:
+                                    # Special handling for IT with UA/MD/RO/TR - always use DS
+                                    if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD", "RO", "TR"]:
                                         depend_tag = f"DS {country} Prod"
                                     elif global_prod:
                                         depend_tag = "Global Prod"

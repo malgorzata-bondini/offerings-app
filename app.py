@@ -64,6 +64,9 @@ with col2:
         
         sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
         
+        # Move Delivery Manager here - right after Service Type
+        delivery_manager = st.text_input("Delivery Manager", value="")
+    
         # Add Business Criticality control
         st.markdown("---")
         business_criticality = st.selectbox(
@@ -73,7 +76,7 @@ with col2:
             help="Set Business Criticality for all generated offerings. If empty, original values from source files will be preserved."
         )
         
-        # Add Approval Required control - MOVE THIS HERE
+        # Add Approval Required control
         approval_required = st.checkbox(
             "Approval Required",
             value=False,
@@ -96,8 +99,6 @@ with col2:
             )
         else:
             service_type = ""
-        
-        delivery_manager = st.text_input("Delivery Manager", value="")
     
     with tab2:
         st.subheader("Direct Parent Offering Selection")

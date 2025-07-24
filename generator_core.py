@@ -825,7 +825,7 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
     
     return "\n".join(lines) if lines else ""
 
-def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality="", approval_required=False):
+def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality="", approval_required=False, approval_required_value="empty"):
     """Create a new row with the specified parent offering and parent values"""
     # Create a basic row structure with required columns
     new_row = {
@@ -846,7 +846,7 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Visibility group": "",
         "Business Criticality": business_criticality,
         "Record view": "",  # Will be set based on SR/IM
-        "Approval required": approval_required  # Set based on user selection
+        "Approval required": approval_required_value if approval_required else "empty"  # Use conditional value
     }
     
     # Set default values based on country
@@ -1056,7 +1056,8 @@ def run_generator(
     use_custom_depend_on=False, custom_depend_on_value="",
     aliases_per_country=None,
     business_criticality="",
-    approval_required=False):  # Add this parameter
+    approval_required=False,
+    approval_required_value="empty"):  # Add this parameter
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
@@ -1273,7 +1274,7 @@ def run_generator(
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
                     # Create a new synthetic row with the specified parent offering and parent
-                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality, approval_required)
+                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality, approval_required, approval_required_value)
                     base_pool = pd.DataFrame([new_row])
                     # For new parent, we can process both levels with the same synthetic data
                     # Initialize schedule checking variables
@@ -1605,8 +1606,11 @@ def run_generator(
                                     elif sr_or_im == "IM":
                                         row.loc[:, "Record view"] = "Incident, Major Incident"
                                     
-                                    # Set Approval required
-                                    row.loc[:, "Approval required"] = approval_required
+                                    # Set Approval required with conditional value
+                                    if approval_required:
+                                        row.loc[:, "Approval required"] = approval_required_value
+                                    else:
+                                        row.loc[:, "Approval required"] = "empty"
                                     
                                     # Apply support group and managed by group
                                     row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
@@ -1923,16 +1927,17 @@ def run_generator(
                 
                 # Special handling for boolean columns
                 if "Approval required" in df_final.columns:
-                    df_final["Approval required"] = df_final["Approval required"].map({
-                        True: 'true', 
-                        False: 'false',
+                    # Keep custom values, but standardize boolean representations
+                    df_final["Approval required"] = df_final["Approval required"].replace({
+                        True: 'true',
+                        False: 'false', 
                         'True': 'true',
                         'False': 'false',
                         'TRUE': 'true',
                         'FALSE': 'false',
-                        '': 'false',
-                        'nan': 'false'
-                    }).fillna('false')
+                        '': 'empty',
+                        'nan': 'empty'
+                    }).fillna('empty')
                 
                 # Store the final DataFrame for later formatting use
                 sheets[sheet_key] = df_final

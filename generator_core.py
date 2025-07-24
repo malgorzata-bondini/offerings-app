@@ -846,7 +846,7 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Visibility group": "",
         "Business Criticality": business_criticality,
         "Record view": "",  # Will be set based on SR/IM
-        "Approval required": approval_required_value if approval_required else "empty"
+        "Approval required": approval_required_value if approval_required else "false"  # Changed from "empty" to "false"
     }
     
     # Set Subscribed by Location based on user choice
@@ -1602,7 +1602,7 @@ def run_generator(
                                     if approval_required:
                                         row.loc[:, "Approval required"] = approval_required_value
                                     else:
-                                        row.loc[:, "Approval required"] = "empty"
+                                        row.loc[:, "Approval required"] = "false"  # Changed from "empty" to "false"
                                     
                                     # Set Subscribed by Location based on user choice
                                     if change_subscribed_location:
@@ -1868,7 +1868,7 @@ def run_generator(
                                     if sheet_name in excel_file.sheet_names:
                                         original_df = pd.read_excel(excel_file, sheet_name=sheet_name)
                                         break
-                            except:
+                            except Exception:
                                 continue
                     
                     # Add missing columns from original, preserving their values

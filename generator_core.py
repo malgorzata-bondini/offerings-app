@@ -1861,6 +1861,10 @@ def run_generator(
                     # Add missing columns from original, preserving their values
                     for col in original_order:
                         if col not in df.columns:
+                            # Skip the Number column - don't add it
+                            if col.lower() == "number" or "number" in col.lower():
+                                continue
+                                
                             if original_df is not None and col in original_df.columns:
                                 # Get original column data and ensure it matches df length
                                 original_col_data = original_df[col]

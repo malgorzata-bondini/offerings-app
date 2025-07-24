@@ -64,6 +64,15 @@ with col2:
         
         sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
         
+        # Add Business Criticality control
+        st.markdown("---")
+        business_criticality = st.selectbox(
+            "Business Criticality",
+            options=["", "1 - most critical", "2 - somewhat critical", "3 - less critical", "4 - not critical"],
+            index=0,
+            help="Set Business Criticality for all generated offerings. If empty, original values from source files will be preserved."
+        )
+        
         # Add Lvl2 checkbox
         st.markdown("---")
         use_lvl2 = st.checkbox(
@@ -646,7 +655,9 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         schedule_settings_per_country=schedule_settings_per_country if use_per_country_schedules else {},
                         # Add custom depend on value
                         use_custom_depend_on=use_custom_depend_on if 'use_custom_depend_on' in locals() else False,
-                        custom_depend_on_value=custom_depend_on_value if 'custom_depend_on_value' in locals() else ""
+                        custom_depend_on_value=custom_depend_on_value if 'custom_depend_on_value' in locals() else "",
+                        # Add business criticality
+                        business_criticality=business_criticality
                     )
                 
                 st.success("✅ Service offerings generated successfully!")
@@ -675,7 +686,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v3.8 | Support for DS-only Countries: CY, RO, TR
+        Service Offerings Generator v3.8 | Support
     </div>
     """,
     unsafe_allow_html=True

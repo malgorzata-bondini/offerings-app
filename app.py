@@ -206,8 +206,8 @@ with col2:
         if use_per_country_schedules:
             st.markdown("**Schedule Settings per Country/Division**")
             
-            # Define available countries/divisions
-            available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "CY"]
+            # Define available countries/divisions - UPDATED with new countries
+            available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "DS CY", "DS RO", "DS TR"]
             
             # Create tabs or columns for different countries
             country_tabs = st.tabs(available_countries)
@@ -225,7 +225,15 @@ with col2:
                     )
                     
                     if country_schedules.strip():
-                        schedule_settings_per_country[country] = country_schedules.strip()
+                        # Map DS CY to CY, DS RO to RO, DS TR to TR for backend compatibility
+                        if country == "DS CY":
+                            schedule_settings_per_country["CY"] = country_schedules.strip()
+                        elif country == "DS RO":
+                            schedule_settings_per_country["RO"] = country_schedules.strip()
+                        elif country == "DS TR":
+                            schedule_settings_per_country["TR"] = country_schedules.strip()
+                        else:
+                            schedule_settings_per_country[country] = country_schedules.strip()
         
         st.markdown("---")
         col_rsp, col_rsl = st.columns(2)
@@ -240,7 +248,8 @@ with col2:
         use_custom_commitments = st.checkbox("Define custom Service Commitments", help="If unchecked, commitments will be copied from source files")
         
         if use_custom_commitments:
-            commitment_country = st.selectbox("Country", ["CY", "DE", "MD", "PL", "UA"])
+            # UPDATED country list with RO and TR
+            commitment_country = st.selectbox("Country", ["CY", "DE", "MD", "PL", "RO", "TR", "UA"])
             
             st.markdown("### Service Commitments Configuration")
             
@@ -309,7 +318,8 @@ with col2:
             st.markdown("#### Support Groups by Country")
             st.info("Select countries to configure specific support groups. Unchecked countries will use empty support groups.")
             
-            countries = ["HS PL", "DS PL", "DE", "UA", "MD", "CY"]
+            # UPDATED countries list with new DS-only countries
+            countries = ["HS PL", "DS PL", "DE", "UA", "MD", "DS CY", "DS RO", "DS TR"]
             support_groups_per_country = {}
             managed_by_groups_per_country = {}
             
@@ -361,13 +371,22 @@ with col2:
                             managed_by_groups_per_country[country] = "\n".join(de_managed_groups) if de_managed_groups else ""
                         else:
                             # Standard single support group for other countries
-                            support_groups_per_country[country] = st.text_input(
+                            # Map display names to backend keys
+                            backend_key = country
+                            if country == "DS CY":
+                                backend_key = "CY"
+                            elif country == "DS RO":
+                                backend_key = "RO"
+                            elif country == "DS TR":
+                                backend_key = "TR"
+                            
+                            support_groups_per_country[backend_key] = st.text_input(
                                 f"Support Group",
                                 value="",
                                 key=f"support_{country}",
                                 placeholder=f"e.g., {country} IT Support"
                             )
-                            managed_by_groups_per_country[country] = st.text_input(
+                            managed_by_groups_per_country[backend_key] = st.text_input(
                                 f"Managed by Group",
                                 value="",
                                 key=f"managed_{country}",
@@ -375,8 +394,17 @@ with col2:
                                 help="If empty, will use the Support Group value"
                             )
                     else:
-                        support_groups_per_country[country] = ""
-                        managed_by_groups_per_country[country] = ""
+                        # Map display names to backend keys for empty values too
+                        backend_key = country
+                        if country == "DS CY":
+                            backend_key = "CY"
+                        elif country == "DS RO":
+                            backend_key = "RO"
+                        elif country == "DS TR":
+                            backend_key = "TR"
+                        
+                        support_groups_per_country[backend_key] = ""
+                        managed_by_groups_per_country[backend_key] = ""
             
             # Set global variables to empty for backward compatibility
             support_group = ""
@@ -429,9 +457,10 @@ with col2:
         if use_custom_depend_on:
             col1, col2 = st.columns([1, 2])
             with col1:
+                # UPDATED options with DS-only countries
                 depend_on_prefix = st.selectbox(
                     "Select Prefix",
-                    options=["HS PL", "DS PL", "HS DE", "DS DE", "UA", "MD", "CY", "Global"],
+                    options=["HS PL", "DS PL", "HS DE", "DS DE", "DS UA", "DS MD", "DS CY", "DS RO", "DS TR", "Global"],
                     index=0,
                     help="Choose the service prefix"
                 )
@@ -505,8 +534,8 @@ with col2:
                 st.markdown("**Aliases per Country/Division**")
                 st.info("Configure aliases for specific countries/divisions. Unconfigured countries will use empty aliases.")
                 
-                # Define available countries/divisions
-                available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "CY"]
+                # Define available countries/divisions - UPDATED with new countries
+                available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "DS CY", "DS RO", "DS TR"]
                 aliases_per_country = {}
                 
                 # Create tabs for different countries
@@ -525,7 +554,16 @@ with col2:
                         )
                         
                         if country_alias.strip():
-                            aliases_per_country[country] = country_alias.strip()
+                            # Map display names to backend keys
+                            backend_key = country
+                            if country == "DS CY":
+                                backend_key = "CY"
+                            elif country == "DS RO":
+                                backend_key = "RO"
+                            elif country == "DS TR":
+                                backend_key = "TR"
+                            
+                            aliases_per_country[backend_key] = country_alias.strip()
                 
                 # Set global alias to empty when using per-country
                 aliases_value = ""
@@ -637,7 +675,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v3.7 | DE Multiple Support Groups Support
+        Service Offerings Generator v3.8 | Support for DS-only Countries: CY, RO, TR
     </div>
     """,
     unsafe_allow_html=True

@@ -13,7 +13,6 @@ from typing import List, Dict, Optional, Any
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
-# This list is only used for documentation, not for adding/removing columns
 need_cols = [
     "Name (Child Service Offering lvl 1)", "Parent Offering",
     "Service Offerings | Depend On (Application Service)", "Service Commitments",
@@ -848,8 +847,7 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
 
 def create_new_parent_row(new_parent_offering, new_parent, country):
     """Create a new row with the specified parent offering and parent values"""
-    # Create a basic row structure with ALL columns that might exist
-    # This is just a template - actual columns will be taken from source file
+    # Create a basic row structure with required columns
     new_row = {
         "Name (Child Service Offering lvl 1)": "",  # Will be filled later
         "Parent Offering": new_parent_offering,
@@ -857,17 +855,33 @@ def create_new_parent_row(new_parent_offering, new_parent, country):
         "Service Offerings | Depend On (Application Service)": "",
         "Service Commitments": "",
         "Delivery Manager": "",
-        "Subscribed by Location": country,  # Use country code directly
-        "Phase": "Catalog",  # Changed from "Live" to "Catalog"
+        "Subscribed by Location": "",
+        "Phase": "Live",
         "Status": "Active",
-        "Life Cycle Stage": "Catalog",  # Changed from "Live" to "Catalog"
+        "Life Cycle Stage": "Live",
         "Life Cycle Status": "Active",
-        "Business Criticality": "",  # Added missing column
         "Support group": "",
         "Managed by Group": "",
         "Subscribed by Company": "",
-        "Visibility group": ""
+        "Visibility group": "",
+        "Business Criticality": ""
     }
+    
+    # Set default values based on country
+    if country == "DE":
+        new_row["Subscribed by Location"] = "DE"
+    elif country == "UA":
+        new_row["Subscribed by Location"] = "UA"
+    elif country == "MD":
+        new_row["Subscribed by Location"] = "MD"
+    elif country == "CY":
+        new_row["Subscribed by Location"] = "CY"
+    elif country == "PL":
+        new_row["Subscribed by Location"] = "PL"
+    elif country == "RO":
+        new_row["Subscribed by Location"] = "RO"
+    elif country == "TR":
+        new_row["Subscribed by Location"] = "TR"
     
     return pd.Series(new_row)
 
@@ -1075,6 +1089,7 @@ def run_generator(
     original_ldap_data = {}  # Store LDAP data from original files
     excel_cache = {}  # Cache for Excel file reads
     missing_schedule_info = {}  # Track rows with missing schedules for red formatting
+    column_order_cache = {}  # Store original column order from files
 
     def parse_keywords(keyword_string):
         """Parse keywords - returns (keywords_list, use_and_logic)"""
@@ -1203,7 +1218,7 @@ def run_generator(
     elif special_dak:
         special_dept = "DAK"
 
-    # First, collect all existing offerings and LDAP data from the source files
+    # First, collect all existing offerings, LDAP data, and column order from the source files
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         try:
             # Cache Excel file to avoid multiple reads
@@ -1211,11 +1226,18 @@ def run_generator(
                 excel_cache[wb] = pd.ExcelFile(wb)
             excel_file = excel_cache[wb]
             
-            # Check BOTH sheets for existing offerings
+            # Check BOTH sheets for existing offerings and column order
             for sheet_name in ["Child SO lvl1", "Child SO lvl2"]:
                 try:
                     if sheet_name in excel_file.sheet_names:
                         df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                        
+                        # Store column order
+                        country = wb.stem.split("_")[-1].upper()
+                        column_key = f"{country}_{sheet_name}"
+                        if column_key not in column_order_cache:
+                            column_order_cache[column_key] = list(df.columns)
+                        
                         if "Name (Child Service Offering lvl 1)" in df.columns:
                             # Clean and normalize the names before adding to set
                             existing_names = df["Name (Child Service Offering lvl 1)"].dropna().astype(str)
@@ -1265,47 +1287,8 @@ def run_generator(
             try:
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
-                    # Try to get column structure from the source file
-                    original_columns = None
-                    for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
-                        if wb.stem.endswith(f"_{country}"):
-                            try:
-                                if wb not in excel_cache:
-                                    excel_cache[wb] = pd.ExcelFile(wb)
-                                excel_file = excel_cache[wb]
-                                if sheet_name in excel_file.sheet_names:
-                                    # Read one row to get all columns
-                                    template_df = pd.read_excel(excel_file, sheet_name=sheet_name, nrows=1)
-                                    original_columns = template_df.columns.tolist()
-                                    # Create a new row with all columns from template
-                                    new_row_data = {}
-                                    for col in original_columns:
-                                        if col == "Parent Offering":
-                                            new_row_data[col] = new_parent_offering
-                                        elif col == "Parent":
-                                            new_row_data[col] = new_parent
-                                        elif col == "Phase":
-                                            new_row_data[col] = "Catalog"
-                                        elif col == "Status":
-                                            new_row_data[col] = "Active"
-                                        elif col == "Life Cycle Stage":
-                                            new_row_data[col] = "Catalog"
-                                        elif col == "Life Cycle Status":
-                                            new_row_data[col] = "Active"
-                                        elif col == "Subscribed by Location":
-                                            new_row_data[col] = country
-                                        else:
-                                            # Copy value from template or use empty string
-                                            new_row_data[col] = template_df.iloc[0][col] if pd.notna(template_df.iloc[0][col]) else ""
-                                    new_row = pd.Series(new_row_data)
-                                    break
-                            except:
-                                pass
-                    
-                    # If we couldn't get template, use fallback
-                    if original_columns is None:
-                        new_row = create_new_parent_row(new_parent_offering, new_parent, country)
-                    
+                    # Create a new synthetic row with the specified parent offering and parent
+                    new_row = create_new_parent_row(new_parent_offering, new_parent, country)
                     base_pool = pd.DataFrame([new_row])
                     # For new parent, we can process both levels with the same synthetic data
                     # Initialize schedule checking variables
@@ -1323,20 +1306,27 @@ def run_generator(
                         
                     df = pd.read_excel(excel_file, sheet_name=sheet_name)
                     
-                    # Store original column order for later use
-                    original_columns = df.columns.tolist()
+                    # Store the original column order for this sheet
+                    column_key = f"{country}_{sheet_name}"
+                    if column_key not in column_order_cache:
+                        column_order_cache[column_key] = list(df.columns)
                     
-                    # Don't add missing columns - preserve original structure
-                    # Just ensure critical columns exist for filtering
-                    required_for_filtering = ["Parent Offering", "Name (Child Service Offering lvl 1)", 
-                                            "Phase", "Status", "Life Cycle Stage", "Life Cycle Status",
-                                            "Service Commitments"]
-                    for col in required_for_filtering:
+                    # Add missing columns as empty, but maintain order
+                    original_columns = list(df.columns)
+                    for col in need_cols:
                         if col not in df.columns:
                             df[col] = ""
                     
-                    # Add LDAP columns if they don't exist - NO, preserve original structure
+                    # Ensure Visibility group column exists
+                    if "Visibility group" not in df.columns:
+                        df["Visibility group"] = ""
+                    
+                    # Add LDAP columns if they don't exist
                     ldap_cols = [col for col in df.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
+                    if not ldap_cols and country == "DE":
+                        # Add a default LDAP column for DE
+                        df["LDAP"] = ""
+                        ldap_cols = ["LDAP"]
 
                     # Initialize schedule checking variables
                     all_country_names_for_schedules = pd.Series([], dtype=str)
@@ -1546,7 +1536,7 @@ def run_generator(
                                 
                                 # Check against existing offerings in source files
                                 if new_name_normalized in existing_offerings:
-                                    raise ValueError(f"Duplicate offering detected! This offering already exists in the source files: {new_name}")
+                                    raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
                                 
                                 # Determine division for PL support groups
                                 division = None
@@ -1615,9 +1605,7 @@ def run_generator(
                                     seen.add(key)
                                     row = base_row_df.copy()
                                     
-                                    # Update ONLY specific columns that need to change
-                                    # All other columns (Phase, Status, Life Cycle Stage, Life Cycle Status, 
-                                    # Business Criticality, Subscribed by Location, etc.) are preserved from original
+                                    # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
                                     row.loc[:, "Delivery Manager"] = delivery_manager
                                     
@@ -1625,8 +1613,11 @@ def run_generator(
                                     row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
                                     row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
                                     
-                                    # Handle aliases - only update if aliases_on is True
-                                    if aliases_on:
+                                    # Handle aliases - copy from original row if aliases_on is False
+                                    if not aliases_on:
+                                        # Keep original aliases values
+                                        pass
+                                    else:
                                         # Determine which alias value to use
                                         alias_value_to_use = ""
                                         
@@ -1646,7 +1637,6 @@ def run_generator(
                                         # Apply alias value to all alias columns
                                         for c in [c for c in row.columns if "Aliases" in c]:
                                             row.loc[:, c] = alias_value_to_use if alias_value_to_use else "-"
-                                    # If aliases_on is False, preserve original alias values
                                     
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
@@ -1675,15 +1665,9 @@ def run_generator(
                                                     for ldap_col, ldap_val in ldap_data.items():
                                                         if ldap_col in row.columns and ldap_val not in ["", "nan", "NaN", "None"]:
                                                             row.loc[:, ldap_col] = ldap_val
-                                    # For CORP offerings - special handling for Subscribed by Company
-                                    elif (require_corp or require_corp_it or require_corp_dedicated) and recv:
-                                        # For CORP offerings, use the receiver (second part after CORP)
-                                        # e.g., [SR DS CY CORP DS UA Dedicated Services] -> DS UA
-                                        row.loc[:, "Subscribed by Company"] = recv
-                                    # For RecP offerings - similar handling
-                                    elif require_recp and recv:
-                                        # For RecP offerings, also use the receiver
-                                        # e.g., [SR DS CY RecP Software incident solving] -> DS CY
+                                    # Handle Subscribed by Company based on type
+                                    elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
+                                        # For CORP offerings, use the receiver
                                         row.loc[:, "Subscribed by Company"] = recv
                                     # PL subscription splits: determine based on actual generated name new_name
                                     elif country == "PL":
@@ -1694,45 +1678,30 @@ def run_generator(
                                             # Default to DS PL
                                             row.loc[:, "Subscribed by Company"] = "DS PL"
                                     elif country == "UA":
-                                        # Only update if not CORP/RecP (CORP/RecP are handled above)
-                                        if not (require_corp or require_corp_it or require_corp_dedicated or require_recp):
-                                            row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
+                                        row.loc[:, "Subscribed by Company"] = "Сiнево Україна"
                                     elif country == "MD":
-                                        # Only update if not CORP/RecP (CORP/RecP are handled above)
-                                        if not (require_corp or require_corp_it or require_corp_dedicated or require_recp):
-                                            if global_prod:
-                                                row.loc[:, "Subscribed by Company"] = recv or tag_hs
-                                            else:
-                                                row.loc[:, "Subscribed by Company"] = "DS MD"
+                                        if global_prod:
+                                            row.loc[:, "Subscribed by Company"] = recv or tag_hs
+                                        else:
+                                            row.loc[:, "Subscribed by Company"] = "DS MD"
                                     elif country == "CY":
-                                        # Only update if not CORP/RecP (CORP/RecP are handled above)
-                                        if not (require_corp or require_corp_it or require_corp_dedicated or require_recp):
-                                            row.loc[:, "Subscribed by Company"] = "CY Diagnostic Laboratories"  # CY now has only DS
+                                        row.loc[:, "Subscribed by Company"] = "CY Diagnostic Laboratories"  # CY now has only DS
                                     elif country == "RO":
-                                        # Only update if not CORP/RecP (CORP/RecP are handled above)
-                                        if not (require_corp or require_corp_it or require_corp_dedicated or require_recp):
-                                            row.loc[:, "Subscribed by Company"] = "DS RO"
+                                        row.loc[:, "Subscribed by Company"] = "DS RO"
                                     elif country == "TR":
-                                        # Only update if not CORP/RecP (CORP/RecP are handled above)
-                                        if not (require_corp or require_corp_it or require_corp_dedicated or require_recp):
-                                            row.loc[:, "Subscribed by Company"] = "DS TR"
+                                        row.loc[:, "Subscribed by Company"] = "DS TR"
                                     else:
-                                        # Only update if not CORP/RecP and not already set from original
-                                        if not (require_corp or require_corp_it or require_corp_dedicated or require_recp):
-                                            # Preserve original value if it exists and is not empty
-                                            if "Subscribed by Company" in row.columns:
-                                                orig_value = str(row.iloc[0]["Subscribed by Company"]).strip()
-                                                if not orig_value or orig_value in ["nan", "NaN", "", "None"]:
-                                                    row.loc[:, "Subscribed by Company"] = recv or tag_hs
-                                                # else keep original value
+                                        # For standard offerings, preserve original if it exists
+                                        if "Subscribed by Company" in base_row.index:
+                                            original_company = str(base_row["Subscribed by Company"]).strip()
+                                            if original_company and original_company not in ["nan", "NaN", "", "None"]:
+                                                row.loc[:, "Subscribed by Company"] = original_company
                                             else:
                                                 row.loc[:, "Subscribed by Company"] = recv or tag_hs
+                                        else:
+                                            row.loc[:, "Subscribed by Company"] = recv or tag_hs
                                     
-                                    # Get original service commitments value
-                                    if isinstance(row, pd.DataFrame):
-                                        orig_comm = str(row.iloc[0]["Service Commitments"]).strip() if "Service Commitments" in row.columns else ""
-                                    else:
-                                        orig_comm = str(row["Service Commitments"]).strip() if "Service Commitments" in row.index else ""
+                                    orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
                                     
                                     # If schedule is missing, use original commitments with user schedule
                                     if missing_schedule:
@@ -1798,6 +1767,9 @@ def run_generator(
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"
                                     
+                                    # Get the column order for this sheet
+                                    column_key = f"{country}_{sheet_name}"
+                                    
                                     # Accumulate rows in lists for batch concatenation
                                     sheets_data.setdefault(sheet_key, [])
                                     if isinstance(row, pd.DataFrame):
@@ -1810,6 +1782,9 @@ def run_generator(
                                         row_dict["_missing_schedule"] = True
                                     else:
                                         row_dict["_missing_schedule"] = False
+                                    
+                                    # Store the column order key for this sheet
+                                    row_dict["_column_order_key"] = column_key
                                     
                                     sheets_data[sheet_key].append(row_dict)
                             
@@ -1832,12 +1807,32 @@ def run_generator(
             print(f"  Processing {sheet_key}: {len(rows_list)} rows")
             df = pd.DataFrame(rows_list)
             
+            # Get the column order key from the first row
+            column_order_key = None
+            if "_column_order_key" in df.columns and len(df) > 0:
+                column_order_key = df.iloc[0]["_column_order_key"]
+            
             # Track which rows have missing schedules BEFORE dropping the column
             missing_schedule_rows = []
             if "_missing_schedule" in df.columns:
                 missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
                 # Store this info for later use
                 missing_schedule_info[sheet_key] = missing_schedule_rows
+            
+            # Remove helper columns
+            for col in ["_missing_schedule", "_column_order_key"]:
+                if col in df.columns:
+                    df = df.drop(columns=[col])
+            
+            # Reorder columns to match original order if we have it
+            if column_order_key and column_order_key in column_order_cache:
+                original_order = column_order_cache[column_order_key]
+                # Get all columns that exist in both original and current dataframe
+                common_cols = [col for col in original_order if col in df.columns]
+                # Add any new columns that weren't in original (shouldn't happen but be safe)
+                new_cols = [col for col in df.columns if col not in common_cols]
+                # Reorder
+                df = df[common_cols + new_cols]
             
             sheets[sheet_key] = df
             
@@ -1903,60 +1898,16 @@ def run_generator(
                 
                 missing_schedule_info[sheet_name] = new_missing_rows
             
-            # Get original column order from the first row's source data
-            if not df_final.empty:
-                # Try to get original columns from the source file
-                try:
-                    source_wb = None
-                    for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
-                        if wb.stem.endswith(f"_{cc}"):
-                            source_wb = wb
-                            break
-                    
-                    if source_wb and source_wb in excel_cache:
-                        excel_file = excel_cache[source_wb]
-                        # Get the appropriate sheet name
-                        source_sheet_name = sheet_name.replace(f"{cc} ", "Child SO ")
-                        if source_sheet_name in excel_file.sheet_names:
-                            # Read just the header to get column order
-                            source_df = pd.read_excel(excel_file, sheet_name=source_sheet_name, nrows=0)
-                            original_column_order = source_df.columns.tolist()
-                            
-                            # Reorder df_final columns to match original, keeping any new columns at the end
-                            existing_cols = [col for col in original_column_order if col in df_final.columns]
-                            new_cols = [col for col in df_final.columns if col not in original_column_order]
-                            df_final = df_final[existing_cols + new_cols]
-                except:
-                    pass  # If we can't get original order, keep current order
+            if "Number" in df_final.columns:
+                df_final = df_final.drop(columns=["Number"])
             
-            # Don't drop any columns - preserve all from original
-            # Only drop technical columns that should never appear in output
-            technical_columns_to_drop = ["Number", "_missing_schedule", "_recv"]
-            for tech_col in technical_columns_to_drop:
-                if tech_col in df_final.columns:
-                    df_final = df_final.drop(columns=[tech_col])
-            
-            # Special handling for PL - Visibility group might not be in original
+            # Remove Visibility group column for PL only if it wasn't in the original
+            cc = sheet_name.split()[0]
+            column_key = f"{cc}_Child SO {sheet_name.split()[-1]}"  # e.g., "PL_Child SO lvl1"
             if cc == "PL" and "Visibility group" in df_final.columns:
-                # Check if it's empty for all rows
-                if df_final["Visibility group"].astype(str).str.strip().replace({"nan": "", "None": "", "": ""}).eq("").all():
-                    # Only drop if it wasn't in the original file
-                    try:
-                        source_wb = None
-                        for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
-                            if wb.stem.endswith("_PL"):
-                                source_wb = wb
-                                break
-                        
-                        if source_wb and source_wb in excel_cache:
-                            excel_file = excel_cache[source_wb]
-                            source_sheet_name = sheet_name.replace("PL ", "Child SO ")
-                            if source_sheet_name in excel_file.sheet_names:
-                                source_df = pd.read_excel(excel_file, sheet_name=source_sheet_name, nrows=0)
-                                if "Visibility group" not in source_df.columns:
-                                    df_final = df_final.drop(columns=["Visibility group"])
-                    except:
-                        pass
+                original_cols = column_order_cache.get(column_key, [])
+                if "Visibility group" not in original_cols:
+                    df_final = df_final.drop(columns=["Visibility group"])
             
             # Clean data before writing to Excel
             for col in df_final.columns:

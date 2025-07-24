@@ -1806,7 +1806,7 @@ def run_generator(
     # Create output file path
     outfile = out_dir / f"Generated_Service_Offerings_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
-    # Ensure output directory exists
+    # Ensure output directory exists - MOVE THIS BEFORE pd.ExcelWriter
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Write to Excel with special handling for empty values

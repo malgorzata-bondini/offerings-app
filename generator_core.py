@@ -18,7 +18,8 @@ need_cols = [
     "Service Offerings | Depend On (Application Service)", "Service Commitments",
     "Delivery Manager", "Subscribed by Location", "Phase", "Status",
     "Life Cycle Stage", "Life Cycle Status", "Support group", "Managed by Group",
-    "Subscribed by Company", "Visibility group", "Business Criticality"
+    "Subscribed by Company", "Visibility group", "Business Criticality",
+    "Record view", "Approval required"  # Add these columns
 ]
 
 discard_lc = {"retired", "retiring", "end of life", "end of support"}
@@ -824,7 +825,7 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
     
     return "\n".join(lines) if lines else ""
 
-def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality=""):
+def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality="", approval_required=False):
     """Create a new row with the specified parent offering and parent values"""
     # Create a basic row structure with required columns
     new_row = {
@@ -843,7 +844,9 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Managed by Group": "",
         "Subscribed by Company": "",
         "Visibility group": "",
-        "Business Criticality": business_criticality,  # Use provided value instead of ""
+        "Business Criticality": business_criticality,
+        "Record view": "",  # Will be set based on SR/IM
+        "Approval required": approval_required  # Set based on user selection
     }
     
     # Set default values based on country
@@ -1052,7 +1055,8 @@ def run_generator(
     schedule_settings_per_country=None,
     use_custom_depend_on=False, custom_depend_on_value="",
     aliases_per_country=None,
-    business_criticality=""):  # Add this parameter
+    business_criticality="",
+    approval_required=False):  # Add this parameter
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
@@ -1269,7 +1273,7 @@ def run_generator(
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
                     # Create a new synthetic row with the specified parent offering and parent
-                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality)
+                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality, approval_required)
                     base_pool = pd.DataFrame([new_row])
                     # For new parent, we can process both levels with the same synthetic data
                     # Initialize schedule checking variables
@@ -1595,6 +1599,15 @@ def run_generator(
                                         row.loc[:, "Business Criticality"] = business_criticality
                                     # Otherwise, keep the original value from source file
                                     
+                                    # Set Record view based on SR/IM selection
+                                    if sr_or_im == "SR":
+                                        row.loc[:, "Record view"] = "Request Item"
+                                    elif sr_or_im == "IM":
+                                        row.loc[:, "Record view"] = "Incident, Major Incident"
+                                    
+                                    # Set Approval required
+                                    row.loc[:, "Approval required"] = approval_required
+                                    
                                     # Apply support group and managed by group
                                     row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
                                     row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
@@ -1740,9 +1753,11 @@ def run_generator(
                                     else:
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag}]"
                                 
+
                                     
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"
+                                    
                                     
                                     # Get the column order for this sheet
                                     column_key = f"{country}_{sheet_name}"
@@ -1905,6 +1920,19 @@ def run_generator(
                         print(f"Warning: Error processing column {col}: {e}")
                         # Fallback: convert everything to string
                         df_final[col] = df_final[col].astype(str).fillna('')
+                
+                # Special handling for boolean columns
+                if "Approval required" in df_final.columns:
+                    df_final["Approval required"] = df_final["Approval required"].map({
+                        True: 'true', 
+                        False: 'false',
+                        'True': 'true',
+                        'False': 'false',
+                        'TRUE': 'true',
+                        'FALSE': 'false',
+                        '': 'false',
+                        'nan': 'false'
+                    }).fillna('false')
                 
                 # Store the final DataFrame for later formatting use
                 sheets[sheet_key] = df_final

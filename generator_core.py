@@ -1835,12 +1835,47 @@ def run_generator(
                 # Reorder columns to match original order if we have it
                 if column_order_key and column_order_key in column_order_cache:
                     original_order = column_order_cache[column_order_key]
-                    # Get all columns that exist in both original and current dataframe
-                    common_cols = [col for col in original_order if col in df.columns]
+                    
+                    # Get the original DataFrame to preserve missing column values
+                    original_df = None
+                    if not use_new_parent:
+                        # Try to get the original data for this sheet
+                        country = sheet_key.split()[0]
+                        level = sheet_key.split()[1]  # e.g., "lvl1"
+                        sheet_name = f"Child SO {level}"
+                        
+                        # Find the source file for this country
+                        for wb_path in src_dir.glob(f"ALL_Service_Offering_*{country}.xlsx"):
+                            try:
+                                if wb_path in excel_cache:
+                                    excel_file = excel_cache[wb_path]
+                                    if sheet_name in excel_file.sheet_names:
+                                        original_df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                                        break
+                            except:
+                                continue
+                    
+                    # Add missing columns from original, preserving their values
+                    for col in original_order:
+                        if col not in df.columns:
+                            if original_df is not None and col in original_df.columns:
+                                original_col_data = original_df[col]
+                                # Use ALL original column data, not just first value
+                                if len(original_col_data) >= len(df):
+                                    df[col] = original_col_data.iloc[:len(df)].values
+                                else:
+                                    df[col] = original_col_data.reindex(range(len(df)), method='ffill').fillna('')
+                            else:
+                                df[col] = ''
+
+                    # Get all columns that exist in original order
+                    ordered_cols = [col for col in original_order if col in df.columns]
+
                     # Add any new columns that weren't in original (shouldn't happen but be safe)
-                    new_cols = [col for col in df.columns if col not in common_cols]
-                    # Reorder
-                    df = df[common_cols + new_cols]
+                    new_cols = [col for col in df.columns if col not in original_order]
+
+                    # Reorder to match original exactly
+                    df = df[ordered_cols + new_cols]
                 
                 # Extract country code from sheet_key (e.g., "PL lvl1" -> "PL")
                 cc = sheet_key.split()[0]
@@ -1900,52 +1935,30 @@ def run_generator(
         for ws in wb.worksheets:
             sheet_name = ws.title
 
-            # Try to get the schedule_suffix for this sheet from the first row, if available
-            schedule_suffix_for_comment = ""
-            try:
-                df_for_comment = sheets.get(sheet_name)
-                if df_for_comment is not None and not df_for_comment.empty:
-                    # Try to get the schedule suffix from the first row's Name (Child Service Offering lvl 1)
-                    first_name = str(df_for_comment.iloc[0].get("Name (Child Service Offering lvl 1)", ""))
-                    # Try to extract the schedule suffix (last word)
-                    if first_name:
-                        schedule_suffix_for_comment = first_name.split()[-1]
-            except Exception:
-                schedule_suffix_for_comment = ""
+            # Find the column index for "Name (Child Service Offering lvl 1)"
+            name_col_idx = None
+            for idx, cell in enumerate(ws[1], start=1):
+                if cell.value == "Name (Child Service Offering lvl 1)":
+                    name_col_idx = idx
+                    break
+            if name_col_idx is not None:
+                name_col_letter = get_column_letter(name_col_idx)
 
-            # Determine if this sheet is CORP type for comment purposes
-            is_corp_type = False
-            sheet_name_upper = sheet_name.upper()
-            if any(x in sheet_name_upper for x in ["CORP", "DEDICATED", "RECP"]):
-                is_corp_type = True
+                # Apply red formatting to each row with missing schedule
+                for row_idx in missing_schedule_info.get(sheet_name, []):
+                    # Excel rows are 1-based, and we need to account for header
+                    excel_row_idx = row_idx + 2
 
-            # Apply red formatting to Name column for rows with missing schedules
-            if sheet_name in missing_schedule_info and missing_schedule_info[sheet_name]:
-                # Find Name column
-                name_col_idx = None
-                for col_idx, cell in enumerate(ws[1], start=1):  # Header row
-                    if cell.value == "Name (Child Service Offering lvl 1)":
-                        name_col_idx = col_idx
-                        break
+                    # Check if row exists
+                    if excel_row_idx <= ws.max_row:
+                        cell = ws[f"{name_col_letter}{excel_row_idx}"]
+                        cell.fill = red_fill
 
-                if name_col_idx:
-                    name_col_letter = get_column_letter(name_col_idx)
-
-                    # Apply red formatting to each row with missing schedule
-                    for row_idx in missing_schedule_info[sheet_name]:
-                        # Excel rows are 1-based, and we need to account for header
-                        excel_row_idx = row_idx + 2
-
-                        # Check if row exists
-                        if excel_row_idx <= ws.max_row:
-                            cell = ws[f"{name_col_letter}{excel_row_idx}"]
-                            cell.fill = red_fill
-
-                            # Add a comment explaining why it's red
-                            cell.comment = Comment(
-                                f"Schedule '{schedule_suffix_for_comment}' not found in source data for {'CORP' if is_corp_type else 'non-CORP'} offerings",
-                                "Service Offering Generator"
-                            )
+                        # Optionally, add a comment explaining why it's red (removed undefined variables)
+                        # cell.comment = Comment(
+                        #     "Schedule not found in source data for this offering",
+                        #     "Service Offering Generator"
+                        # )
             
             # Apply column widths and formatting
             for col_idx, col in enumerate(ws.columns, start=1):

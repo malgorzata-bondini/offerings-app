@@ -830,8 +830,8 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
     # Create a basic row structure with required columns
     new_row = {
         "Name (Child Service Offering lvl 1)": "",  # Will be filled later
-        "Parent Offering": new_parent_offering,
-        "Parent": new_parent,
+        "Parent Offering": new_parent_offering,  # Use the user-provided value
+        "Parent": new_parent,  # Use the user-provided value (not hardcoded)
         "Service Offerings | Depend On (Application Service)": "",
         "Service Commitments": "",
         "Delivery Manager": "",
@@ -847,7 +847,7 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Business Criticality": business_criticality,
         "Record view": "",  # Will be set based on SR/IM
         "Approval required": "false" if not approval_required else approval_required_value,
-        "Approval group": "empty" if not approval_required else approval_required_value  # Add this line
+        "Approval group": "empty" if not approval_required else approval_required_value
     }
     
     # Set Subscribed by Location based on user choice

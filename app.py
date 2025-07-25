@@ -537,12 +537,8 @@ with col2:
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)
         
-        # Add pluralization setting
-        use_pluralization = st.checkbox(
-            "Use plural forms for hardware items", 
-            value=True,
-            help="Convert singular hardware terms to plural (e.g., Laptop → Laptops, Mouse → Mouses)"
-        )
+        # Remove pluralization checkbox - always use pluralization
+        use_pluralization = True  # Always enabled
         
         # Custom Depend On setting
         st.markdown("### Service Offerings | Depend On")

@@ -425,6 +425,9 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
+    # Apply pluralization to catalog name for hardware items
+    catalog_name_plural = get_plural_form(catalog_name)
+    
     # Extract country from parent content
     parts = parent_content.split()
     country = ""
@@ -966,10 +969,9 @@ def get_de_company_and_ldap(support_group, receiver, original_row=None):
         # Fallback to support group name if no original value available
         return support_group, ""
 
-# Dodaj na początku pliku (lub przed pętlą generującą wiersze):
 PLURAL_MAP = {
     "Laptop": "Laptops",
-    "Desktop": "Desktops",
+    "Desktop": "Desktops", 
     "Docking station": "Docking stations",
     "Printer": "Printers",
     "Barcode printer": "Barcode printers",
@@ -977,20 +979,49 @@ PLURAL_MAP = {
     "Display": "Displays",
     "Deskphone": "Deskphones",
     "Smartphone": "Smartphones",
-    "Mouse": "Mouses",
+    "Mouse": "Mouses",  # Note: "Mice" would be grammatically correct, but "Mouses" is common in IT
     "Keyboard": "Keyboards",
     "Headset": "Headsets",
     "Tablet": "Tablets",
-    "Audio equipment": "Audio equipment",
-    "Video surveillance": "Video surveillance",
-    "UPS": "UPS",
+    "Audio equipment": "Audio equipment",  # Already plural
+    "Video surveillance": "Video surveillance",  # Already plural/uncountable
+    "UPS": "UPS",  # Acronym, same in plural
     "External webcam": "External webcams",
-    "Projector": "Projectors",
+    "Projector": "Projectors", 
     "External storage device": "External storage devices",
     "Microphone": "Microphones",
-    "Other hardware": "Other hardware"
-    # Dodaj kolejne według potrzeb
+    "Other hardware": "Other hardware",  # Already plural/uncountable
+    # Add more as needed
+    "Server": "Servers",
+    "Router": "Routers",
+    "Switch": "Switches",
+    "Firewall": "Firewalls",
+    "Access point": "Access points",
+    "Scanner": "Scanners",
+    "Webcam": "Webcams",
+    "Camera": "Cameras",
+    "Monitor": "Monitors",
+    "Speaker": "Speakers",
+    "Cable": "Cables",
+    "Adapter": "Adapters"
 }
+
+def get_plural_form(word):
+    """Get plural form of a word if it exists in PLURAL_MAP, otherwise return original"""
+    if not word:
+        return word
+    
+    # Check direct match first
+    if word in PLURAL_MAP:
+        return PLURAL_MAP[word]
+    
+    # Check case-insensitive match
+    for singular, plural in PLURAL_MAP.items():
+        if word.lower() == singular.lower():
+            return plural
+    
+    # If not found, return original word
+    return word
 
 def run_generator(
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
@@ -1018,7 +1049,8 @@ def run_generator(
     approval_required=False,
     approval_required_value="empty",
     change_subscribed_location=False,
-    custom_subscribed_location="Global"):
+    custom_subscribed_location="Global",
+    use_pluralization=True):  # Add this parameter with default True
     """
     Main generator function.
     """
@@ -1853,34 +1885,6 @@ def run_generator(
                     # Add missing columns from original, preserving their values - SAFER VERSION
                     for col in original_order:
                         if col not in df.columns:
-                            # Skip the Number column - don't add it (exact match only)
-                            if col == "Number":
-                                continue
-                                
-                            if original_df is not None and col in original_df.columns:
-                                try:
-                                    # Get original column data
-                                    original_col_data = original_df[col].copy()
-                                    
-                                    # Create new column with appropriate default value
-                                    if len(df) > 0:
-                                        # Determine appropriate default based on original data
-                                        non_null_values = original_col_data.dropna()
-                                        if len(non_null_values) > 0:
-                                            # Use the most common non-null value or first value
-                                            default_val = non_null_values.iloc[0] if len(non_null_values) > 0 else ''
-                                        else:
-                                            default_val = ''
-                                        
-                                        # Create column with consistent values
-                                        df[col] = [default_val] * len(df)
-                                    else:
-                                        df[col] = pd.Series([], dtype='object')
-                                        
-                                except Exception as e:
-                                    print(f"Warning: Error adding column {col}: {e}")
-                                    df[col] = ''
-                            else:
                                 df[col] = ''
                     
                     # Reorder columns to match original order, excluding Number column

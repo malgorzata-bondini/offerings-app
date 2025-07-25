@@ -1647,37 +1647,37 @@ def run_generator(
                                     row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
                                     row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
                                     
-                                    # Handle aliases
-                                    if aliases_on:
-                                        alias_value_to_set = ""
-                                        # Determine the value to use for the alias
-                                        if aliases_value == "USE_APP_NAMES":
-                                            alias_value_to_set = app if app else ""
-                                        elif aliases_per_country:
-                                            if country == "PL" and recv:
-                                                alias_value_to_set = aliases_per_country.get(recv, "")
-                                            else:
-                                                alias_value_to_set = aliases_per_country.get(country, "")
-                                        
-                                        if not alias_value_to_set:
-                                            alias_value_to_set = aliases_value
-
-                                        # If we have a value and selected languages, find and set the alias
-                                        if alias_value_to_set and selected_languages:
-                                            for lang in selected_languages:
-                                                # Construct potential column names to search for
-                                                # This handles variations like "Aliases (u_label) - ENG" or "Aliases - ENG"
-                                                search_term_1 = f"ALIASES (U_LABEL) - {lang.upper()}"
-                                                search_term_2 = f"ALIASES - {lang.upper()}"
-
-                                                # Iterate through columns and find the correct one
-                                                for col in row.columns:
-                                                    # Normalize column name for robust matching
-                                                    normalized_col = ' '.join(str(col).upper().split())
-                                                    if normalized_col == search_term_1 or normalized_col == search_term_2:
-                                                        print(f"✅ Found alias column '{col}' for language '{lang}'. Setting value to '{alias_value_to_set}'.")
-                                                        row.loc[:, col] = alias_value_to_set
-                                                        break # Found column for this language, move to next language
+                                    # USUŃ TEN CAŁY BLOK - TO JEST DUPLIKAT!
+                                    # if aliases_on:
+                                    #     alias_value_to_set = ""
+                                    #     # Determine the value to use for the alias
+                                    #     if aliases_value == "USE_APP_NAMES":
+                                    #         alias_value_to_set = app if app else ""
+                                    #     elif aliases_per_country:
+                                    #         if country == "PL" and recv:
+                                    #             alias_value_to_set = aliases_per_country.get(recv, "")
+                                    #         else:
+                                    #             alias_value_to_set = aliases_per_country.get(country, "")
+                                    #     
+                                    #     if not alias_value_to_set:
+                                    #         alias_value_to_set = aliases_value
+                                    #
+                                    #     # If we have a value and selected languages, find and set the alias
+                                    #     if alias_value_to_set and selected_languages:
+                                    #         for lang in selected_languages:
+                                    #             # Construct potential column names to search for
+                                    #             # This handles variations like "Aliases (u_label) - ENG" or "Aliases - ENG"
+                                    #             search_term_1 = f"ALIASES (U_LABEL) - {lang.upper()}"
+                                    #             search_term_2 = f"ALIASES - {lang.upper()}"
+                                    #
+                                    #             # Iterate through columns and find the correct one
+                                    #             for col in row.columns:
+                                    #                 # Normalize column name for robust matching
+                                    #                 normalized_col = ' '.join(str(col).upper().split())
+                                    #                 if normalized_col == search_term_1 or normalized_col == search_term_2:
+                                    #                     print(f"✅ Found alias column '{col}' for language '{lang}'. Setting value to '{alias_value_to_set}'.")
+                                    #                     row.loc[:, col] = alias_value_to_set
+                                    #                     break # Found column for this language, move to next language
                                     
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
@@ -1702,6 +1702,8 @@ def run_generator(
                                         if require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                             # For CORP offerings, extract what comes after CORP
                                             # Example: [SR DS CY CORP HS DE Dedicated Services] -> "HS DE"
+                                            match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
+                                            # Ensure 'match' is always defined before use
                                             match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
                                             if match:
                                                 row.loc[:, "Subscribed by Company"] = match.group(1)
@@ -1743,6 +1745,7 @@ def run_generator(
                                             # Use the direct string if provided
                                             row.loc[:, "Service Commitments"] = custom_commitments_str
                                            
+                                            match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
                                             if match:
                                                 row.loc[:, "Subscribed by Company"] = match.group(1)
                                             else:
@@ -2017,10 +2020,10 @@ def run_generator(
                         return ''
                     return s
 
-                # Use _clean_cell directly with applymap
+                # Use _clean_cell directly with applymap for DataFrame, apply for Series
                 if isinstance(df_final, pd.DataFrame):
-                    df_final = df_final.applymap(_clean_cell)
-                else:
+                    df_final = df_final.map(_clean_cell)
+                elif isinstance(df_final, pd.Series):
                     df_final = df_final.apply(_clean_cell)
 
                 # Keep the dedicated treatment for the two boolean-ish columns

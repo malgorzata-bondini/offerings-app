@@ -615,39 +615,45 @@ with col2:
         else:
             custom_depend_on_value = ""
         
-        # Aliases
+        # Aliases - UPROSZCZONA WERSJA
         st.markdown("### Aliases")
-        aliases_on = st.checkbox("Enable Aliases", value=False)
 
-        # Initialize variables
-        use_per_country_aliases = False
-        aliases_per_country = {}
-        selected_languages = []
+        # Option to use same values as app names - GŁÓWNY CHECKBOX
+        use_same_as_apps = st.checkbox("Use same values as Application Names", 
+                                      value=False,
+                                      help="When checked, aliases will automatically use the same values as the application names in ENG column")
 
-        if aliases_on:
-            # Option to use same values as app names
-            use_same_as_apps = st.checkbox("Use same values as Application Names", 
-                                          value=False,
-                                          help="When checked, aliases will automatically use the same values as the application names in ENG column")
+        if use_same_as_apps:
+            # Auto-enable aliases and set to use app names
+            aliases_on = True
+            aliases_value = "USE_APP_NAMES"
+            use_per_country_aliases = False
+            aliases_per_country = {}
+            selected_languages = ["ENG"]  # Automatically set to ENG only
             
-            if use_same_as_apps:
-                # Show preview of what will be used - NO LANGUAGE SELECTION
-                if new_apps:
-                    st.info(f"**Aliases will use:** {', '.join(new_apps)} **in ENG column**")
-                else:
-                    st.warning("No application names defined. Add applications in Basic tab first.")
-                
-                # Set aliases to use app names - NO LANGUAGE SELECTION NEEDED
-                aliases_value = "USE_APP_NAMES"
-                use_per_country_aliases = False
-                aliases_per_country = {}
-                selected_languages = ["ENG"]  # Automatically set to ENG only
+            if new_apps:
+                st.success(f"✅ **Aliases will use:** {', '.join(new_apps)} **in ENG column**")
             else:
-                # Language selection - ONLY when NOT using app names
-                st.markdown("**Select Languages for Aliases:**")
-                st.info("Choose which language columns should receive alias values")
+                st.warning("⚠️ No application names defined. Add applications in Basic tab first.")
                 
-                # Create language checkboxes
+        else:
+            # Regular aliases section - ONLY when NOT using app names
+            aliases_on = st.checkbox("Enable Aliases", value=False)
+            
+            if aliases_on:
+                # Simple global alias value
+                aliases_value = st.text_input(
+                    "Alias Value",
+                    value="",
+                    placeholder="e.g., LAPTOP, DESKTOP, SOFTWARE",
+                    help="Enter the value to use for aliases in all language columns"
+                )
+                
+                # Language selection
+                st.markdown("**Select Languages for Aliases:**")
+                st.info("Choose which language columns should receive the alias value")
+                
+                # Create language checkboxes in a more compact layout
                 lang_cols = st.columns(4)
                 with lang_cols[0]:
                     lang_eng = st.checkbox("ENG", key="alias_lang_eng", help="English aliases")
@@ -673,62 +679,26 @@ with col2:
                 
                 # Show selected languages
                 if selected_languages:
-                    st.success(f"**Selected languages:** {', '.join(selected_languages)}")
+                    st.success(f"✅ **Selected languages:** {', '.join(selected_languages)}")
                 else:
-                    st.warning("No languages selected. Aliases will not be set.")
+                    st.warning("⚠️ No languages selected. Aliases will not be set.")
                 
-                # Option for global or per-country aliases
-                use_per_country_aliases = st.checkbox("Use different aliases per country/division", 
-                                                     value=False, 
-                                                     help="Define specific aliases for different countries or divisions")
-                
-                if use_per_country_aliases:
-                    st.markdown("**Aliases per Country/Division**")
-                    st.info("Configure aliases for specific countries/divisions. Unconfigured countries will use empty aliases.")
-                    
-                    # Define available countries/divisions - UPDATED with new countries
-                    available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "DS CY", "DS RO", "DS TR"]
-                    aliases_per_country = {}
-                    
-                    # Create tabs for different countries
-                    alias_country_tabs = st.tabs(available_countries)
-                    
-                    for idx, country in enumerate(available_countries):
-                        with alias_country_tabs[idx]:
-                            st.markdown(f"**{country} Aliases**")
-                            
-                            country_alias = st.text_input(
-                                f"Alias Value for {country}",
-                                value="",
-                                key=f"alias_{country.replace(' ', '_')}",
-                                placeholder=f"e.g., {country}_ALIAS",
-                                help=f"Alias value to use specifically for {country}"
-                            )
-                            
-                            if country_alias.strip():
-                                # Map display names to backend keys
-                                backend_key = country
-                                if country == "DS CY":
-                                    backend_key = "CY"
-                                elif country == "DS RO":
-                                    backend_key = "RO"
-                                elif country == "DS TR":
-                                    backend_key = "TR"
-                                
-                                aliases_per_country[backend_key] = country_alias.strip()
-                    
-                    # Set global alias to empty when using per-country
-                    aliases_value = ""
-                else:
-                    # Global alias value
-                    aliases_value = st.text_input(
-                        "Global Alias Value",
-                        value="",
-                        help="Enter the value to use for aliases (same for all countries)"
-                    )
-        else:
+                # Per-country aliases are removed - keep these variables for backend compatibility
+                use_per_country_aliases = False
+                aliases_per_country = {}
+            else:
+                # When aliases are disabled
+                aliases_value = ""
+                selected_languages = []
+                use_per_country_aliases = False
+                aliases_per_country = {}
+
+        # When aliases are completely disabled
+        if not aliases_on and not use_same_as_apps:
             aliases_value = ""
             selected_languages = []
+            use_per_country_aliases = False
+            aliases_per_country = {}
 
 st.markdown("---")
 

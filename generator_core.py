@@ -1822,8 +1822,23 @@ def run_generator(
     # Create output file path
     outfile = out_dir / f"Generated_Service_Offerings_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
-    # Ensure output directory exists - MOVE THIS BEFORE pd.ExcelWriter
+    # Ensure output directory exists
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check if we have any data to write
+    if not sheets_data or all(not rows_list for rows_list in sheets_data.values()):
+        print("❌ No matching offerings found with the specified keywords.")
+        print("Please check your search criteria:")
+        if keywords_parent.strip():
+            print(f"  - Parent keywords: {keywords_parent}")
+        if keywords_child.strip():
+            print(f"  - Child keywords: {keywords_child}")
+        if keywords_excluded.strip():
+            print(f"  - Excluded keywords: {keywords_excluded}")
+        print("Try using different or fewer keywords, or check if the source files contain matching offerings.")
+        
+        # Return None or raise an exception instead of trying to create empty Excel
+        raise ValueError("No matching offerings found. Please adjust your search criteria.")
 
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile, engine="openpyxl") as w:

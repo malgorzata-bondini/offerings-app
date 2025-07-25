@@ -1644,28 +1644,31 @@ def run_generator(
                                         if not alias_value_to_use:
                                             alias_value_to_use = aliases_value
                                         
-                                        # Handle special "USE_APP_NAMES" value
-                                        if alias_value_to_use == "USE_APP_NAMES":
+                                        # Handle special "USE_APP_NAMES" value - CHECK BOTH VALUES
+                                        if alias_value_to_use == "USE_APP_NAMES" or aliases_value == "USE_APP_NAMES":
                                             # Use app name as alias if app is provided
                                             alias_value_to_use = app if app else ""
                                         
                                         # Find all alias columns
-                                        alias_columns = [c for c in row.columns if "Alias" in c]
+                                        alias_columns = [c for c in row.columns if "Alias" in c or "alias" in c or "u_label" in c]
                                         
                                         if alias_columns and alias_value_to_use:
                                             # Special case: if "USE_APP_NAMES" was selected, always use ENG column
-                                            if aliases_value == "USE_APP_NAMES":
-                                                # Look for ENG alias column specifically
+                                            if aliases_value == "USE_APP_NAMES" or alias_value_to_use == "USE_APP_NAMES":
+                                                # Look for ENG alias column specifically - EXPANDED SEARCH
                                                 eng_columns = [col for col in alias_columns 
                                                              if "- ENG" in col or "(ENG)" in col or 
                                                              "- EN" in col or "(EN)" in col or
-                                                             "- ENGLISH" in col or "(ENGLISH)" in col]
+                                                             "- ENGLISH" in col or "(ENGLISH)" in col or
+                                                             col.endswith("ENG") or "ENG" in col.upper()]
                                                 
                                                 if eng_columns:
                                                     # Use the first ENG column found
+                                                    print(f"DEBUG: Setting alias '{alias_value_to_use}' in ENG column: {eng_columns[0]}")
                                                     row.loc[:, eng_columns[0]] = alias_value_to_use
                                                 elif alias_columns:
                                                     # Fallback to first alias column if no ENG found
+                                                    print(f"DEBUG: No ENG column found, using first alias column: {alias_columns[0]}")
                                                     row.loc[:, alias_columns[0]] = alias_value_to_use
                                             else:
                                                 # Original logic for when languages are selected

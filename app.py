@@ -627,78 +627,21 @@ with col2:
             # Auto-enable aliases and set to use app names
             aliases_on = True
             aliases_value = "USE_APP_NAMES"
-            use_per_country_aliases = False
-            aliases_per_country = {}
             selected_languages = ["ENG"]  # Automatically set to ENG only
             
             if new_apps:
                 st.success(f"✅ **Aliases will use:** {', '.join(new_apps)} **in ENG column**")
             else:
                 st.warning("⚠️ No application names defined. Add applications in Basic tab first.")
-                
         else:
-            # Regular aliases section - ONLY when NOT using app names
-            aliases_on = st.checkbox("Enable Aliases", value=False)
-            
-            if aliases_on:
-                # Simple global alias value
-                aliases_value = st.text_input(
-                    "Alias Value",
-                    value="",
-                    placeholder="e.g., LAPTOP, DESKTOP, SOFTWARE",
-                    help="Enter the value to use for aliases in all language columns"
-                )
-                
-                # Language selection
-                st.markdown("**Select Languages for Aliases:**")
-                st.info("Choose which language columns should receive the alias value")
-                
-                # Create language checkboxes in a more compact layout
-                lang_cols = st.columns(4)
-                with lang_cols[0]:
-                    lang_eng = st.checkbox("ENG", key="alias_lang_eng", help="English aliases")
-                    lang_pl = st.checkbox("PL", key="alias_lang_pl", help="Polish aliases")
-                with lang_cols[1]:
-                    lang_de = st.checkbox("DE", key="alias_lang_de", help="German aliases")
-                    lang_md = st.checkbox("MD", key="alias_lang_md", help="Moldovan aliases")
-                with lang_cols[2]:
-                    lang_ua = st.checkbox("UA", key="alias_lang_ua", help="Ukrainian aliases")
-                    lang_tr = st.checkbox("TR", key="alias_lang_tr", help="Turkish aliases")
-                with lang_cols[3]:
-                    lang_cy = st.checkbox("CY", key="alias_lang_cy", help="Cypriot aliases")
-                
-                # Collect selected languages
-                selected_languages = []
-                if lang_eng: selected_languages.append("ENG")
-                if lang_pl: selected_languages.append("PL")
-                if lang_de: selected_languages.append("DE")
-                if lang_md: selected_languages.append("MD")
-                if lang_ua: selected_languages.append("UA")
-                if lang_tr: selected_languages.append("TR")
-                if lang_cy: selected_languages.append("CY")
-                
-                # Show selected languages
-                if selected_languages:
-                    st.success(f"✅ **Selected languages:** {', '.join(selected_languages)}")
-                else:
-                    st.warning("⚠️ No languages selected. Aliases will not be set.")
-                
-                # Per-country aliases are removed - keep these variables for backend compatibility
-                use_per_country_aliases = False
-                aliases_per_country = {}
-            else:
-                # When aliases are disabled
-                aliases_value = ""
-                selected_languages = []
-                use_per_country_aliases = False
-                aliases_per_country = {}
-
-        # When aliases are completely disabled
-        if not aliases_on and not use_same_as_apps:
+            # When aliases are disabled
+            aliases_on = False
             aliases_value = ""
             selected_languages = []
-            use_per_country_aliases = False
-            aliases_per_country = {}
+
+        # Remove per-country aliases variables for backend compatibility
+        use_per_country_aliases = False
+        aliases_per_country = {}
 
 st.markdown("---")
 

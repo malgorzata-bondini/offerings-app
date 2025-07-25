@@ -1047,7 +1047,7 @@ def run_generator(
     schedule_settings_per_country=None,
     use_custom_depend_on=False, custom_depend_on_value="",
     aliases_per_country=None,
-    selected_languages=None,
+    selected_languages=None,  # ← DODAJ TEN PARAMETR!
     business_criticality="",
     approval_required=False,
     approval_required_value="empty",

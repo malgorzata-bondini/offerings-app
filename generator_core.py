@@ -1672,45 +1672,51 @@ def run_generator(
                                         if alias_value_to_use == "USE_APP_NAMES" or aliases_value == "USE_APP_NAMES":
                                             alias_value_to_use = app if app else ""
                                         
-                                        # STEP 1: Look for EXACT match: "Aliases (u_label) - ENG"
-                                        exact_alias_column = None
-                                        for col in row.columns:
-                                            if col == "Aliases (u_label) - ENG":
-                                                exact_alias_column = col
-                                                break
+                                        # Progressive alias column search with fallback logic
+                                        target_column = None
                                         
-                                        # STEP 2: If exact match found, use it
-                                        if exact_alias_column and alias_value_to_use:
-                                            row.loc[:, exact_alias_column] = alias_value_to_use
-                                        
-                                        # STEP 3: If no exact match, look for columns with "Aliases" AND "ENG"
-                                        elif alias_value_to_use:
-                                            aliases_eng_columns = []
+                                        if alias_value_to_use:  # Only proceed if we have a value to set
+                                            # STEP 1: Look for EXACT match: "Aliases (u_label) - ENG"
                                             for col in row.columns:
-                                                col_upper = col.upper()
-                                                if "ALIASES" in col_upper and "ENG" in col_upper:
-                                                    aliases_eng_columns.append(col)
+                                                if col == "Aliases (u_label) - ENG":
+                                                    target_column = col
+                                                    break
                                             
-                                            # STEP 4: For USE_APP_NAMES, ONLY use columns with ENG
-                                            if aliases_value == "USE_APP_NAMES":
-                                                if aliases_eng_columns:
-                                                    # Use first column that has both Aliases and ENG
-                                                    row.loc[:, aliases_eng_columns[0]] = alias_value_to_use
-                                                # If no ENG columns found, DO NOT set any alias for USE_APP_NAMES
-                                            else:
-                                                # For other alias values, try broader search if no Aliases+ENG found
-                                                if aliases_eng_columns:
-                                                    row.loc[:, aliases_eng_columns[0]] = alias_value_to_use
-                                                else:
-                                                    # STEP 5: Broader search - any column with "alias" or "u_label"
-                                                    broader_alias_columns = []
-                                                    for col in row.columns:
-                                                        col_lower = col.lower()
-                                                        if any(keyword in col_lower for keyword in ["alias", "u_label"]):
-                                                            broader_alias_columns.append(col)
-                                                    
-                                                    if broader_alias_columns:
-                                                        row.loc[:, broader_alias_columns[0]] = alias_value_to_use
+                                            # STEP 2: Look for columns with "ALIASES" AND "ENG"
+                                            if not target_column:
+                                                for col in row.columns:
+                                                    col_upper = col.upper()
+                                                    if "ALIASES" in col_upper and "ENG" in col_upper:
+                                                        target_column = col
+                                                        break
+                                            
+                                            # STEP 3: Look for any column with "ALIASES" (any language)
+                                            if not target_column:
+                                                for col in row.columns:
+                                                    col_upper = col.upper()
+                                                    if "ALIASES" in col_upper:
+                                                        target_column = col
+                                                        break
+                                            
+                                            # STEP 4: Look for columns with "u_label"
+                                            if not target_column:
+                                                for col in row.columns:
+                                                    col_lower = col.lower()
+                                                    if "u_label" in col_lower:
+                                                        target_column = col
+                                                        break
+                                            
+                                            # STEP 5: Look for any column with "alias"
+                                            if not target_column:
+                                                for col in row.columns:
+                                                    col_lower = col.lower()
+                                                    if "alias" in col_lower:
+                                                        target_column = col
+                                                        break
+                                            
+                                            # Set the alias value if we found a target column
+                                            if target_column:
+                                                row.loc[:, target_column] = alias_value_to_use
 
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
@@ -1754,13 +1760,8 @@ def run_generator(
                                         if "Subscribed by Company" in base_row.index:
                                             original_company = str(base_row["Subscribed by Company"]).strip()
                                             if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:
-                                                row.loc[:, "Subscribed by Company"] = original_company
-                                            else:
-                                                # Leave empty if original was empty
                                                 row.loc[:, "Subscribed by Company"] = ""
-                                        else:
-                                            # Leave empty if column doesn't exist
-                                            row.loc[:, "Subscribed by Company"] = ""
+                                
                                     
                                     orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
                                     

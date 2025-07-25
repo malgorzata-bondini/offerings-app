@@ -19,8 +19,8 @@ need_cols = [
     "Service Offerings | Depend On (Application Service)", "Service Commitments",
     "Delivery Manager", "Subscribed by Location", "Phase", "Status",
     "Life Cycle Stage", "Life Cycle Status", "Support group", "Managed by Group",
-    "Subscribed by Company", "Visibility group", "Business Criticality",
-    "Record view", "Approval required", "Approval group"  # Add "Approval group"
+    "Subscribed by Company", "Business Criticality",
+    "Record view", "Approval required", "Approval group"  # Removed "Visibility group"
 ]
 
 discard_lc = {"retired", "retiring", "end of life", "end of support"}
@@ -853,11 +853,11 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Support group": "",
         "Managed by Group": "",
         "Subscribed by Company": "",  # Will be set during processing based on receiver and CORP type
-        "Visibility group": "",
         "Business Criticality": business_criticality,
         "Record view": "",  # Will be set based on SR/IM
         "Approval required": "false" if not approval_required else approval_required_value,
         "Approval group": "empty" if not approval_required else approval_required_value
+        # Removed "Visibility group" line
     }
     
     # Set Subscribed by Location based on user choice
@@ -1329,10 +1329,10 @@ def run_generator(
                         if col not in df.columns:
                             df[col] = ""
 
-                    # Ensure Visibility group column exists
-                    if "Visibility group" not in df.columns:
-                        df["Visibility group"] = ""
-                    
+                    # Remove the "Ensure Visibility group column exists" section
+                    # if "Visibility group" not in df.columns:
+                    #     df["Visibility group"] = ""
+
                     # Add LDAP columns if they don't exist
                     ldap_cols = [col for col in df.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
                     if not ldap_cols and country == "DE":
@@ -1660,10 +1660,6 @@ def run_generator(
                                     else:
                                         # Kopiuj z oryginalnego pliku
                                         row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
-                                    # Handle Visibility group - ensure it exists for PL
-                                    if country == "PL" and "Visibility group" not in row.columns:
-                                        row.loc[:, "Visibility group"] = ""
-
                                     # Handle DE special cases
                                     if country == "DE":
                                         company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
@@ -1913,10 +1909,10 @@ def run_generator(
                 cc = sheet_key.split()[0]
                 
                 # Remove Visibility group column for PL only if it wasn't in the original
-                if cc == "PL" and "Visibility group" in df.columns:
-                    original_cols = column_order_cache.get(column_order_key, [])
-                    if "Visibility group" not in original_cols:
-                        df = df.drop(columns=["Visibility group"])
+                # if cc == "PL" and "Visibility group" in df.columns:
+                #     original_cols = column_order_cache.get(column_order_key, [])
+                #     if "Visibility group" not in original_cols:
+                #         df = df.drop(columns=["Visibility group"])
                 
                 # Clean data before writing to Excel - SAFER VERSION
                 df_final = df.copy()

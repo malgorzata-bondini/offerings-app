@@ -1654,8 +1654,10 @@ def run_generator(
                                             # Look for the exact column name "Aliases (u_label) - ENG"
                                             exact_column_name = "Aliases (u_label) - ENG"
                                             if exact_column_name in row.columns:
-                                                print(f"✅ Found alias column '{exact_column_name}'. Setting app name '{app}'.")
-                                                row.loc[:, exact_column_name] = app
+                                                print(f"✅ FOUND! Setting alias column '{exact_column_name}' to '{app}'")
+                                                # Use .at for single value assignment
+                                                row.at[row.index[0], exact_column_name] = app
+                                                print(f"✅ CONFIRMED: Value set to '{row.at[row.index[0], exact_column_name]}'")
                                             else:
                                                 print(f"❌ Column '{exact_column_name}' not found in available columns")
                                         

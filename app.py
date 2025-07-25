@@ -1,3 +1,21 @@
+# Add pluralization function at the top of the file
+def get_plural_form_preview(word):
+    """Get plural form for preview - simplified version"""
+    plural_map = {
+        "Laptop": "Laptops", "Desktop": "Desktops", "Docking station": "Docking stations",
+        "Printer": "Printers", "Barcode printer": "Barcode printers", "Barcode scanner": "Barcode scanners",
+        "Display": "Displays", "Deskphone": "Deskphones", "Smartphone": "Smartphones",
+        "Mouse": "Mouses", "Keyboard": "Keyboards", "Headset": "Headsets", "Tablet": "Tablets",
+        "Audio equipment": "Audio equipment", "Video surveillance": "Video surveillance",
+        "UPS": "UPS", "External webcam": "External webcams", "Projector": "Projectors",
+        "External storage device": "External storage devices", "Microphone": "Microphones",
+        "Other hardware": "Other hardware", "Server": "Servers", "Router": "Routers",
+        "Switch": "Switches", "Firewall": "Firewalls", "Access point": "Access points",
+        "Scanner": "Scanners", "Webcam": "Webcams", "Camera": "Cameras", "Monitor": "Monitors",
+        "Speaker": "Speakers", "Cable": "Cables", "Adapter": "Adapters"
+    }
+    return plural_map.get(word, word)
+
 import streamlit as st
 import pandas as pd
 from pathlib import Path
@@ -604,12 +622,16 @@ with col2:
             # Show preview(s) for the custom depend on values
             if new_apps:
                 if len(new_apps) == 1:
-                    custom_depend_on_value = f"[{prefix_tag}] {new_apps[0]}"
+                    # Apply pluralization to app name in preview
+                    app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
+                    custom_depend_on_value = f"[{prefix_tag}] {app_name}"
                     st.info(f"Preview: `{custom_depend_on_value}`")
                 else:
                     st.info("Preview for each app:")
                     for app in new_apps:
-                        st.text(f"• `[{prefix_tag}] {app}`")
+                        # Apply pluralization to each app name in preview
+                        app_name = get_plural_form_preview(app) if use_pluralization else app
+                        st.text(f"• `[{prefix_tag}] {app_name}`")
                     # Store prefix only - the backend will handle app names automatically
                     custom_depend_on_value = f"[{prefix_tag}]"
             else:

@@ -684,7 +684,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         schedule_suffixes=schedule_suffixes,
                         delivery_manager=delivery_manager,
                         global_prod=global_prod,
-                        # Add pluralization parameter
+                        use_pluralization=use_pluralization,  # Add this line
                         rsp_duration=rsp_duration,
                         rsl_duration=rsl_duration,
                         sr_or_im=sr_or_im,
@@ -708,27 +708,20 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
                         require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
                         use_new_parent=use_new_parent,
-                        new_parent_offering=new_parent_offerings,  # Pass the full string
-                        new_parent=new_parents,  # Pass the full string
+                        new_parent_offering=new_parent_offerings,
+                        new_parent=new_parents,
                         keywords_excluded=keywords_excluded if not use_new_parent else "",
                         use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
                         service_type_lvl2=service_type if 'service_type' in locals() else "",
-                        # Add per-country support groups
                         support_groups_per_country=support_groups_per_country if use_per_country_groups else {},
                         managed_by_groups_per_country=managed_by_groups_per_country if use_per_country_groups else {},
-                        # Add per-country schedule settings
                         schedule_settings_per_country=schedule_settings_per_country if use_per_country_schedules else {},
-                        # Add custom depend on value
                         use_custom_depend_on=use_custom_depend_on if 'use_custom_depend_on' in locals() else False,
                         custom_depend_on_value=custom_depend_on_value if 'custom_depend_on_value' in locals() else "",
-                        # Pass selected languages for aliases
                         selected_languages=selected_languages if 'selected_languages' in locals() else [],
-                        # Add business criticality
                         business_criticality=business_criticality,
-                        # Add approval required
                         approval_required=approval_required,
                         approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
-                        # Add location settings
                         change_subscribed_location=change_subscribed_location,
                         custom_subscribed_location=custom_subscribed_location
                     )

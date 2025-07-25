@@ -425,32 +425,340 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
-    # Check if "Hardware" is in parent_offering or catalog_name to determine case
-    use_lowercase_app = "Hardware" in parent_offering or "Hardware" in catalog_name
+    # Apply pluralization to catalog name for hardware items
+    catalog_name_plural = get_plural_form(catalog_name)
     
-    # Apply case to app name based on hardware presence
-    if app and use_lowercase_app:
-        app_to_use = app.lower()
+    # Extract country from parent content
+    parts = parent_content.split()
+    country = ""
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
+            country = part
+            break
+    
+    # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
+    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security"]
+    parent_lower = parent_offering.lower()
+    catalog_lower = catalog_name.lower()
+    parent_content_lower = parent_content.lower()
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                      for keyword in no_prod_keywords)
+    
+    if special_dept == "Medical":
+        # Extract division and country from parent content
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        topic_parts = []
+        
+        for i, part in enumerate(parts):
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+            elif part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
+                topic_parts.append(part)
+        
+        topic = " ".join(topic_parts) if topic_parts else "Software"
+        
+        # Build Medical name - NO PROD
+        prefix_parts = [sr_or_im]
+        
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
+        
+        prefix_parts.append("Medical")
+        
+        # Use topic from parent and lowercase catalog name
+        final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
+    
+    elif special_dept == "DAK":
+        # Replace DAK with Business Services - NO PROD
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR", "DAK"]:
+                country = part
+        
+        prefix_parts = [sr_or_im]
+        
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
+        
+        prefix_parts.append("Business Services")
+        
+        # Add app only if provided - NO PROD
+        if app:
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} {schedule_suffix}"
+        else:
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
+    
+    elif special_dept == "HR":
+        # HR - NO PROD
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+        
+        prefix_parts = [sr_or_im]
+        
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
+        
+        prefix_parts.append("HR")
+        
+        # Extract the topic from parent content
+        topic_parts = []
+        for part in parts:
+            if part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
+                topic_parts.append(part)
+        
+        topic = " ".join(topic_parts) if topic_parts else "Software"
+        
+        # Add app if provided - NO PROD
+        if app:
+            final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} {schedule_suffix}"
+        else:
+            final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
+    
+    elif special_dept == "IT":
+        # IT - special handling
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        topic = ""
+        
+        # Find division, country and topic
+        topic_parts = []
+        for i, part in enumerate(parts):
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+            else:
+                # Collect all remaining words as topic (e.g., "Security & Privacy", "Hardware", etc.)
+                if part not in ["HS", "DS", "RecP"] and not (len(part) == 2 and part.isupper()):
+                    topic_parts.append(part)
+        
+        # Join all topic parts to get the full topic phrase
+        topic = " ".join(topic_parts) if topic_parts else ""
+        
+        # If no topic found, use the first significant word from catalog name
+        if not topic:
+            catalog_words = catalog_name.split()
+            for word in catalog_words:
+                if word.lower() not in ["the", "a", "an", "and", "or", "for", "of", "in", "on", "to"]:
+                    topic = word
+                    break
+        
+        prefix_parts = [sr_or_im]
+        
+        # For DE with receiver, extract division from receiver (e.g., "HS DE" -> "HS")
+        if country == "DE" and receiver:
+            recv_division = receiver.split()[0]  # Extract HS or DS
+            prefix_parts.append(recv_division)
+        # Special handling for UA, MD, RO, and TR - always use DS
+        elif country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.append("DS")
+        elif division:
+            prefix_parts.append(division)
+        else:
+            # Default to HS if no division found
+            prefix_parts.append("HS")
+        
+        if country:
+            prefix_parts.append(country)
+        prefix_parts.append("IT")
+        
+        # For IT, build the name with topic BEFORE the brackets
+        # Format: [SR DS MD IT] Hardware configuration laptop Mon-Fri 8-16
+        name_parts = []
+        
+        if topic:
+            # Topic goes BEFORE the brackets
+            name_parts.append(f"[{' '.join(prefix_parts)}] {topic}")
+        else:
+            name_parts.append(f"[{' '.join(prefix_parts)}]")
+        
+        name_parts.append(catalog_name.lower())
+        
+        # Add app if provided
+        if app:
+            # Build the current name string to check for "hardware"
+            current_name_str = " ".join(name_parts)
+            # Check if "hardware" is in the current name (case insensitive)
+            if "hardware" in current_name_str.lower():
+                name_parts.append(app.lower())  # Use lowercase for hardware
+            else:
+                name_parts.append(app)  # Keep original case
+        
+        # Add "solving" for IM
+        if sr_or_im == "IM":
+            name_parts.append("solving")
+        
+        # Check if topic contains any no-prod keywords
+        topic_lower = topic.lower() if topic else ""
+        topic_exclude_prod = any(keyword in topic_lower for keyword in no_prod_keywords)
+        
+        # Only add Prod if no hardware/mailbox/network/mobile/security keywords in any source
+        if not exclude_prod and not topic_exclude_prod:
+            name_parts.append("Prod")
+        
+        name_parts.append(schedule_suffix)
+        
+        # Join and ensure incident naming
+        final_name = " ".join(name_parts)
+        return ensure_incident_naming(final_name)
+    
     else:
-        app_to_use = app
+        # Standard case - replace Parent with SR/IM and add IT for RecP entries
+        parts = parent_content.split()
+        division = ""
+        country_code = ""
+        dept = ""
+        other_parts = []
+        
+        # Parse parent content to extract components
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
+                country_code = part
+            elif part in ["IT", "HR", "Medical", "Business Services"]:
+                dept = part
+            else:
+                other_parts.append(part)
+        
+        # Build the new name components
+        name_parts = [sr_or_im]
+        
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            name_parts.append("DS")
+        elif division:
+            name_parts.append(division)
+        else:
+            # Default to HS if no division found
+            name_parts.append("HS")
+        
+        if country_code:
+            name_parts.append(country_code)
+        
+        # Add other parts (like RecP, Software, etc.)
+        name_parts.extend(other_parts)
+        
+        # For RecP entries, add IT department if not already present
+        if "RecP" in other_parts and not dept:
+            name_parts.append("IT")
+        elif dept:
+            name_parts.append(dept)
+        
+        # Build the final name
+        prefix = f"[{' '.join(name_parts)}]"
+        
+        # Add catalog name
+        final_parts = [prefix, catalog_name]
+        
+        # Check if we should add Prod
+        catalog_lower = catalog_name.lower()
+        exclude_prod = any(keyword in catalog_lower for keyword in ["hardware", "mailbox", "network", "mobile", "security"])
+        
+        # Add app if provided
+        if app:
+            final_parts.append(app)
+        
+        # Add "solving" for IM
+        if sr_or_im == "IM":
+            final_parts.append("solving")
+        
+        if not exclude_prod:
+            final_parts.append("Prod")
+        
+        final_parts.append(schedule_suffix)
+        
+        final_name = " ".join(final_parts)
+        return ensure_incident_naming(final_name)
+
+def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
+    """Build name for CORP offerings"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
     
-    # Extract the core part of catalog name (e.g., "Software incident solving")
-    name_parts = [f"[{sr_or_im}]", catalog_name]
+    # Extract parts from parent content
+    parts = parent_content.split()
+    country = ""
+    topic = ""
     
-    # Add app if provided
-    if app_to_use:
-        name_parts.append(app_to_use)
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS"]:
+            country = part
+        elif part not in ["HS", "DS", "Parent", "RecP"]:
+            topic = part
     
-    # Check if name contains Microsoft - if so, don't add Prod
-    name_so_far = " ".join(name_parts).lower()
-    if "microsoft" not in name_so_far:
-        name_parts.append("Prod")
+    # Build CORP name
+    prefix_parts = [sr_or_im]
     
-    # Add schedule
-    name_parts.append(schedule_suffix)
+    # Get division and country with special handling for MD/UA/RO/TR
+    division, country_code = get_division_and_country(parent_content, country, delivering_tag)
     
-    # Join and ensure incident naming
-    final_name = " ".join(name_parts)
+    # Add delivering tag parts (who delivers the service - from user input)
+    if delivering_tag:
+        delivering_parts = delivering_tag.split()
+        # For MD/UA/RO/TR, override with DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            prefix_parts.extend(delivering_parts[:2])  # Take division and country from delivering tag
+    else:
+        prefix_parts.extend([division, country])
+    
+    prefix_parts.extend(["CORP", receiver])
+    
+    # Only add topic if it exists, don't default to IT for CORP
+    if topic:
+        prefix_parts.append(topic)
+    
+    if sr_or_im == "SR":
+        if app:
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
+        else:
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
+    else:
+        # For IM: always add solving after the app (or after catalog if no app)
+        if app:
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving Prod {schedule_suffix}"
+        else:
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
+    
     return ensure_incident_naming(final_name)
 
 def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
@@ -1161,308 +1469,6 @@ def run_generator(
                                         # For non-CORP, check only in non-CORP names
                                         if len(non_corp_names_for_schedules) > 0:
                                             # Look for exact schedule match in non-CORP offerings
-                                            schedule_found = any(schedule_pattern in name for name in non_corp_names_for_schedules)
-                                            if not schedule_found:
-                                                missing_schedule = True
-                                        else:
-                                            # No non-CORP offerings exist, so schedule is missing
-                                            missing_schedule = True
-                                
-                                # For DE, find the matching row (DS DE or HS DE) in the original data
-                                if country == "DE" and not use_new_parent:
-                                    # Always attempt to pick matching row but do not skip if none found
-                                    recv_mask = base_pool["Name (Child Service Offering lvl 1)"].str.contains(
-                                        rf"\b{re.escape(recv)}\b", case=False
-                                    )
-                                    if recv_mask.any():
-                                        # Use the first matching row as base
-                                        base_row = base_pool[recv_mask].iloc[0]
-                                        base_row_df = base_row.to_frame().T.copy()
-                                        original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
-                        
-                                # Build name based on type
-                                if is_lvl2:
-                                    new_name = build_lvl2_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, service_type_lvl2
-                                    )
-                                elif require_corp:
-                                    new_name = build_corp_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                                    )
-                                elif require_recp:
-                                    new_name = build_recp_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                                    )
-                                elif require_corp_it:
-                                    new_name = build_corp_it_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                                    )
-                                elif require_corp_dedicated:
-                                    new_name = build_corp_dedicated_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
-                                    )
-                                else:
-                                    # For standard names, handle DE split naming
-                                    if country == "DE" and recv:
-                                        # Extract parent content to build proper name with DS/HS
-                                        parent_content = extract_parent_info(parent_full)
-                                        catalog_name = extract_catalog_name(parent_full)
-                                        
-                                        # Replace parent division with receiver division
-                                        parts = parent_content.split()
-                                        new_parts = [sr_or_im]
-                                        
-                                        # Add receiver division (DS or HS from recv)
-                                        recv_division = recv.split()[0]  # Extract DS or HS from "DS DE" or "HS DE"
-                                        new_parts.append(recv_division)
-                                        
-                                        # Add country and other parts
-                                        for part in parts:
-                                            if part in ["HS", "DS"]:
-                                                continue  # Skip original division
-                                            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
-                                                new_parts.append(part)  # Add country
-                                            elif part in ["IT", "HR", "Medical", "Business Services"] or (part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper())):
-                                                new_parts.append(part)  # Add dept or other parts
-                                        
-                                        # Build new parent offering with updated division
-                                        new_parent_offering_str = f"[Parent {' '.join(new_parts)}] {catalog_name}"
-                                        new_name = build_standard_name(
-                                            new_parent_offering_str, sr_or_im, app, schedule_suffix, special_dept, recv
-                                        )
-                                    else:
-                                        new_name = build_standard_name(
-                                            parent_full, sr_or_im, app, schedule_suffix, special_dept, recv
-                                        )
-                                
-                                # Normalize the name for comparison (remove extra spaces)
-                                new_name_normalized = ' '.join(new_name.split())
-                                
-                                # Check against existing offerings in source files
-                                if new_name_normalized in existing_offerings:
-                                    raise ValueError(f"Sorry, it would be a duplicate - we already have this offering in the system: {new_name}")
-                                
-                                # Determine division for PL support groups
-                                division = None
-                                if country == "PL":
-                                    # Try to determine division from the new_name or original data
-                                    if "HS PL" in new_name or "HS PL" in str(base_row.get("Name (Child Service Offering lvl 1)", "")):
-                                        division = "HS"
-                                    elif "DS PL" in new_name or "DS PL" in str(base_row.get("Name (Child Service Offering lvl 1)", "")):
-                                        division = "DS"
-                                    else:
-                                        # Try to determine from parent offering
-                                        parent_content = extract_parent_info(parent_full)
-                                        if "HS" in parent_content.split():
-                                            division = "HS"
-                                        elif "DS" in parent_content.split():
-                                            division = "DS"
-                                        else:
-                                            # Default to HS if cannot determine
-                                            division = "HS"
-                                
-                                # Get support groups list
-                                if country == "PL":
-                                    # For PL, directly use the receiver-specific support group
-                                    # The receiver is the key (e.g., "HS PL" or "DS PL")
-                                    key = recv  # recv is already correctly set to "HS PL" or "DS PL"
-                                    country_supports = support_groups_per_country.get(key, "")
-                                    country_managed = managed_by_groups_per_country.get(key, "")
-                                    
-                                    # For PL, we expect only one support group per receiver
-                                    if country_supports:
-                                        sg = str(country_supports).strip()
-                                        mg = str(country_managed or sg).strip()
-                                        support_groups_list = [(sg, mg)]
-                                    else:
-                                        # Fallback to empty if no support group configured for this receiver
-                                        support_groups_list = [("", "")]
-                                else:
-                                    # For other countries, use the existing logic
-                                    support_groups_list = get_support_groups_list_for_country(
-                                        country, support_group, support_groups_per_country, 
-                                        managed_by_groups_per_country, division
-                                    )
-                                
-                                # For DE, limit groups to those matching the current receiver if any, else keep all
-                                if country == "DE" and recv:
-                                    prefix = recv
-                                    matching = [(sg, mg) for sg, mg in support_groups_list
-                                                if sg.strip().startswith(prefix)]
-                                    if matching:
-                                        support_groups_list = matching
-                                
-                                # Create offerings for each support group combination
-                                for support_group_for_country, managed_by_group_for_country in support_groups_list:
-                                    # Skip duplicates based on name, receiver, app, schedule, support and managed groups
-                                    key = (
-                                        new_name_normalized,
-                                        recv,
-                                        app,
-                                        schedule_suffix,
-                                        support_group_for_country,
-                                        managed_by_group_for_country
-                                    )
-                                    
-                                    if key in seen:
-                                        continue
-                                    seen.add(key)
-                                    row = base_row_df.copy()
-                                    
-                                    # Update the name
-                                    row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
-                                    row.loc[:, "Parent"] = new_parent if use_new_parent else ""
-                                    row.loc[:, "Delivery Manager"] = delivery_manager
-                                    
-                                    # Apply business criticality if provided
-                                    if business_criticality:
-                                        row.loc[:, "Business Criticality"] = business_criticality
-                                    # Otherwise, keep the original value from source file
-                                    
-                                    # Set Record view based on SR/IM selection
-                                    if sr_or_im == "SR":
-                                        row.loc[:, "Record view"] = "Request Item"
-                                    elif sr_or_im == "IM":
-                                        row.loc[:, "Record view"] = "Incident, Major Incident"
-                                    
-                                    # Set Approval required with conditional value
-                                    if approval_required:
-                                        row.loc[:, "Approval required"] = approval_required_value
-                                        row.loc[:, "Approval group"] = approval_required_value  # Set to what user wrote
-                                    else:
-                                        row.loc[:, "Approval required"] = "false"
-                                        row.loc[:, "Approval group"] = "empty"  # Set to "empty" when not required
-                                    
-                                    # Set Subscribed by Location based on user choice
-                                    if change_subscribed_location:
-                                        row.loc[:, "Subscribed by Location"] = custom_subscribed_location
-                                    else:
-                                        row.loc[:, "Subscribed by Location"] = "Global"
-                                    
-                                    # Apply support group and managed by group
-                                    row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
-                                    row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
-                                    
-                                    # Handle aliases
-                                    exact_column_name = "Aliases (u_label) - ENG"
-                                    if exact_column_name not in row.columns:
-                                        row[exact_column_name] = ""
-                                    if aliases_on and aliases_value == "USE_APP_NAMES":
-                                        row.loc[:, exact_column_name] = app if app else ""
-                                    else:
-                                        # Kopiuj z oryginalnego pliku
-                                        row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
-                                    # Handle Visibility group - ensure it exists for PL
-                                    if country == "PL" and "Visibility group" not in row.columns:
-                                        row.loc[:, "Visibility group"] = ""
-
-                                    # Handle DE special cases
-                                    if country == "DE":
-                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
-                                        row.loc[:, "Subscribed by Company"] = company
-                                        
-                                        # Handle LDAP columns
-                                        ldap_cols = [col for col in row.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
-                                        if ldap_cols:
-                                            # Clear all LDAP columns first
-                                            for ldap_col in ldap_cols:
-                                                row.loc[:, ldap_col] = ""
-                                            
-
-                                    # Handle Subscribed by Company based on type and mode
-                                    if use_new_parent:
-                                        # NEW PARENT MODE - special logic
-                                        if require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                                            # For CORP offerings, extract what comes after CORP
-                                            # Example: [SR DS CY CORP HS DE Dedicated Services] -> "HS DE"
-                                            match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
-                                            if match:
-                                                row.loc[:, "Subscribed by Company"] = match.group(1)
-                                            else:
-                                                # Fallback to receiver if pattern not found
-                                                row.loc[:, "Subscribed by Company"] = recv
-                                        else:
-                                            # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
-                                            row.loc[:, "Subscribed by Company"] = recv
-                                    elif country == "DE":
-                                        # Existing DE logic for Germany
-                                        company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
-                                        row.loc[:, "Subscribed by Company"] = company
-                                    elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                                        # For CORP offerings in normal mode, clear the field
-                                        row.loc[:, "Subscribed by Company"] = ""
-                                    # For standard offerings, keep original value from source file
-                                    
-                                    
-                                    orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
-                                    
-                                    # If schedule is missing, use original commitments with user schedule
-                                    if missing_schedule:
-                                        if not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]:
-                                            # If original commitments are empty, create new ones with user schedule
-                                            row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im)
-                                        else:
-                                            # Update original commitments with user schedule
-                                            row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
-                                    # For Lvl2, keep empty commitments empty
-                                    elif is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
-                                        row.loc[:, "Service Commitments"] = ""
-                                    else:
-                                        # Handle custom commitments - use both approaches
-                                        if use_custom_commitments and custom_commitments_str:
-                                            # Use the direct string if provided
-                                            row.loc[:, "Service Commitments"] = custom_commitments_str
-                                        elif use_custom_commitments and commitment_country:
-                                            # Use custom_commit_block function if country provided
-                                            row.loc[:, "Service Commitments"] = custom_commit_block(
-                                                commitment_country,
-
-                                                sr_or_im, rsp_enabled, rsl_enabled,
-                                                rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
-                                                rsp_time, rsl_time
-                                            )
-                                        else:
-                                            # Use existing logic
-                                            if not orig_comm or orig_comm == "-":
-                                                row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im)
-                                            else:
-                                                row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
-                                    
-                                    # Special handling for IT with UA/MD/RO/TR - always use DS
-                                    if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD", "RO", "TR"]:
-                                        depend_tag = f"DS {country} Prod"
-                                    elif global_prod:
-                                        depend_tag = "Global Prod"
-                                    else:
-                                        if country == "PL":
-                                            # Regex-based PL Prod determination (case-insensitive)
-                                            if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
-                                                depend_tag = "HS PL Prod"
-                                            if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
-                                                depend_tag = "HS PL Prod"
-                                            elif re.search(r'\bDS\s+PL\b', new_name, re.IGNORECASE):
-                                                depend_tag = "DS PL Prod"
-                                            else:
-                                                depend_tag = "DS PL Prod"  # safe default
-                                        elif recv:
-                                            depend_tag = f"{recv} Prod"
-                                        else:
-                                            depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
-                                    
-                                    # Always update Service Offerings | Depend On based on computed depend_tag and app
-                                    if use_custom_depend_on and custom_depend_on_value:
-                                        # Use custom prefix but still include app name automatically
-                                        if app:
-                                            # Apply pluralization to app name if enabled
-                                            app_to_use = get_plural_form(app) if use_pluralization else app
-                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{custom_depend_on_value} {app_to_use}"
-                                        else:
-                                            # If no app and using custom depend on, use the custom value only if it's meant to be used without app
-                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
-                                    elif app:
-                                        # Apply pluralization to app name if enabled
-                                        app_to_use = get_plural_form(app) if use_pluralization else app
-                                        # Only set depend on if app is provided
                                             schedule_found = any(schedule_pattern in name for name in non_corp_names_for_schedules)
                                             if not schedule_found:
                                                 missing_schedule = True

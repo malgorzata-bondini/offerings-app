@@ -1639,6 +1639,15 @@ def run_generator(
                                         if not alias_value_to_use:
                                             alias_value_to_use = aliases_value
                                         
+                                        # Handle special "USE_APP_NAMES" value
+                                        if alias_value_to_use == "USE_APP_NAMES":
+                                            # Use app name as alias if app is provided
+                                            if app:
+                                                alias_value_to_use = app
+                                            else:
+                                                # If no app provided, use empty string
+                                                alias_value_to_use = ""
+                                        
                                         # Apply alias value to all alias columns
                                         for c in [c for c in row.columns if "Aliases" in c]:
                                             row.loc[:, c] = alias_value_to_use if alias_value_to_use else "-"

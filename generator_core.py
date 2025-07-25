@@ -1648,42 +1648,50 @@ def run_generator(
                                     row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
                                     
                                     # Handle aliases
-                                    if aliases_on and selected_languages:
-                                        alias_value_to_set = ""
-                                        
-                                        # Determine the value to use for the alias
-                                        if aliases_value == "USE_APP_NAMES":
-                                            alias_value_to_set = app if app else ""
-                                        elif aliases_per_country:
-                                            if country == "PL" and recv:
-                                                alias_value_to_set = aliases_per_country.get(recv, "")
+                                    if aliases_on:
+                                        # Check if "Use same values as Application Names" is selected
+                                        if aliases_value == "USE_APP_NAMES" and app:
+                                            # Look for the exact column name "Aliases (u_label) - ENG"
+                                            exact_column_name = "Aliases (u_label) - ENG"
+                                            if exact_column_name in row.columns:
+                                                print(f"✅ Found alias column '{exact_column_name}'. Setting app name '{app}'.")
+                                                row.loc[:, exact_column_name] = app
                                             else:
-                                                alias_value_to_set = aliases_per_country.get(country, "")
-                                        else:
-                                            alias_value_to_set = aliases_value
+                                                print(f"❌ Column '{exact_column_name}' not found in available columns")
                                         
-                                        # If we have a value and selected languages, find and set the alias
-                                        if alias_value_to_set:
-                                            for lang in selected_languages:
-                                                # Look for alias columns with various naming patterns
-                                                alias_patterns = [
-                                                    f"Aliases (u_label) - {lang}",
-                                                    f"ALIASES (U_LABEL) - {lang}",
-                                                    f"Aliases - {lang}",
-                                                    f"ALIASES - {lang}",
-                                                    f"Alias - {lang}",
-                                                    f"ALIAS - {lang}"
-                                                ]
-                                                
-                                                # Find matching column
-                                                for col in row.columns:
-                                                    col_normalized = col.strip()
-                                                    for pattern in alias_patterns:
-                                                        if col_normalized.upper() == pattern.upper():
-                                                            print(f"✅ Found alias column '{col}' for language '{lang}'. Setting value to '{alias_value_to_set}'.")
-                                                            row.loc[:, col] = alias_value_to_set
-                                                            break
-                                    
+                                        # Handle other alias scenarios (per country, custom values) if selected_languages is provided
+                                        elif selected_languages:
+                                            alias_value_to_set = ""
+                                            
+                                            if aliases_per_country:
+                                                if country == "PL" and recv:
+                                                    alias_value_to_set = aliases_per_country.get(recv, "")
+                                                else:
+                                                    alias_value_to_set = aliases_per_country.get(country, "")
+                                            else:
+                                                alias_value_to_set = aliases_value
+                                            
+                                            # If we have a value and selected languages, find and set the alias
+                                            if alias_value_to_set:
+                                                for lang in selected_languages:
+                                                    # Look for alias columns with various naming patterns
+                                                    alias_patterns = [
+                                                        f"Aliases (u_label) - {lang}",
+                                                        f"ALIASES (U_LABEL) - {lang}",
+                                                        f"Aliases - {lang}",
+                                                        f"ALIASES - {lang}",
+                                                        f"Alias - {lang}",
+                                                        f"ALIAS - {lang}"
+                                                    ]
+                                                    
+                                                    # Find matching column
+                                                    for col in row.columns:
+                                                        col_normalized = col.strip()
+                                                        for pattern in alias_patterns:
+                                                            if col_normalized.upper() == pattern.upper():
+                                                                print(f"✅ Found alias column '{col}' for language '{lang}'. Setting value to '{alias_value_to_set}'.")
+                                                                row.loc[:, col] = alias_value_to_set
+                                                                break
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
@@ -1708,8 +1716,6 @@ def run_generator(
                                             # For CORP offerings, extract what comes after CORP
                                             # Example: [SR DS CY CORP HS DE Dedicated Services] -> "HS DE"
                                             match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
-                                            # Ensure 'match' is always defined before use
-                                            match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
                                             if match:
                                                 row.loc[:, "Subscribed by Company"] = match.group(1)
                                             else:
@@ -1718,18 +1724,15 @@ def run_generator(
                                         else:
                                             # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
                                             row.loc[:, "Subscribed by Company"] = recv
-                                    if country == "DE":
-                                        # Existing DE logic
-                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
+                                    elif country == "DE":
+                                        # Existing DE logic for Germany
+                                        company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
                                         row.loc[:, "Subscribed by Company"] = company
                                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
-                                        # For CORP offerings in normal mode, extract from the second part of the name
-                                        # Example: [SR DS CY CORP DS CY IT] -> "DS CY"
-                                        if "Subscribed by Company" in base_row.index:
-                                            original_company = str(base_row["Subscribed by Company"]).strip()
-                                            if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:
-                                                row.loc[:, "Subscribed by Company"] = ""
-                                
+                                        # For CORP offerings in normal mode, clear the field
+                                        row.loc[:, "Subscribed by Company"] = ""
+                                    # For standard offerings, keep original value from source file
+                                    
                                     
                                     orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
                                     
@@ -1746,9 +1749,6 @@ def run_generator(
                                         row.loc[:, "Service Commitments"] = ""
                                     else:
                                         # Handle custom commitments - use both approaches
-                                        if use_custom_commitments and custom_commitments_str:
-                                            # Use the direct string if provided
-                                            row.loc[:, "Service Commitments"] = custom_commitments_str
                                            
                                             match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
                                             if match:
@@ -1756,18 +1756,14 @@ def run_generator(
                                             else:
                                                 # Fallback to receiver if pattern not found
                                                 row.loc[:, "Subscribed by Company"] = recv
-                                        else:
-                                            # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
-                                            row.loc[:, "Subscribed by Company"] = recv
                                     if country == "DE":
                                         # Existing DE logic
-                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
-                                        row.loc[:, "Subscribed by Company"] = company
+                                        row.loc[:, "Subscribed by Company"] = get_de_company_and_ldap(support_group_for_country, recv, base_row)[0]
                                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                         # For CORP offerings in normal mode, extract from the second part of the name
                                         # Example: [SR DS CY CORP DS CY IT] -> "DS CY"
                                         if "Subscribed by Company" in base_row.index:
-                                            original_company = str(base_row["Subscribed by Company"]).strip()
+                                            pass  # No action needed, remove unused variable
                                             if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:
                                                 row.loc[:, "Subscribed by Company"] = ""
                                     

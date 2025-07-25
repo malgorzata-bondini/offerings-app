@@ -966,65 +966,31 @@ def get_de_company_and_ldap(support_group, receiver, original_row=None):
         # Fallback to support group name if no original value available
         return support_group, ""
 
-@dataclass
-class GeneratorConfig:
-    # Basic parameters
-    keywords_parent: str
-    keywords_child: str
-    new_apps: List[str]
-    schedule_suffixes: List[str]
-    delivery_manager: str
-    global_prod: bool
-    
-    # Service parameters
-    rsp_duration: str
-    rsl_duration: str
-    sr_or_im: str
-    
-    # Type flags
-    require_corp: bool = False
-    require_recp: bool = False
-    require_corp_it: bool = False
-    require_corp_dedicated: bool = False
-    
-    # Special department flags
-    special_it: bool = False
-    special_hr: bool = False
-    special_medical: bool = False
-    special_dak: bool = False
-    
-    # Other parameters
-    delivering_tag: str = ""
-    support_group: str = ""
-    managed_by_group: str = ""
-    aliases_on: bool = False
-    aliases_value: str = ""
-    
-    # Directories
-    src_dir: Optional[Path] = None
-    out_dir: Optional[Path] = None
-    
-    # Custom commitments
-    use_custom_commitments: bool = False
-    custom_commitments_str: str = ""
-    commitment_country: Optional[str] = None
-    
-    # Per-country settings
-    support_groups_per_country: Optional[Dict[str, str]] = None
-    managed_by_groups_per_country: Optional[Dict[str, str]] = None
-    schedule_settings_per_country: Optional[Dict[str, str]] = None
-    aliases_per_country: Optional[Dict[str, str]] = None
-    
-    # Additional flags
-    use_new_parent: bool = False
-    new_parent_offering: str = ""
-    new_parent: str = ""
-    keywords_excluded: str = ""
-    use_lvl2: bool = False
-    service_type_lvl2: str = ""
-    use_custom_depend_on: bool = False
-    custom_depend_on_value: str = ""
-    business_criticality: str = ""
+# Dodaj na początku pliku (lub przed pętlą generującą wiersze):
+PLURAL_MAP = {
+    "Laptop": "Laptops",
+    "Desktop": "Desktops",
+    "Docking station": "Docking stations",
+    "Printer": "Printers",
+    "Barcode printer": "Barcode printers",
+    "Barcode scanner": "Barcode scanners",
+    "Display": "Displays",
+    "Deskphone": "Deskphones",
+    "Smartphone": "Smartphones",
+    "Mouse": "Mouses",
+    "Keyboard": "Keyboards",
+    "Headset": "Headsets",
+    "Tablet": "Tablets",
+    "Audio equipment": "Audio equipment",
+    "Video surveillance": "Video surveillance",
+    "UPS": "UPS",
+    "External webcam": "External webcams",
+    "Projector": "Projectors",
+    "External storage device": "External storage devices",
+    "Microphone": "Microphones",
+    "Other hardware": "Other hardware"
+    # Dodaj kolejne według potrzeb
+}
 
 def run_generator(
     keywords_parent, keywords_child, new_apps, schedule_suffixes,

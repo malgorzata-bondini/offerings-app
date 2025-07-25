@@ -673,7 +673,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
         st.error("⚠️ Please upload at least one Excel file")
     elif use_new_parent and (not new_parent_offerings or not new_parents):
         st.error("⚠️ When using specific parent offering, please add at least one Parent Offering and Parent pair")
-    elif not use_new_parent and not keywords_parent.strip() and not keywords_child.strip():
+    elif not use_new_parent and not keywords_parent and not keywords_child:
         st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering, or use specific parent offering")
     elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")

@@ -1892,7 +1892,7 @@ def run_generator(
                             except Exception:
                                 continue
                     
-                    # Add missing columns from original, preserving their values
+                    # Add missing columns from original, preserving their values - SAFER VERSION
                     for col in original_order:
                         if col not in df.columns:
                             # Skip the Number column - don't add it (exact match only)
@@ -1900,17 +1900,28 @@ def run_generator(
                                 continue
                                 
                             if original_df is not None and col in original_df.columns:
-                                # Get original column data and ensure it matches df length
-                                original_col_data = original_df[col]
-                                
-                                # Safely handle length mismatch
-                                if len(original_col_data) >= len(df):
-                                    # Take exactly the number we need
-                                    df[col] = original_col_data.iloc[:len(df)].reset_index(drop=True)
-                                else:
-                                    # Fill missing values with empty strings
-                                    padded_data = list(original_col_data) + [''] * (len(df) - len(original_col_data))
-                                    df[col] = padded_data[:len(df)]
+                                try:
+                                    # Get original column data
+                                    original_col_data = original_df[col].copy()
+                                    
+                                    # Create new column with appropriate default value
+                                    if len(df) > 0:
+                                        # Determine appropriate default based on original data
+                                        non_null_values = original_col_data.dropna()
+                                        if len(non_null_values) > 0:
+                                            # Use the most common non-null value or first value
+                                            default_val = non_null_values.iloc[0] if len(non_null_values) > 0 else ''
+                                        else:
+                                            default_val = ''
+                                        
+                                        # Create column with consistent values
+                                        df[col] = [default_val] * len(df)
+                                    else:
+                                        df[col] = pd.Series([], dtype='object')
+                                        
+                                except Exception as e:
+                                    print(f"Warning: Error adding column {col}: {e}")
+                                    df[col] = ''
                             else:
                                 df[col] = ''
                     
@@ -1939,58 +1950,63 @@ def run_generator(
                 df_final = df.copy()
                 for col in df_final.columns:
                     try:
-                        # Handle mixed types more safely
-                        df_final[col] = df_final[col].fillna('').astype(str)
+                        # Handle different data types more safely
+                        if df_final[col].dtype == 'object':
+                            # For object columns, handle nulls and convert carefully
+                            df_final[col] = df_final[col].fillna('')
+                            # Only convert to string if it's not already a string
+                            df_final[col] = df_final[col].apply(lambda x: str(x) if pd.notna(x) and x != '' else '')
+                        elif df_final[col].dtype in ['int64', 'float64']:
+                            # For numeric columns, keep as numeric but handle NaN
+                            df_final[col] = df_final[col].fillna('')
+                        else:
+                            # For other types, handle more carefully
+                            df_final[col] = df_final[col].fillna('')
                         
-                        # Replace problematic values
-                        df_final[col] = df_final[col].replace({
-                            'nan': '',
-                            'NaN': '',
-                            'None': '',
-                            'none': '',
-                            'NULL': '',
-                            'null': '',
-                            '<NA>': '',
-                            'True': 'true',
-                            'TRUE': 'true',
-                            'False': 'false',
-                            'FALSE': 'false'
-                        })
+                        # Replace problematic values only for string columns
+                        if df_final[col].dtype == 'object':
+                            df_final[col] = df_final[col].replace({
+                                'nan': '',
+                                'NaN': '',
+                                'None': '',
+                                'none': '',
+                                'NULL': '',
+                                'null': '',
+                                '<NA>': ''
+                            })
                         
                     except Exception as e:
                         print(f"Warning: Error processing column {col}: {e}")
-                        # Fallback: convert everything to string
-                        df_final[col] = df_final[col].astype(str).fillna('')
+                        # Fallback: handle more safely
+                        df_final[col] = df_final[col].fillna('').astype(str)
                 
-                # Special handling for boolean columns
+                # Special handling for boolean columns - IMPROVED
                 if "Approval required" in df_final.columns:
-                    # Keep custom values, but standardize boolean representations
-                    df_final["Approval required"] = df_final["Approval required"].replace({
-                        'True': 'false',
-                        'False': 'false',
-                        'TRUE': 'false',
-                        'FALSE': 'false',
-                        '': 'false',
-                        'nan': 'false'
-                    }).fillna('false')
+                    # Handle approval required more carefully
+                    def clean_approval_value(val):
+                        if pd.isna(val) or str(val).strip() in ['', 'nan', 'NaN', 'None', 'none']:
+                            return 'false'
+                        val_str = str(val).strip().lower()
+                        if val_str in ['true', 'false']:
+                            return val_str
+                        elif val_str in ['yes', 'y', '1']:
+                            return 'true'
+                        elif val_str in ['no', 'n', '0']:
+                            return 'false'
+                        else:
+                            # Keep custom values as-is (like "empty", etc.)
+                            return str(val).strip()
                     
-                    # Only keep non-false values if they're meaningful
-                    mask = ~df_final["Approval required"].isin(['false', '', 'nan', 'NaN', 'None'])
-                    df_final.loc[~mask, "Approval required"] = 'false'
+                    df_final["Approval required"] = df_final["Approval required"].apply(clean_approval_value)
                 
-                # Special handling for Approval group column
+                # Special handling for Approval group column - IMPROVED
                 if "Approval group" in df_final.columns:
-                    # For Approval group, clean up empty/null values to "empty"
-                    df_final["Approval group"] = df_final["Approval group"].replace({
-                        'nan': 'empty',
-                        'NaN': 'empty',
-                        'None': 'empty',
-                        'none': 'empty',
-                        'NULL': 'empty',
-                        'null': 'empty',
-                        '<NA>': 'empty',
-                        '': 'empty'
-                    }).fillna('empty')
+                    def clean_approval_group(val):
+                        if pd.isna(val) or str(val).strip() in ['', 'nan', 'NaN', 'None', 'none', 'NULL', 'null', '<NA>']:
+                            return 'empty'
+                        return str(val).strip()
+                    
+                    df_final["Approval group"] = df_final["Approval group"].apply(clean_approval_group)
                 
                 # Store the final DataFrame for later formatting use
                 sheets[sheet_key] = df_final
@@ -2047,21 +2063,23 @@ def run_generator(
                 
                 ws.column_dimensions[col_letter].width = max_length + 2
                 
-                # Apply text wrapping and clean cell values
+                # Apply text wrapping and clean cell values - SAFER VERSION
                 for cell in col:
                     try:
-                        cell.alignment = Alignment(wrap_text=True)
+                        if hasattr(cell, 'alignment'):
+                            cell.alignment = Alignment(wrap_text=True)
+                        
                         # Clean up cell values more safely
                         from openpyxl.cell.cell import MergedCell
-                        if not isinstance(cell, MergedCell) and cell.value is not None:
+                        if not isinstance(cell, MergedCell) and hasattr(cell, 'value') and cell.value is not None:
                             cell_val = str(cell.value).strip()
-                            if cell_val.lower() in ['nan', 'none', 'null', '<na>', 'n/a']:
-                                cell.value = ''
-                            elif cell_val == '':
-                                cell.value = None
+                            # Only clean up obviously invalid values
+                            if cell_val.lower() in ['nan', 'none', 'null', '<na>', 'n/a'] or cell_val == '':
+                                cell.value = None  # Use None instead of empty string for Excel
+                            # Keep other values as-is to avoid corruption
                     except Exception as e:
-                        print(f"Warning: Error formatting cell: {e}")
-                        pass
+                        # Don't print warnings for every cell - just continue
+                        continue
         
         wb.save(outfile)
     except Exception as e:

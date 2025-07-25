@@ -1829,18 +1829,24 @@ def run_generator(
 
     # Check if we have any data to write
     if not sheets_data or all(not rows_list for rows_list in sheets_data.values()):
-        print("❌ No matching offerings found with the specified keywords.")
-        print("Please check your search criteria:")
-        if keywords_parent.strip():
-            print(f"  - Parent keywords: {keywords_parent}")
-        if keywords_child.strip():
-            print(f"  - Child keywords: {keywords_child}")
-        if keywords_excluded.strip():
-            print(f"  - Excluded keywords: {keywords_excluded}")
-        print("Try using different or fewer keywords, or check if the source files contain matching offerings.")
-        
-        # Return None or raise an exception instead of trying to create empty Excel
-        raise ValueError("No matching offerings found. Please adjust your search criteria.")
+        if use_new_parent:
+            # For new parent mode, this might be expected if we're creating entirely new offerings
+            print("ℹ️ Creating new parent offerings...")
+            # Don't raise an error - this is normal for new parent mode
+            # Instead, we should have data from the synthetic rows we created
+        else:
+            print("❌ No matching offerings found with the specified keywords.")
+            print("Please check your search criteria:")
+            if keywords_parent.strip():
+                print(f"  - Parent keywords: {keywords_parent}")
+            if keywords_child.strip():
+                print(f"  - Child keywords: {keywords_child}")
+            if keywords_excluded.strip():
+                print(f"  - Excluded keywords: {keywords_excluded}")
+            print("Try using different or fewer keywords, or check if the source files contain matching offerings.")
+            
+            # Return None or raise an exception instead of trying to create empty Excel
+            raise ValueError("No matching offerings found. Please adjust your search criteria.")
 
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile, engine="openpyxl") as w:

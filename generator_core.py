@@ -1951,20 +1951,21 @@ def run_generator(
                 if "Approval required" in df_final.columns:
                     # Keep custom values, but standardize boolean representations
                     df_final["Approval required"] = df_final["Approval required"].replace({
-                        True: 'false',
-                        False: 'false', 
                         'True': 'false',
                         'False': 'false',
                         'TRUE': 'false',
                         'FALSE': 'false',
                         '': 'false',
-                        'nan': 'false',
-                        'empty': 'empty'  # Only explicit 'empty' stays as 'empty'
+                        'nan': 'false'
                     }).fillna('false')
+                    
+                    # Only keep non-false values if they're meaningful
+                    mask = ~df_final["Approval required"].isin(['false', '', 'nan', 'NaN', 'None'])
+                    df_final.loc[~mask, "Approval required"] = 'false'
                 
                 # Special handling for Approval group column
                 if "Approval group" in df_final.columns:
-                    # For Approval group, preserve user input but clean up empty/null values
+                    # For Approval group, clean up empty/null values to "empty"
                     df_final["Approval group"] = df_final["Approval group"].replace({
                         'nan': 'empty',
                         'NaN': 'empty',
@@ -2031,17 +2032,18 @@ def run_generator(
                 
                 ws.column_dimensions[col_letter].width = max_length + 2
                 
-                # Apply text wrapping
+                # Apply text wrapping and clean cell values
                 for cell in col:
                     try:
                         cell.alignment = Alignment(wrap_text=True)
-                        # Clean up cell values
+                        # Clean up cell values more safely
                         from openpyxl.cell.cell import MergedCell
-                        if not isinstance(cell, MergedCell):
-                            if cell.value in ['nan', 'NaN', 'None', None, 'none', 'NULL', 'null', '<NA>']:
-                                cell.value = None
-                            elif isinstance(cell.value, str) and cell.value.lower() in ['nan', 'none', 'null']:
+                        if not isinstance(cell, MergedCell) and cell.value is not None:
+                            cell_val = str(cell.value).strip()
+                            if cell_val.lower() in ['nan', 'none', 'null', '<na>', 'n/a']:
                                 cell.value = ''
+                            elif cell_val == '':
+                                cell.value = None
                     except Exception as e:
                         print(f"Warning: Error formatting cell: {e}")
                         pass

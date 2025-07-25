@@ -1055,6 +1055,21 @@ def run_generator(
     """
     Main generator function.
     """
+    # Define helper function for cleaning approval values
+    def clean_approval_value(val):
+        if pd.isna(val) or str(val).strip() in ['', 'nan', 'NaN', 'None', 'none', 'NULL', 'null', '<NA>']:
+            return 'false'
+        val_str = str(val).strip().lower()
+        if val_str in ['true', 'false']:
+            return val_str
+        elif val_str in ['yes', 'y', '1']:
+            return 'true'
+        elif val_str in ['no', 'n', '0']:
+            return 'false'
+        else:
+            # Keep custom values as-is (like "empty", etc.)
+            return str(val).strip()
+
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
         support_groups_per_country = {}
@@ -1628,6 +1643,8 @@ def run_generator(
                                         # Keep original aliases values
                                         pass
                                     else:
+                                        print(f"DEBUG: Processing aliases - aliases_on={aliases_on}, aliases_value='{aliases_value}', app='{app}'")
+                                        
                                         # Determine which alias value to use
                                         alias_value_to_use = ""
                                         
@@ -1644,23 +1661,39 @@ def run_generator(
                                         if not alias_value_to_use:
                                             alias_value_to_use = aliases_value
                                         
+                                        print(f"DEBUG: alias_value_to_use after logic: '{alias_value_to_use}'")
+                                        
                                         # Handle special "USE_APP_NAMES" value - CHECK BOTH VALUES
                                         if alias_value_to_use == "USE_APP_NAMES" or aliases_value == "USE_APP_NAMES":
                                             # Use app name as alias if app is provided
                                             alias_value_to_use = app if app else ""
+                                            print(f"DEBUG: Using app name as alias: '{alias_value_to_use}'")
                                         
-                                        # Find all alias columns
-                                        alias_columns = [c for c in row.columns if "Alias" in c or "alias" in c or "u_label" in c]
+                                        # Find all alias columns - EXPANDED SEARCH
+                                        alias_columns = []
+                                        for col in row.columns:
+                                            col_lower = col.lower()
+                                            if any(keyword in col_lower for keyword in ["alias", "u_label", "label"]):
+                                                alias_columns.append(col)
+                                        
+                                        print(f"DEBUG: Found alias columns: {alias_columns}")
+                                        print(f"DEBUG: All available columns: {list(row.columns)}")
                                         
                                         if alias_columns and alias_value_to_use:
+                                            print(f"DEBUG: Will set alias value '{alias_value_to_use}' in columns")
+                                            
                                             # Special case: if "USE_APP_NAMES" was selected, always use ENG column
-                                            if aliases_value == "USE_APP_NAMES" or alias_value_to_use == "USE_APP_NAMES":
+                                            if aliases_value == "USE_APP_NAMES":
+                                                print(f"DEBUG: USE_APP_NAMES mode - looking for ENG columns")
+                                                
                                                 # Look for ENG alias column specifically - EXPANDED SEARCH
-                                                eng_columns = [col for col in alias_columns 
-                                                             if "- ENG" in col or "(ENG)" in col or 
-                                                             "- EN" in col or "(EN)" in col or
-                                                             "- ENGLISH" in col or "(ENGLISH)" in col or
-                                                             col.endswith("ENG") or "ENG" in col.upper()]
+                                                eng_columns = []
+                                                for col in alias_columns:
+                                                    col_upper = col.upper()
+                                                    if any(pattern in col_upper for pattern in ["ENG", "EN", "ENGLISH"]):
+                                                        eng_columns.append(col)
+                                                
+                                                print(f"DEBUG: Found ENG columns: {eng_columns}")
                                                 
                                                 if eng_columns:
                                                     # Use the first ENG column found
@@ -1673,6 +1706,7 @@ def run_generator(
                                             else:
                                                 # Original logic for when languages are selected
                                                 if selected_languages:
+                                                    print(f"DEBUG: Using selected languages: {selected_languages}")
                                                     # Find columns that match selected languages
                                                     matching_columns = []
                                                     
@@ -1695,8 +1729,11 @@ def run_generator(
                                                     # Remove duplicates while preserving order
                                                     matching_columns = list(dict.fromkeys(matching_columns))
                                                     
+                                                    print(f"DEBUG: Matching columns for languages: {matching_columns}")
+                                                    
                                                     # Set alias value in ALL matching columns
                                                     for col in matching_columns:
+                                                        print(f"DEBUG: Setting alias '{alias_value_to_use}' in column: {col}")
                                                         row.loc[:, col] = alias_value_to_use
 
                                     # Handle Visibility group - ensure it exists for PL
@@ -2021,28 +2058,6 @@ def run_generator(
                             df_final[col] = df_final[col].fillna('')
                         
                         # Replace problematic values only for string columns
-                        if df_final[col].dtype == 'object':
-                            df_final[col] = df_final[col].replace({
-                                'nan': '',
-                                'NaN': '',
-                                'None': '',
-                                'none': '',
-                                'NULL': '',
-                                'null': '',
-                                '<NA>': ''
-                            })
-                        
-                    except Exception as e:
-                        print(f"Warning: Error processing column {col}: {e}")
-                        # Fallback: handle more safely
-                        df_final[col] = df_final[col].fillna('').astype(str)
-                
-                # Special handling for boolean columns - IMPROVED
-                if "Approval required" in df_final.columns:
-                    # Handle approval required more carefully
-                    def clean_approval_value(val):
-                        if pd.isna(val) or str(val).strip() in ['', 'nan', 'NaN', 'None', 'none']:
-                            return 'false'
                         val_str = str(val).strip().lower()
                         if val_str in ['true', 'false']:
                             return val_str
@@ -2053,6 +2068,9 @@ def run_generator(
                         else:
                             # Keep custom values as-is (like "empty", etc.)
                             return str(val).strip()
+                    except Exception as e:
+                        # If any error occurs during cleaning, skip and continue
+                        continue
                     
                     df_final["Approval required"] = df_final["Approval required"].apply(clean_approval_value)
                 

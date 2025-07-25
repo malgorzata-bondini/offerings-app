@@ -800,6 +800,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         # Add custom depend on value
                         use_custom_depend_on=use_custom_depend_on if 'use_custom_depend_on' in locals() else False,
                         custom_depend_on_value=custom_depend_on_value if 'custom_depend_on_value' in locals() else "",
+                        # Pass selected languages for aliases
+                        selected_languages=selected_languages if 'selected_languages' in locals() else [],
                         # Add business criticality
                         business_criticality=business_criticality,
                         # Add approval required

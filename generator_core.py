@@ -613,7 +613,13 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Add app if provided
         if app:
-            name_parts.append(app)
+            # Build the current name string to check for "hardware"
+            current_name_str = " ".join(name_parts)
+            # Check if "hardware" is in the current name (case insensitive)
+            if "hardware" in current_name_str.lower():
+                name_parts.append(app.lower())  # Use lowercase for hardware
+            else:
+                name_parts.append(app)  # Keep original case
         
         # Add "solving" for IM
         if sr_or_im == "IM":

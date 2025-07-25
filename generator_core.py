@@ -1644,12 +1644,21 @@ def run_generator(
                                             # Use app name as alias if app is provided
                                             alias_value_to_use = app if app else ""
                                         
-                                        # Apply alias value to all alias columns - search for "Alias" (not "Aliases")
+                                        # Debug: Print what we're working with
+                                        print(f"DEBUG: aliases_value='{aliases_value}', alias_value_to_use='{alias_value_to_use}', app='{app}'")
+                                        
+                                        # Apply alias value to all alias columns - search for "Alias" 
                                         alias_columns = [c for c in row.columns if "Alias" in c]
+                                        
+                                        print(f"DEBUG: Found alias columns: {alias_columns}")
                                         
                                         if alias_columns:
                                             for c in alias_columns:
-                                                row.loc[:, c] = alias_value_to_use if alias_value_to_use else "-"
+                                                final_alias = alias_value_to_use if alias_value_to_use else "-"
+                                                row.loc[:, c] = final_alias
+                                                print(f"DEBUG: Set alias '{final_alias}' in column: {c}")
+                                        else:
+                                            print("DEBUG: No alias columns found")
                                         
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:

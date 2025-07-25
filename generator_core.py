@@ -1313,10 +1313,18 @@ def run_generator(
                     
                     # Add missing columns as empty, but maintain order
                     original_columns = list(df.columns)
+                    
+                    # DEBUG: Print all columns to see what we have
+                    print(f"🔍 **COLUMNS IN {wb.name} - {sheet_name}**:")
+                    for i, col in enumerate(df.columns):
+                        print(f"  {i+1:2d}. '{col}'")
+                        if "alias" in col.lower() or "u_label" in col.lower():
+                            print(f"      ⭐ **ALIAS COLUMN FOUND!**")
+                    
                     for col in need_cols:
                         if col not in df.columns:
                             df[col] = ""
-                    
+
                     # Ensure Visibility group column exists
                     if "Visibility group" not in df.columns:
                         df["Visibility group"] = ""
@@ -1743,14 +1751,6 @@ def run_generator(
                                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                         # For CORP offerings in normal mode, extract from the second part of the name
                                         # Example: [SR DS CY CORP DS CY IT] -> "DS CY"
-                                        match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
-                                        if match:
-                                            row.loc[:, "Subscribed by Company"] = match.group(1)
-                                        else:
-                                            # Fallback to receiver if pattern not found
-                                            row.loc[:, "Subscribed by Company"] = recv
-                                    else:
-                                                                               # For standard offerings in normal mode, ALWAYS preserve original value from source file
                                         if "Subscribed by Company" in base_row.index:
                                             original_company = str(base_row["Subscribed by Company"]).strip()
                                             if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:

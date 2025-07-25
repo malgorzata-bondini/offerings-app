@@ -537,6 +537,13 @@ with col2:
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False)
         
+        # Add pluralization setting
+        use_pluralization = st.checkbox(
+            "Use plural forms for hardware items", 
+            value=True,
+            help="Convert singular hardware terms to plural (e.g., Laptop → Laptops, Mouse → Mouses)"
+        )
+        
         # Custom Depend On setting
         st.markdown("### Service Offerings | Depend On")
         use_custom_depend_on = st.checkbox("Use custom 'Service Offerings | Depend On' value", value=False, 
@@ -677,6 +684,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         schedule_suffixes=schedule_suffixes,
                         delivery_manager=delivery_manager,
                         global_prod=global_prod,
+                        # Add pluralization parameter
                         rsp_duration=rsp_duration,
                         rsl_duration=rsl_duration,
                         sr_or_im=sr_or_im,

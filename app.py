@@ -583,9 +583,15 @@ with col2:
             
             # Construct the custom depend on value
             if depend_on_prefix == "Global":
-                prefix_tag = "Global Prod"
+                if special_it:
+                    prefix_tag = "Global"  # Remove "Prod" for IT
+                else:
+                    prefix_tag = "Global Prod"
             else:
-                prefix_tag = f"{depend_on_prefix} Prod"
+                if special_it:
+                    prefix_tag = depend_on_prefix  # Remove "Prod" for IT
+                else:
+                    prefix_tag = f"{depend_on_prefix} Prod"
             
             # Show preview(s) for the custom depend on values
             if new_apps:

@@ -140,67 +140,42 @@ with col2:
         if use_new_parent:
             st.info("📝 Enter the exact Parent Offering and Parent values to use")
             
-            # Initialize session state for dynamic parent offerings
-            if 'parent_offerings' not in st.session_state:
-                st.session_state.parent_offerings = [{"offering": "", "parent": ""}]
+            col_parent1, col_parent2 = st.columns(2)
+            with col_parent1:
+                new_parent_offering = st.text_input(
+                    "New Parent Offering",
+                    value="",
+                    placeholder="e.g., [Parent HS PL IT] Software assistance",
+                    help="Enter the complete Parent Offering text"
+                )
             
-            st.markdown("### Parent Offering Pairs")
-            
-            # Display existing pairs
-            for i, pair in enumerate(st.session_state.parent_offerings):
-                col1, col2, col3 = st.columns([2, 2, 1])
-                
-                with col1:
-                    pair["offering"] = st.text_input(
-                        "New Parent Offering",
-                        value=pair["offering"],
-                        placeholder="e.g., [Parent HS PL IT] Software assistance",
-                        key=f"offering_{i}"
-                    )
-                
-                with col2:
-                    pair["parent"] = st.text_input(
-                        "New Parent",
-                        value=pair["parent"],
-                        placeholder="e.g., PL IT Support",
-                        key=f"parent_{i}"
-                    )
-                
-                with col3:
-                    if len(st.session_state.parent_offerings) > 1:
-                        if st.button("➖", key=f"remove_{i}", help="Remove this pair"):
-                            st.session_state.parent_offerings.pop(i)
-                            st.rerun()
-            
-            # Add/Remove buttons
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("➕ Add Parent Offering", use_container_width=True):
-                    st.session_state.parent_offerings.append({"offering": "", "parent": ""})
-                    st.rerun()
-            
-            with col2:
-                if len(st.session_state.parent_offerings) > 1:
-                    if st.button("➖ Remove Last", use_container_width=True):
-                        st.session_state.parent_offerings.pop()
-                        st.rerun()
-            
-            # Convert to the format expected by the backend
-            new_parent_offerings = "\n".join([pair["offering"] for pair in st.session_state.parent_offerings if pair["offering"]])
-            new_parents = "\n".join([pair["parent"] for pair in st.session_state.parent_offerings if pair["parent"]])
-            
-            # Show preview
-            if new_parent_offerings and new_parents:
-                st.success("✅ **Preview of Parent Offering pairs:**")
-                for i, pair in enumerate(st.session_state.parent_offerings):
-                    if pair["offering"] and pair["parent"]:
-                        st.write(f"{i+1}. **Parent Offering:** `{pair['offering']}` → **New Parent:** `{pair['parent']}`")
+            with col_parent2:
+                new_parent = st.text_input(
+                    "New Parent",
+                    value="",
+                    placeholder="e.g., PL IT Support",
+                    help="Enter the Parent value"
+                )
         else:
-            new_parent_offerings = ""
-            new_parents = ""
-            # Clear session state when not using new parent
-            if 'parent_offerings' in st.session_state:
-                del st.session_state.parent_offerings
+            new_parent_offering = ""
+            new_parent = ""
+        
+        # Zmień z pojedynczego pola na textarea dla wielu parent offerings
+        st.text_area(
+            "New Parent Offerings (one per line)",
+            value="",
+            height=100,
+            placeholder="[Parent HS PL IT] Software assistance\n[Parent DS PL IT] Hardware support\n[Parent HS DE Medical] Patient management",
+            help="Enter multiple parent offerings, one per line. Each line should contain both Parent Offering and Parent values."
+        )
+
+        st.text_area(
+            "Corresponding New Parents (one per line)",
+            value="",
+            height=100,
+            placeholder="PL IT Support\nPL Hardware\nDE Medical Support",
+            help="Enter corresponding parent values, one per line. Must match the number of parent offerings above."
+        )
     
     with tab3:
         st.subheader("Schedule Settings")
@@ -671,8 +646,8 @@ st.markdown("---")
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
-    elif use_new_parent and (not new_parent_offerings or not new_parents):
-        st.error("⚠️ When using specific parent offering, please add at least one Parent Offering and Parent pair")
+    elif use_new_parent and (not new_parent_offering or not new_parent):
+        st.error("⚠️ When using specific parent offering, both 'New Parent Offering' and 'New Parent' must be filled")
     elif not use_new_parent and not keywords_parent and not keywords_child:
         st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering, or use specific parent offering")
     elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
@@ -722,6 +697,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
                         require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
                         use_new_parent=use_new_parent,
+                        new_parent_offering=new_parent_offering,
+                        new_parent=new_parent,
                         keywords_excluded=keywords_excluded if not use_new_parent else "",
                         use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
                         service_type_lvl2=service_type if 'service_type' in locals() else "",

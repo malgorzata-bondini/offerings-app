@@ -159,6 +159,23 @@ with col2:
         else:
             new_parent_offering = ""
             new_parent = ""
+        
+        # Zmień z pojedynczego pola na textarea dla wielu parent offerings
+        st.text_area(
+            "New Parent Offerings (one per line)",
+            value="",
+            height=100,
+            placeholder="[Parent HS PL IT] Software assistance\n[Parent DS PL IT] Hardware support\n[Parent HS DE Medical] Patient management",
+            help="Enter multiple parent offerings, one per line. Each line should contain both Parent Offering and Parent values."
+        )
+
+        st.text_area(
+            "Corresponding New Parents (one per line)",
+            value="",
+            height=100,
+            placeholder="PL IT Support\nPL Hardware\nDE Medical Support",
+            help="Enter corresponding parent values, one per line. Must match the number of parent offerings above."
+        )
     
     with tab3:
         st.subheader("Schedule Settings")

@@ -556,6 +556,11 @@ with col2:
             with col2:
                 # Show which apps will be used automatically
                 if new_apps:
+                    # Calculate dynamic height based on number of apps
+                    num_apps = len(new_apps)
+                    # Base height of 60px + 25px per additional app, with minimum 80px and maximum 300px
+                    dynamic_height = max(80, min(300, 60 + (num_apps * 25)))
+                    
                     if len(new_apps) == 1:
                         st.text_input(
                             "Application Name",
@@ -568,7 +573,7 @@ with col2:
                             "Application Names",
                             value="\n".join(new_apps),
                             disabled=True,
-                            height=80,
+                            height=dynamic_height,
                             help=f"Will automatically use each app: {', '.join(new_apps)}"
                         )
                     app_names_display = new_apps

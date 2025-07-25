@@ -1772,21 +1772,10 @@ def run_generator(
                                             # If no app and using custom depend on, use the custom value only if it's meant to be used without app
                                             row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
                                     elif app:
-                                        # Determine depend tag without Prod for IT
-                                        if special_dept == "IT":
-                                            # For IT, create depend tag without Prod
-                                            if country == "PL":
-                                                if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
-                                                    depend_tag_clean = "HS PL"
-                                                elif re.search(r'\bDS\s+PL\b', new_name, re.IGNORECASE):
-                                                    depend_tag_clean = "DS PL"
-                                                else:
-                                                    depend_tag_clean = "DS PL"  # safe default
-                                            elif recv:
-                                                depend_tag_clean = recv  # e.g., "HS DE", "DS DE"
-                                            else:
-                                                depend_tag_clean = f"{delivering_tag}" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"HS {country}"
-                                            
+                                        # Check if IT is selected in naming convention
+                                        if special_it:  # Change from special_dept == "IT" to special_it
+                                            # For IT, don't add Prod to depend on
+                                            depend_tag_clean = depend_tag.replace(' Prod', '')
                                             row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"[{depend_tag_clean}] {app}"
                                         else:
                                             # For non-IT, use the normal depend tag with Prod

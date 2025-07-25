@@ -1039,9 +1039,7 @@ def run_generator(
     rsp_priority="", rsl_priority="",
     rsp_time="", rsl_time="",
     require_corp_it=False, require_corp_dedicated=False,
-    use_new_parent=False, 
-    new_parent_offerings="",  # Changed to plural and accept multiline string
-    new_parents="",          # Changed to plural and accept multiline string
+    use_new_parent=False, new_parent_offering="", new_parent="",
     keywords_excluded="",
     use_lvl2=False, service_type_lvl2="",
     support_groups_per_country=None, managed_by_groups_per_country=None,
@@ -1052,24 +1050,9 @@ def run_generator(
     approval_required=False,
     approval_required_value="empty",
     change_subscribed_location=False,
-    custom_subscribed_location="Global"):
+    custom_subscribed_location="Global"):  # Add these parameters
 
-    # Parse multiple parent offerings
-    parent_offering_pairs = []
-    if use_new_parent:
-        # Split by lines and parse
-        offering_lines = [line.strip() for line in new_parent_offerings.split('\n') if line.strip()]
-        parent_lines = [line.strip() for line in new_parents.split('\n') if line.strip()]
-        
-        # Validate that we have the same number of offerings and parents
-        if len(offering_lines) != len(parent_lines):
-            raise ValueError(f"Number of Parent Offerings ({len(offering_lines)}) must match number of New Parents ({len(parent_lines)})")
-        
-        # Create pairs
-        for offering, parent in zip(offering_lines, parent_lines):
-            parent_offering_pairs.append((offering, parent))
-    
-    # Rest of existing initialization code...
+    # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
         support_groups_per_country = {}
     if managed_by_groups_per_country is None:
@@ -1281,23 +1264,13 @@ def run_generator(
             is_lvl2 = (current_level == 2)
                 
             try:
-                # IF USING NEW PARENT, CREATE MULTIPLE SYNTHETIC ROWS
+                # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
-                    # Create multiple base rows - one for each parent offering pair
-                    base_pool_list = []
-                    for new_parent_offering, new_parent in parent_offering_pairs:
-                        new_row = create_new_parent_row(
-                            new_parent_offering, new_parent, country, 
-                            business_criticality, approval_required, 
-                            approval_required_value, change_subscribed_location, 
-                            custom_subscribed_location
-                        )
-                        base_pool_list.append(new_row)
-                    
-                    # Combine all synthetic rows into a DataFrame
-                    base_pool = pd.DataFrame(base_pool_list)
-                    
-                    # Initialize schedule checking variables for new parent mode
+                    # Create a new synthetic row with the specified parent offering and parent
+                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
+                    base_pool = pd.DataFrame([new_row])
+                    # For new parent, we can process both levels with the same synthetic data
+                    # Initialize schedule checking variables
                     all_country_names_for_schedules = pd.Series([], dtype=str)
                     corp_names_for_schedules = pd.Series([], dtype=str)
                     non_corp_names_for_schedules = pd.Series([], dtype=str)
@@ -1390,7 +1363,7 @@ def run_generator(
                 if base_pool.empty:
                     continue
                 
-                # Process ALL matching rows (now multiple for new parent mode)
+                # Process ALL matching rows, not just the first one
                 total_base_rows = len(base_pool)
                 print(f"Processing {total_base_rows} base rows...")
                 start_time = time.time()
@@ -1748,21 +1721,46 @@ def run_generator(
                                             # Update original commitments with user schedule
                                             row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
                                     # For Lvl2, keep empty commitments empty
-
-                                    # Ensure depend_tag is always defined before use
-                                    if country == "PL":
-                                        # Regex-based PL Prod determination (case-insensitive)
-                                        if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
-                                            depend_tag = "HS PL Prod"
-                                        elif re.search(r'\bDS\s+PL\b', new_name, re.IGNORECASE):
-                                            depend_tag = "DS PL Prod"
-                                        else:
-                                            depend_tag = "DS PL Prod"  # safe default
-                                    elif recv:
-                                        depend_tag = f"{recv} Prod"
+                                    elif is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
+                                        row.loc[:, "Service Commitments"] = ""
                                     else:
-                                        depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
-
+                                        # Handle custom commitments - use both approaches
+                                        if use_custom_commitments and custom_commitments_str:
+                                            # Use the direct string if provided
+                                            row.loc[:, "Service Commitments"] = custom_commitments_str
+                                        elif use_custom_commitments and commitment_country:
+                                            # Use custom_commit_block function if country provided
+                                            row.loc[:, "Service Commitments"] = custom_commit_block(
+                                                commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
+                                                rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
+                                                rsp_time, rsl_time
+                                            )
+                                        else:
+                                            # Use existing logic
+                                            if not orig_comm or orig_comm == "-":
+                                                row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im)
+                                            else:
+                                                row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
+                                    
+                                    # Special handling for IT with UA/MD/RO/TR - always use DS
+                                    if (special_dept == "IT" or require_corp_it) and country in ["UA", "MD", "RO", "TR"]:
+                                        depend_tag = f"DS {country} Prod"
+                                    elif global_prod:
+                                        depend_tag = "Global Prod"
+                                    else:
+                                        if country == "PL":
+                                            # Regex-based PL Prod determination (case-insensitive)
+                                            if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
+                                                depend_tag = "HS PL Prod"
+                                            elif re.search(r'\bDS\s+PL\b', new_name, re.IGNORECASE):
+                                                depend_tag = "DS PL Prod"
+                                            else:
+                                                depend_tag = "DS PL Prod"  # safe default
+                                        elif recv:
+                                            depend_tag = f"{recv} Prod"
+                                        else:
+                                            depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"{tag_hs} Prod"
+                                    
                                     # Always update Service Offerings | Depend On based on computed depend_tag and app
                                     if use_custom_depend_on and custom_depend_on_value:
                                         # Use custom prefix but still include app name automatically
@@ -2081,29 +2079,3 @@ def run_generator(
     print("Processing complete. Output saved to:", outfile)
     # Return the output file path
     return outfile
-
-import streamlit as st
-
-# W funkcji która obsługuje UI
-def handle_new_parent_offerings(use_new_parent, new_parent_offerings, new_parents):
-    if use_new_parent:
-        # Parse and validate
-        offering_lines = [line.strip() for line in new_parent_offerings.split('\n') if line.strip()]
-        parent_lines = [line.strip() for line in new_parents.split('\n') if line.strip()]
-        
-        if not offering_lines:
-            st.error("❌ Please enter at least one Parent Offering")
-            return False
-            
-        if len(offering_lines) != len(parent_lines):
-            st.error(f"❌ Number of Parent Offerings ({len(offering_lines)}) must match number of New Parents ({len(parent_lines)})")
-            return False
-        
-        # Show preview
-        st.info("📋 **Preview of Parent Offering pairs:**")
-        for i, (offering, parent) in enumerate(zip(offering_lines, parent_lines), 1):
-            st.write(f"{i}. **Parent Offering:** `{offering}`")
-            st.write(f"   **New Parent:** `{parent}`")
-        
-        return True
-    return True

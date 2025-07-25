@@ -1647,69 +1647,37 @@ def run_generator(
                                     row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
                                     row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
                                     
-                                    # Handle aliases - copy from original row if aliases_on is False
-                                    if not aliases_on:
-                                        print(f"🔧 Aliases OFF - keeping original values")
-                                        pass
-                                    else:
-                                        print(f"🔧 Aliases ON - processing...")
-                                        print(f"🔍 Available columns in row: {list(row.columns)}")
-                                        
-                                        # Check specifically for the exact column name
-                                        exact_col = "Aliases (u_label) - ENG"
-                                        if exact_col in row.columns:
-                                            print(f"✅ Found exact column: '{exact_col}'")
-                                            current_value = row.iloc[0][exact_col] if len(row) > 0 else ""
-                                            print(f"📋 Current value in column: '{current_value}'")
-                                        else:
-                                            print(f"❌ Exact column '{exact_col}' NOT FOUND!")
-                                            # Show similar columns
-                                            alias_like_cols = [col for col in row.columns if 'alias' in col.lower() or 'u_label' in col.lower()]
-                                            print(f"🔍 Alias-like columns found: {alias_like_cols}")
-                                        
-                                        # Determine which alias value to use
-                                        alias_value_to_use = ""
-                                        
-                                        # Check for per-country alias first
-                                        if aliases_per_country:
-                                            print(f"📍 Per-country aliases configured: {aliases_per_country}")
+                                    # Handle aliases
+                                    if aliases_on:
+                                        alias_value_to_set = ""
+                                        # Determine the value to use for the alias
+                                        if aliases_value == "USE_APP_NAMES":
+                                            alias_value_to_set = app if app else ""
+                                        elif aliases_per_country:
                                             if country == "PL" and recv:
-                                                alias_value_to_use = aliases_per_country.get(recv, "")
-                                                print(f"📍 PL receiver {recv} -> alias: '{alias_value_to_use}'")
+                                                alias_value_to_set = aliases_per_country.get(recv, "")
                                             else:
-                                                alias_value_to_use = aliases_per_country.get(country, "")
-                                                print(f"📍 Country {country} -> alias: '{alias_value_to_use}'")
+                                                alias_value_to_set = aliases_per_country.get(country, "")
                                         
-                                        # If no per-country value found, use global alias value
-                                        if not alias_value_to_use:
-                                            alias_value_to_use = aliases_value
-                                            print(f"🌍 Using global alias value: '{alias_value_to_use}'")
-                                        
-                                        # Handle special "USE_APP_NAMES" value
-                                        if alias_value_to_use == "USE_APP_NAMES" or aliases_value == "USE_APP_NAMES":
-                                            alias_value_to_use = app if app else ""
-                                            print(f"📱 Using app name as alias: '{alias_value_to_use}'")
-                                        
-                                        print(f"🎯 Final alias value to use: '{alias_value_to_use}'")
-                                        
-                                        # Set the alias value directly to the exact column if it exists
-                                        if exact_col in row.columns and alias_value_to_use:
-                                            print(f"🎯 Setting alias '{alias_value_to_use}' directly to column '{exact_col}'")
-                                            row.loc[:, exact_col] = alias_value_to_use
-                                            
-                                            # Verify it was set
-                                            new_value = row.iloc[0][exact_col] if len(row) > 0 else ""
-                                            print(f"✅ Verification - New value in column: '{new_value}'")
-                                            
-                                            if new_value != alias_value_to_use:
-                                                print(f"❌ WARNING: Value not set correctly! Expected: '{alias_value_to_use}', Got: '{new_value}'")
-                                            else:
-                                                print(f"✅ SUCCESS: Alias value set correctly!")
-                                        elif not alias_value_to_use:
-                                            print(f"⚠️ No alias value to set (empty)")
-                                        else:
-                                            print(f"❌ CRITICAL: Column '{exact_col}' not found in row columns!")
-                                            print(f"🔍 All columns: {list(row.columns)}")
+                                        if not alias_value_to_set:
+                                            alias_value_to_set = aliases_value
+
+                                        # If we have a value and selected languages, find and set the alias
+                                        if alias_value_to_set and selected_languages:
+                                            for lang in selected_languages:
+                                                # Construct potential column names to search for
+                                                # This handles variations like "Aliases (u_label) - ENG" or "Aliases - ENG"
+                                                search_term_1 = f"ALIASES (U_LABEL) - {lang.upper()}"
+                                                search_term_2 = f"ALIASES - {lang.upper()}"
+
+                                                # Iterate through columns and find the correct one
+                                                for col in row.columns:
+                                                    # Normalize column name for robust matching
+                                                    normalized_col = ' '.join(str(col).upper().split())
+                                                    if normalized_col == search_term_1 or normalized_col == search_term_2:
+                                                        print(f"✅ Found alias column '{col}' for language '{lang}'. Setting value to '{alias_value_to_set}'.")
+                                                        row.loc[:, col] = alias_value_to_set
+                                                        break # Found column for this language, move to next language
                                     
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
@@ -1743,7 +1711,47 @@ def run_generator(
                                         else:
                                             # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
                                             row.loc[:, "Subscribed by Company"] = recv
-                                    elif country == "DE":
+                                    if country == "DE":
+                                        # Existing DE logic
+                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
+                                        row.loc[:, "Subscribed by Company"] = company
+                                    elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
+                                        # For CORP offerings in normal mode, extract from the second part of the name
+                                        # Example: [SR DS CY CORP DS CY IT] -> "DS CY"
+                                        if "Subscribed by Company" in base_row.index:
+                                            original_company = str(base_row["Subscribed by Company"]).strip()
+                                            if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:
+                                                row.loc[:, "Subscribed by Company"] = ""
+                                
+                                    
+                                    orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
+                                    
+                                    # If schedule is missing, use original commitments with user schedule
+                                    if missing_schedule:
+                                        if not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]:
+                                            # If original commitments are empty, create new ones with user schedule
+                                            row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im)
+                                        else:
+                                            # Update original commitments with user schedule
+                                            row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
+                                    # For Lvl2, keep empty commitments empty
+                                    elif is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
+                                        row.loc[:, "Service Commitments"] = ""
+                                    else:
+                                        # Handle custom commitments - use both approaches
+                                        if use_custom_commitments and custom_commitments_str:
+                                            # Use the direct string if provided
+                                            row.loc[:, "Service Commitments"] = custom_commitments_str
+                                           
+                                            if match:
+                                                row.loc[:, "Subscribed by Company"] = match.group(1)
+                                            else:
+                                                # Fallback to receiver if pattern not found
+                                                row.loc[:, "Subscribed by Company"] = recv
+                                        else:
+                                            # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
+                                            row.loc[:, "Subscribed by Company"] = recv
+                                    if country == "DE":
                                         # Existing DE logic
                                         company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
                                         row.loc[:, "Subscribed by Company"] = company

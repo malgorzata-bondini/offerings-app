@@ -1297,6 +1297,12 @@ def run_generator(
                     # Combine all synthetic rows into a DataFrame
                     base_pool = pd.DataFrame(base_pool_list)
                     
+                    # DEBUG: Show what we created
+                    print(f"Created {len(base_pool)} synthetic rows for new parent mode")
+                    if not base_pool.empty:
+                        print(f"Sample Parent Offering: {base_pool.iloc[0]['Parent Offering']}")
+                        print(f"Sample Name: {base_pool.iloc[0]['Name (Child Service Offering lvl 1)']}")
+                    
                     # Initialize schedule checking variables for new parent mode
                     all_country_names_for_schedules = pd.Series([], dtype=str)
                     corp_names_for_schedules = pd.Series([], dtype=str)
@@ -1387,6 +1393,23 @@ def run_generator(
                     base_pool = df.loc[mask]
                     print(f"Final matching rows: {len(base_pool)}")
                 
+                if base_pool.empty:
+                    continue
+                
+                # SKIP KEYWORD FILTERING FOR NEW PARENT MODE
+                if not use_new_parent:
+                    # Apply keyword filtering only in normal mode
+                    if keywords_parent.strip() or keywords_child.strip():
+                        keyword_mask = base_pool.apply(row_keywords_ok, axis=1)
+                        print(f"Rows after keyword filtering: {keyword_mask.sum()}")
+                        base_pool = base_pool[keyword_mask]
+                    
+                    if keywords_excluded.strip():
+                        excluded_mask = base_pool.apply(row_excluded_keywords_ok, axis=1)
+                        print(f"Rows after excluded keywords filtering: {excluded_mask.sum()}")
+                        base_pool = base_pool[excluded_mask]
+                # In new parent mode, skip keyword filtering since names will be generated later
+
                 if base_pool.empty:
                     continue
                 
@@ -1728,29 +1751,6 @@ def run_generator(
                                         # For standard offerings in normal mode, ALWAYS preserve original value from source file
                                         if "Subscribed by Company" in base_row.index:
                                             original_company = str(base_row["Subscribed by Company"]).strip()
-                                            if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:
-                                                row.loc[:, "Subscribed by Company"] = original_company
-                                            else:
-                                                # Leave empty if original was empty
-                                                row.loc[:, "Subscribed by Company"] = ""
-                                        else:
-                                            # Leave empty if column doesn't exist
-                                            row.loc[:, "Subscribed by Company"] = ""
-                                    
-                                    orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
-                                    
-                                    # If schedule is missing, use original commitments with user schedule
-                                    if missing_schedule:
-                                        if not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]:
-                                            # If original commitments are empty, create new ones with user schedule
-                                            row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im)
-                                        else:
-                                            # Update original commitments with user schedule
-                                            row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
-                                    # For Lvl2, keep empty commitments empty
-
-                                    # Ensure depend_tag is always defined before use
-                                    if country == "PL":
                                         # Regex-based PL Prod determination (case-insensitive)
                                         if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
                                             depend_tag = "HS PL Prod"
@@ -1758,7 +1758,8 @@ def run_generator(
                                             depend_tag = "DS PL Prod"
                                         else:
                                             depend_tag = "DS PL Prod"  # safe default
-                                    elif recv:
+                                    # If none of the above, fallback to depend_tag using receiver or delivering_tag
+                                    if recv:
                                         depend_tag = f"{recv} Prod"
                                     else:
                                         depend_tag = f"{delivering_tag} Prod" if (require_corp or require_recp or require_corp_it or require_corp_dedicated) else f"HS {country} Prod"

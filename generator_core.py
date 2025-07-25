@@ -1653,34 +1653,11 @@ def run_generator(
                                         exact_column_name = "Aliases (u_label) - ENG"
                                         if exact_column_name not in row.columns:
                                             row[exact_column_name] = ""
-                                        row.loc[:, exact_column_name] = app if app else ""
-                                        # Pozostałe aliasy (per country, custom values) – tylko jeśli są selected_languages
-                                        if selected_languages:
-                                            alias_value_to_set = ""
-                                            if aliases_per_country:
-                                                if country == "PL" and recv:
-                                                    alias_value_to_set = aliases_per_country.get(recv, "")
-                                                else:
-                                                    alias_value_to_set = aliases_per_country.get(country, "")
-                                            else:
-                                                alias_value_to_set = aliases_value
-                                            if alias_value_to_set:
-                                                for lang in selected_languages:
-                                                    alias_patterns = [
-                                                        f"Aliases (u_label) - {lang}",
-                                                        f"ALIASES (U_LABEL) - {lang}",
-                                                        f"Aliases - {lang}",
-                                                        f"ALIASES - {lang}",
-                                                        f"Alias - {lang}",
-                                                        f"ALIAS - {lang}"
-                                                    ]
-                                                    for col in row.columns:
-                                                        col_normalized = col.strip()
-                                                        for pattern in alias_patterns:
-                                                            if col_normalized.upper() == pattern.upper():
-                                                                print(f"✅ Found alias column '{col}' for language '{lang}'. Setting value to '{alias_value_to_set}'.")
-                                                                row.loc[:, col] = alias_value_to_set
-                                                                break
+                                        if aliases_on and aliases_value == "USE_APP_NAMES":
+                                            row.loc[:, exact_column_name] = row.loc[:, "Name (Child Service Offering lvl 1)"]
+                                        else:
+                                            # Kopiuj z oryginalnego pliku
+                                            row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
@@ -1745,6 +1722,7 @@ def run_generator(
                                             # Use custom_commit_block function if country provided
                                             row.loc[:, "Service Commitments"] = custom_commit_block(
                                                 commitment_country,
+
                                                 sr_or_im, rsp_enabled, rsl_enabled,
                                                 rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
                                                 rsp_time, rsl_time

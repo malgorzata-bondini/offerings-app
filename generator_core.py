@@ -1644,10 +1644,6 @@ def run_generator(
                                         # Keep original aliases values
                                         pass
                                     else:
-                                        # Add Streamlit debugging
-                                        st.write(f"🔍 **DEBUG**: Processing aliases - aliases_on={aliases_on}")
-                                        st.write(f"🔍 **DEBUG**: aliases_value='{aliases_value}', app='{app}'")
-                                        
                                         # Determine which alias value to use
                                         alias_value_to_use = ""
                                         
@@ -1664,87 +1660,49 @@ def run_generator(
                                         if not alias_value_to_use:
                                             alias_value_to_use = aliases_value
                                         
-                                        st.write(f"🔍 **DEBUG**: alias_value_to_use after logic: '{alias_value_to_use}'")
-                                        
-                                        # Handle special "USE_APP_NAMES" value - CHECK BOTH VALUES
+                                        # Handle special "USE_APP_NAMES" value
                                         if alias_value_to_use == "USE_APP_NAMES" or aliases_value == "USE_APP_NAMES":
-                                            # Use app name as alias if app is provided
-                                            original_alias = alias_value_to_use
                                             alias_value_to_use = app if app else ""
-                                            st.write(f"✅ **DEBUG**: USE_APP_NAMES detected! '{original_alias}' → '{alias_value_to_use}'")
                                         
-                                        # Find all alias columns - EXPANDED SEARCH
-                                        alias_columns = []
-                                        st.write(f"🔍 **DEBUG**: Searching in columns: {list(row.columns)}")
+                                        # STEP 1: Look for EXACT match: "Aliases (u_label) - ENG"
+                                        exact_alias_column = None
                                         for col in row.columns:
-                                            col_lower = col.lower()
-                                            if any(keyword in col_lower for keyword in ["alias", "u_label", "label"]):
-                                                alias_columns.append(col)
-                                                st.write(f"✅ **Found alias column**: '{col}'")
+                                            if col == "Aliases (u_label) - ENG":
+                                                exact_alias_column = col
+                                                break
                                         
-                                        st.write(f"📋 **Final alias columns**: {alias_columns}")
-                                        st.write(f"💡 **Will use value**: '{alias_value_to_use}'")
+                                        # STEP 2: If exact match found, use it
+                                        if exact_alias_column and alias_value_to_use:
+                                            row.loc[:, exact_alias_column] = alias_value_to_use
                                         
-                                        if alias_columns and alias_value_to_use:
-                                            # Special case: if "USE_APP_NAMES" was selected, always use ENG column
+                                        # STEP 3: If no exact match, look for columns with "Aliases" AND "ENG"
+                                        elif alias_value_to_use:
+                                            aliases_eng_columns = []
+                                            for col in row.columns:
+                                                col_upper = col.upper()
+                                                if "ALIASES" in col_upper and "ENG" in col_upper:
+                                                    aliases_eng_columns.append(col)
+                                            
+                                            # STEP 4: For USE_APP_NAMES, ONLY use columns with ENG
                                             if aliases_value == "USE_APP_NAMES":
-                                                st.write(f"🎯 **USE_APP_NAMES mode** - looking for ENG columns")
-                                                
-                                                # Look for ENG alias column specifically - EXPANDED SEARCH
-                                                eng_columns = []
-                                                for col in alias_columns:
-                                                    col_upper = col.upper()
-                                                    st.write(f"🔍 Checking '{col}' (upper: '{col_upper}') for ENG patterns")
-                                                    if any(pattern in col_upper for pattern in ["ENG", "EN", "ENGLISH"]):
-                                                        eng_columns.append(col)
-                                                        st.write(f"✅ **MATCH**: '{col}' contains ENG pattern")
-                                                
-                                                st.write(f"🎯 **ENG columns found**: {eng_columns}")
-                                                
-                                                if eng_columns:
-                                                    # Use the first ENG column found
-                                                    target_col = eng_columns[0]
-                                                    st.write(f"✍️ **SETTING**: '{alias_value_to_use}' in ENG column '{target_col}'")
-                                                    row.loc[:, target_col] = alias_value_to_use
-                                                    st.write(f"✅ **CONFIRMED**: Value set in '{target_col}'")
-                                                elif alias_columns:
-                                                    # Fallback to first alias column if no ENG found
-                                                    target_col = alias_columns[0]
-                                                    st.write(f"⚠️ **FALLBACK**: No ENG column, using '{target_col}'")
-                                                    row.loc[:, target_col] = alias_value_to_use
-                                                    st.write(f"✅ **CONFIRMED**: Value set in '{target_col}'")
+                                                if aliases_eng_columns:
+                                                    # Use first column that has both Aliases and ENG
+                                                    row.loc[:, aliases_eng_columns[0]] = alias_value_to_use
+                                                # If no ENG columns found, DO NOT set any alias for USE_APP_NAMES
                                             else:
-                                                # Original logic for when languages are selected
-                                                if selected_languages:
-                                                    st.write(f"🌍 **Language mode**: {selected_languages}")
-                                                    # Find columns that match selected languages
-                                                    matching_columns = []
+                                                # For other alias values, try broader search if no Aliases+ENG found
+                                                if aliases_eng_columns:
+                                                    row.loc[:, aliases_eng_columns[0]] = alias_value_to_use
+                                                else:
+                                                    # STEP 5: Broader search - any column with "alias" or "u_label"
+                                                    broader_alias_columns = []
+                                                    for col in row.columns:
+                                                        col_lower = col.lower()
+                                                        if any(keyword in col_lower for keyword in ["alias", "u_label"]):
+                                                            broader_alias_columns.append(col)
                                                     
-                                                    for col in alias_columns:
-                                                        # Check if this column matches any of the selected languages
-                                                        for lang in selected_languages:
-                                                            # Try different naming patterns
-                                                            if (f"- {lang}" in col or f"({lang})" in col or 
-                                                                f"_{lang}" in col or col.endswith(f" {lang}")):
-                                                                matching_columns.append(col)
-                                                                break
-                                                            # Special cases for alternative language codes
-                                                            elif lang == "ENG" and any(x in col for x in ["- EN", "- ENGLISH", "(EN)", "(ENGLISH)"]):
-                                                                matching_columns.append(col)
-                                                                break
-                                                            elif lang == "DE" and any(x in col for x in ["- GER", "- GERMAN", "(GER)", "(GERMAN)"]):
-                                                                matching_columns.append(col)
-                                                                break
-                                                    
-                                                    # Remove duplicates while preserving order
-                                                    matching_columns = list(dict.fromkeys(matching_columns))
-                                                    
-                                                    st.write(f"📋 **Matching columns for languages**: {matching_columns}")
-                                                    
-                                                    # Set alias value in ALL matching columns
-                                                    for col in matching_columns:
-                                                        st.write(f"✍️ **SETTING**: '{alias_value_to_use}' in column: {col}")
-                                                        row.loc[:, col] = alias_value_to_use
+                                                    if broader_alias_columns:
+                                                        row.loc[:, broader_alias_columns[0]] = alias_value_to_use
 
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
@@ -1762,17 +1720,7 @@ def run_generator(
                                             for ldap_col in ldap_cols:
                                                 row.loc[:, ldap_col] = ""
                                             
-                                            # Set the special LDAP value if we have one
-                                            if ldap and ldap not in ["", "nan", "NaN", "None"]:
-                                                # Use the first LDAP column
-                                                row.loc[:, ldap_cols[0]] = ldap
-                                            else:
-                                                # Try to find LDAP from original data
-                                                if support_group_for_country in original_ldap_data:
-                                                    ldap_data = original_ldap_data[support_group_for_country]
-                                                    for ldap_col, ldap_val in ldap_data.items():
-                                                        if ldap_col in row.columns and ldap_val not in ["", "nan", "NaN", "None"]:
-                                                            row.loc[:, ldap_col] = ldap_val
+
                                     # Handle Subscribed by Company based on type and mode
                                     if use_new_parent:
                                         # NEW PARENT MODE - special logic
@@ -2067,7 +2015,11 @@ def run_generator(
                         return ''
                     return s
 
-                df_final = df_final.applymap(_clean_cell)
+                # Use _clean_cell directly with applymap
+                if isinstance(df_final, pd.DataFrame):
+                    df_final = df_final.applymap(_clean_cell)
+                else:
+                    df_final = df_final.apply(_clean_cell)
 
                 # Keep the dedicated treatment for the two boolean-ish columns
                 df_final["Approval required"] = df_final["Approval required"].apply(clean_approval_value)

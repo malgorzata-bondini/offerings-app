@@ -1648,16 +1648,14 @@ def run_generator(
                                     row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
                                     
                                     # Handle aliases
-                                    if aliases_on:
-                                        # Zawsze kopiuj nazwę aplikacji do "Aliases (u_label) - ENG" jeśli wybrano "USE_APP_NAMES" i jest aplikacja
-                                        exact_column_name = "Aliases (u_label) - ENG"
-                                        if exact_column_name not in row.columns:
-                                            row[exact_column_name] = ""
-                                        if aliases_on and aliases_value == "USE_APP_NAMES":
-                                            row.loc[:, exact_column_name] = row.loc[:, "Name (Child Service Offering lvl 1)"]
-                                        else:
-                                            # Kopiuj z oryginalnego pliku
-                                            row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
+                                    exact_column_name = "Aliases (u_label) - ENG"
+                                    if exact_column_name not in row.columns:
+                                        row[exact_column_name] = ""
+                                    if aliases_on and aliases_value == "USE_APP_NAMES":
+                                        row.loc[:, exact_column_name] = app if app else ""
+                                    else:
+                                        # Kopiuj z oryginalnego pliku
+                                        row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
@@ -1742,6 +1740,8 @@ def run_generator(
                                     else:
                                         if country == "PL":
                                             # Regex-based PL Prod determination (case-insensitive)
+                                            if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
+                                                depend_tag = "HS PL Prod"
                                             if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
                                                 depend_tag = "HS PL Prod"
                                             elif re.search(r'\bDS\s+PL\b', new_name, re.IGNORECASE):

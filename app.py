@@ -1,4 +1,11 @@
-# Add pluralization function at the top of the file
+import streamlit as st
+import pandas as pd
+from pathlib import Path
+import shutil
+import tempfile
+from generator_core import run_generator
+
+# Add pluralization function AFTER imports
 def get_plural_form_preview(word):
     """Get plural form for preview - simplified version"""
     plural_map = {
@@ -15,13 +22,6 @@ def get_plural_form_preview(word):
         "Speaker": "Speakers", "Cable": "Cables", "Adapter": "Adapters"
     }
     return plural_map.get(word, word)
-
-import streamlit as st
-import pandas as pd
-from pathlib import Path
-import shutil
-import tempfile
-from generator_core import run_generator
 
 st.set_page_config(page_title="Service Offerings Generator", layout="wide")
 

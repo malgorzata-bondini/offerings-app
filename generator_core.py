@@ -1649,75 +1649,68 @@ def run_generator(
                                     
                                     # Handle aliases - copy from original row if aliases_on is False
                                     if not aliases_on:
-                                        # Keep original aliases values
+                                        print(f"🔧 Aliases OFF - keeping original values")
                                         pass
                                     else:
+                                        print(f"🔧 Aliases ON - processing...")
+                                        print(f"🔍 Available columns in row: {list(row.columns)}")
+                                        
+                                        # Check specifically for the exact column name
+                                        exact_col = "Aliases (u_label) - ENG"
+                                        if exact_col in row.columns:
+                                            print(f"✅ Found exact column: '{exact_col}'")
+                                            current_value = row.iloc[0][exact_col] if len(row) > 0 else ""
+                                            print(f"📋 Current value in column: '{current_value}'")
+                                        else:
+                                            print(f"❌ Exact column '{exact_col}' NOT FOUND!")
+                                            # Show similar columns
+                                            alias_like_cols = [col for col in row.columns if 'alias' in col.lower() or 'u_label' in col.lower()]
+                                            print(f"🔍 Alias-like columns found: {alias_like_cols}")
+                                        
                                         # Determine which alias value to use
                                         alias_value_to_use = ""
                                         
-                                        # Check for per-country alias first, but only if per-country aliases are configured
+                                        # Check for per-country alias first
                                         if aliases_per_country:
-                                            # For PL, check both HS PL and DS PL based on receiver
+                                            print(f"📍 Per-country aliases configured: {aliases_per_country}")
                                             if country == "PL" and recv:
                                                 alias_value_to_use = aliases_per_country.get(recv, "")
+                                                print(f"📍 PL receiver {recv} -> alias: '{alias_value_to_use}'")
                                             else:
-                                                # For other countries, use country code directly
                                                 alias_value_to_use = aliases_per_country.get(country, "")
+                                                print(f"📍 Country {country} -> alias: '{alias_value_to_use}'")
                                         
                                         # If no per-country value found, use global alias value
                                         if not alias_value_to_use:
                                             alias_value_to_use = aliases_value
+                                            print(f"🌍 Using global alias value: '{alias_value_to_use}'")
                                         
                                         # Handle special "USE_APP_NAMES" value
                                         if alias_value_to_use == "USE_APP_NAMES" or aliases_value == "USE_APP_NAMES":
                                             alias_value_to_use = app if app else ""
+                                            print(f"📱 Using app name as alias: '{alias_value_to_use}'")
                                         
-                                        # Progressive alias column search with fallback logic
-                                        target_column = None
+                                        print(f"🎯 Final alias value to use: '{alias_value_to_use}'")
                                         
-                                        if alias_value_to_use:  # Only proceed if we have a value to set
-                                            # STEP 1: Look for EXACT match: "Aliases (u_label) - ENG"
-                                            for col in row.columns:
-                                                if col == "Aliases (u_label) - ENG":
-                                                    target_column = col
-                                                    break
+                                        # Set the alias value directly to the exact column if it exists
+                                        if exact_col in row.columns and alias_value_to_use:
+                                            print(f"🎯 Setting alias '{alias_value_to_use}' directly to column '{exact_col}'")
+                                            row.loc[:, exact_col] = alias_value_to_use
                                             
-                                            # STEP 2: Look for columns with "ALIASES" AND "ENG"
-                                            if not target_column:
-                                                for col in row.columns:
-                                                    col_upper = col.upper()
-                                                    if "ALIASES" in col_upper and "ENG" in col_upper:
-                                                        target_column = col
-                                                        break
+                                            # Verify it was set
+                                            new_value = row.iloc[0][exact_col] if len(row) > 0 else ""
+                                            print(f"✅ Verification - New value in column: '{new_value}'")
                                             
-                                            # STEP 3: Look for any column with "ALIASES" (any language)
-                                            if not target_column:
-                                                for col in row.columns:
-                                                    col_upper = col.upper()
-                                                    if "ALIASES" in col_upper:
-                                                        target_column = col
-                                                        break
-                                            
-                                            # STEP 4: Look for columns with "u_label"
-                                            if not target_column:
-                                                for col in row.columns:
-                                                    col_lower = col.lower()
-                                                    if "u_label" in col_lower:
-                                                        target_column = col
-                                                        break
-                                            
-                                            # STEP 5: Look for any column with "alias"
-                                            if not target_column:
-                                                for col in row.columns:
-                                                    col_lower = col.lower()
-                                                    if "alias" in col_lower:
-                                                        target_column = col
-                                                        break
-                                            
-                                            # Set the alias value if we found a target column
-                                            if target_column:
-                                                row.loc[:, target_column] = alias_value_to_use
-
+                                            if new_value != alias_value_to_use:
+                                                print(f"❌ WARNING: Value not set correctly! Expected: '{alias_value_to_use}', Got: '{new_value}'")
+                                            else:
+                                                print(f"✅ SUCCESS: Alias value set correctly!")
+                                        elif not alias_value_to_use:
+                                            print(f"⚠️ No alias value to set (empty)")
+                                        else:
+                                            print(f"❌ CRITICAL: Column '{exact_col}' not found in row columns!")
+                                            print(f"🔍 All columns: {list(row.columns)}")
+                                    
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""

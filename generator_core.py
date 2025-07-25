@@ -1649,52 +1649,52 @@ def run_generator(
                                             # Use app name as alias if app is provided
                                             alias_value_to_use = app if app else ""
                                         
-                                        # Debug print to see what's happening
-                                        print(f"DEBUG: aliases_value={aliases_value}, alias_value_to_use={alias_value_to_use}, app={app}, country={country}")
-                                        
                                         # Find all alias columns
                                         alias_columns = [c for c in row.columns if "Alias" in c]
-                                        print(f"DEBUG: Found alias columns: {alias_columns}")
-                                        print(f"DEBUG: Selected languages: {selected_languages}")
                                         
-                                        if alias_columns and alias_value_to_use and selected_languages:
-                                            # Find columns that match selected languages
-                                            matching_columns = []
-                                            
-                                            for col in alias_columns:
-                                                # Check if this column matches any of the selected languages
-                                                for lang in selected_languages:
-                                                    # Try different naming patterns
-                                                    if (f"- {lang}" in col or f"({lang})" in col or 
-                                                        f"_{lang}" in col or col.endswith(f" {lang}")):
-                                                        matching_columns.append(col)
-                                                        break
-                                                    # Special cases for alternative language codes
-                                                    elif lang == "ENG" and any(x in col for x in ["- EN", "- ENGLISH", "(EN)", "(ENGLISH)"]):
-                                                        matching_columns.append(col)
-                                                        break
-                                                    elif lang == "DE" and any(x in col for x in ["- GER", "- GERMAN", "(GER)", "(GERMAN)"]):
-                                                        matching_columns.append(col)
-                                                        break
-                                            
-                                            # Remove duplicates while preserving order
-                                            matching_columns = list(dict.fromkeys(matching_columns))
-                                            
-                                            # Set alias value in ALL matching columns
-                                            if matching_columns:
-                                                for col in matching_columns:
-                                                    row.loc[:, col] = alias_value_to_use
-                                                    print(f"DEBUG: Set alias '{alias_value_to_use}' in column: {col}")
+                                        if alias_columns and alias_value_to_use:
+                                            # Special case: if "USE_APP_NAMES" was selected, always use ENG column
+                                            if aliases_value == "USE_APP_NAMES":
+                                                # Look for ENG alias column specifically
+                                                eng_columns = [col for col in alias_columns 
+                                                             if "- ENG" in col or "(ENG)" in col or 
+                                                             "- EN" in col or "(EN)" in col or
+                                                             "- ENGLISH" in col or "(ENGLISH)" in col]
+                                                
+                                                if eng_columns:
+                                                    # Use the first ENG column found
+                                                    row.loc[:, eng_columns[0]] = alias_value_to_use
+                                                elif alias_columns:
+                                                    # Fallback to first alias column if no ENG found
+                                                    row.loc[:, alias_columns[0]] = alias_value_to_use
                                             else:
-                                                print(f"DEBUG: No alias columns found for selected languages {selected_languages}")
-                                                print(f"DEBUG: Available alias columns: {alias_columns}")
-                                        else:
-                                            if not alias_columns:
-                                                print("DEBUG: No alias columns found in the data!")
-                                            if not alias_value_to_use:
-                                                print("DEBUG: No alias value to set!")
-                                            if not selected_languages:
-                                                print("DEBUG: No languages selected for aliases!")
+                                                # Original logic for when languages are selected
+                                                if selected_languages:
+                                                    # Find columns that match selected languages
+                                                    matching_columns = []
+                                                    
+                                                    for col in alias_columns:
+                                                        # Check if this column matches any of the selected languages
+                                                        for lang in selected_languages:
+                                                            # Try different naming patterns
+                                                            if (f"- {lang}" in col or f"({lang})" in col or 
+                                                                f"_{lang}" in col or col.endswith(f" {lang}")):
+                                                                matching_columns.append(col)
+                                                                break
+                                                            # Special cases for alternative language codes
+                                                            elif lang == "ENG" and any(x in col for x in ["- EN", "- ENGLISH", "(EN)", "(ENGLISH)"]):
+                                                                matching_columns.append(col)
+                                                                break
+                                                            elif lang == "DE" and any(x in col for x in ["- GER", "- GERMAN", "(GER)", "(GERMAN)"]):
+                                                                matching_columns.append(col)
+                                                                break
+                                                    
+                                                    # Remove duplicates while preserving order
+                                                    matching_columns = list(dict.fromkeys(matching_columns))
+                                                    
+                                                    # Set alias value in ALL matching columns
+                                                    for col in matching_columns:
+                                                        row.loc[:, col] = alias_value_to_use
 
                                     # Handle Visibility group - ensure it exists for PL
                                     if country == "PL" and "Visibility group" not in row.columns:
@@ -1752,7 +1752,7 @@ def run_generator(
                                             # Fallback to receiver if pattern not found
                                             row.loc[:, "Subscribed by Company"] = recv
                                     else:
-                                        # For standard offerings in normal mode, ALWAYS preserve original value from source file
+                                                                               # For standard offerings in normal mode, ALWAYS preserve original value from source file
                                         if "Subscribed by Company" in base_row.index:
                                             original_company = str(base_row["Subscribed by Company"]).strip()
                                             if original_company and original_company not in ["nan", "NaN", "", "None", "none"]:

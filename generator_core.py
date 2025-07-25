@@ -613,13 +613,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Add app if provided
         if app:
-            # Build the current name string to check for "hardware"
-            current_name_str = " ".join(name_parts)
-            # Check if "hardware" is in the current name (case insensitive)
-            if "hardware" in current_name_str.lower():
-                name_parts.append(app.lower())  # Use lowercase for hardware
-            else:
-                name_parts.append(app)  # Keep original case
+            name_parts.append(app)
         
         # Add "solving" for IM
         if sr_or_im == "IM":
@@ -1660,10 +1654,8 @@ def run_generator(
                                     else:
                                         # Kopiuj z oryginalnego pliku
                                         row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
-                                    # Handle Visibility group - copy from original base_row
-                                    if "Visibility group" in base_row.index:
-                                        row.loc[:, "Visibility group"] = base_row["Visibility group"]
-                                    else:
+                                    # Handle Visibility group - ensure it exists for PL
+                                    if country == "PL" and "Visibility group" not in row.columns:
                                         row.loc[:, "Visibility group"] = ""
 
                                     # Handle DE special cases
@@ -1674,6 +1666,8 @@ def run_generator(
                                         # Handle LDAP columns
                                         ldap_cols = [col for col in row.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
                                         if ldap_cols:
+                                            # Clear all LDAP columns first
+                                            for ldap_col in ldap_cols:
                                                 row.loc[:, ldap_col] = ""
                                             
 

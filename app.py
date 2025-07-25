@@ -722,6 +722,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
                         require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
                         use_new_parent=use_new_parent,
+                        new_parent_offering=new_parent_offerings,  # Pass the full string
+                        new_parent=new_parents,  # Pass the full string
                         keywords_excluded=keywords_excluded if not use_new_parent else "",
                         use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
                         service_type_lvl2=service_type if 'service_type' in locals() else "",
@@ -737,8 +739,10 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         business_criticality=business_criticality,
                         # Add approval required
                         approval_required=approval_required,
-                        # Add approval required value
-                        approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty"
+                        approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
+                        # Add location settings
+                        change_subscribed_location=change_subscribed_location,
+                        custom_subscribed_location=custom_subscribed_location
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

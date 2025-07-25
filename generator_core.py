@@ -1102,10 +1102,6 @@ def run_generator(
             return keywords, False
 
     def row_keywords_ok(row):
-        # Skip keyword checking if we're in new parent mode
-        if use_new_parent:
-            return True
-        
         # Parse parent keywords
         parent_keywords, parent_use_and = parse_keywords(keywords_parent)
         
@@ -1153,7 +1149,7 @@ def run_generator(
                         break
                 if not found:
                     return False
-    
+        
         return True
 
     def row_excluded_keywords_ok(row):
@@ -1297,17 +1293,10 @@ def run_generator(
                             custom_subscribed_location
                         )
                         base_pool_list.append(new_row)
-    
-                    # Debug print
-                    print(f"DEBUG: Created {len(base_pool_list)} synthetic rows for country {country}")
-                    print(f"DEBUG: Parent offering pairs: {parent_offering_pairs}")
-    
+                    
                     # Combine all synthetic rows into a DataFrame
                     base_pool = pd.DataFrame(base_pool_list)
-    
-                    # Debug print
-                    print(f"DEBUG: Base pool shape: {base_pool.shape}")
-    
+                    
                     # Initialize schedule checking variables for new parent mode
                     all_country_names_for_schedules = pd.Series([], dtype=str)
                     corp_names_for_schedules = pd.Series([], dtype=str)
@@ -1446,6 +1435,7 @@ def run_generator(
                             country_schedule_suffixes = get_schedule_suffixes_for_country(
                                 country, recv, schedule_settings_per_country, schedule_suffixes
                             )
+                            
                             for schedule_suffix in country_schedule_suffixes:
                                 # Check if schedule exists in the source data
                                 missing_schedule = False
@@ -1831,9 +1821,6 @@ def run_generator(
     # Convert lists to DataFrames once - major performance improvement!
     print(f"Converting {len(sheets_data)} sheet lists to DataFrames...")
     
-    # Initialize df to None to avoid unbound errors
-    df = None
-
     # Create output file path
     outfile = out_dir / f"Generated_Service_Offerings_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
@@ -1842,233 +1829,176 @@ def run_generator(
 
     # Check if we have any data to write
     if not sheets_data or all(not rows_list for rows_list in sheets_data.values()):
-        if use_new_parent:
-            # For new parent mode, this might be expected if we're creating entirely new offerings
-            print("ℹ️ Creating new parent offerings...")
-            # Don't raise an error - this is normal for new parent mode
-            # Instead, we should have data from the synthetic rows we created
-            
-            # BUT FIRST CHECK: If we have no data at all, there might be an issue
-            # Let's create a minimal sheet to avoid the Excel error
-            if not sheets_data:
-                print("⚠️ No data generated. This might indicate an issue with the configuration.")
-                print("Creating a minimal output file...")
-                
-                # Create a minimal sheet with just headers to avoid Excel error
-                minimal_data = pd.DataFrame(columns=need_cols)
-                with pd.ExcelWriter(outfile, engine="openpyxl") as w:
-                    minimal_data.to_excel(w, sheet_name="No_Data_Generated", index=False)
-                
-                print(f"Minimal file created at: {outfile}")
-                return outfile
-                
-        else:
-            print("❌ No matching offerings found with the specified keywords.")
-            print("Please check your search criteria:")
-            if keywords_parent.strip():
-                print(f"  - Parent keywords: {keywords_parent}")
-            if keywords_child.strip():
-                print(f"  - Child keywords: {keywords_child}")
-            if keywords_excluded.strip():
-                print(f"  - Excluded keywords: {keywords_excluded}")
-            print("Try using different or fewer keywords, or check if the source files contain matching offerings.")
-            
-            # Return None or raise an exception instead of trying to create empty Excel
-            raise ValueError("No matching offerings found. Please adjust your search criteria.")
+        print("❌ No matching offerings found with the specified keywords.")
+        print("Please check your search criteria:")
+        if keywords_parent.strip():
+            print(f"  - Parent keywords: {keywords_parent}")
+        if keywords_child.strip():
+            print(f"  - Child keywords: {keywords_child}")
+        if keywords_excluded.strip():
+            print(f"  - Excluded keywords: {keywords_excluded}")
+        print("Try using different or fewer keywords, or check if the source files contain matching offerings.")
+        
+        # Return None or raise an exception instead of trying to create empty Excel
+        raise ValueError("No matching offerings found. Please adjust your search criteria.")
 
     # Write to Excel with special handling for empty values
     with pd.ExcelWriter(outfile, engine="openpyxl") as w:
         sheets = {}  # Store final DataFrames for later use
         
-        # Check if we actually have data to write
-        has_data = any(rows_list for rows_list in sheets_data.values())
-        
-        if not has_data:
-            # Create a minimal sheet to prevent Excel error
-            print("⚠️ No actual data to write, creating placeholder sheet...")
-            minimal_data = pd.DataFrame(columns=need_cols)
-            minimal_data.to_excel(w, sheet_name="No_Data_Generated", index=False)
-        else:
-            for sheet_key, rows_list in sheets_data.items():
-                if rows_list:
-                    print(f"  Processing {sheet_key}: {len(rows_list)} rows")
-                    df = pd.DataFrame(rows_list)
-                    
-                    # Get the column order key from the first row
-                    column_order_key = None
-                    if "_column_order_key" in df.columns and len(df) > 0:
-                        column_order_key = df.iloc[0]["_column_order_key"]
+        for sheet_key, rows_list in sheets_data.items():
+            if rows_list:
+                print(f"  Processing {sheet_key}: {len(rows_list)} rows")
+                df = pd.DataFrame(rows_list)
+                
+                # Get the column order key from the first row
+                column_order_key = None
+                if "_column_order_key" in df.columns and len(df) > 0:
+                    column_order_key = df.iloc[0]["_column_order_key"]
 
-                    # Extract sheet_name from sheet_key for use below
-                    sheet_name = sheet_key
+                # Extract sheet_name from sheet_key for use below
+                sheet_name = sheet_key
 
-                    # Track which rows have missing schedules BEFORE dropping the column
-                    missing_schedule_rows = []
-                    if "_missing_schedule" in df.columns:
-                        missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
-                        # Store this info for later use
-                        missing_schedule_info[sheet_name] = missing_schedule_rows
+                # Track which rows have missing schedules BEFORE dropping the column
+                missing_schedule_rows = []
+                if "_missing_schedule" in df.columns:
+                    missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
+                    # Store this info for later use
+                    missing_schedule_info[sheet_name] = missing_schedule_rows
+                
+                # Remove helper columns
+                for col in ["_missing_schedule", "_column_order_key"]:
+                    if col in df.columns:
+                        df = df.drop(columns=[col])
+                
+                # Reorder columns to match original order if we have it
+                if column_order_key and column_order_key in column_order_cache:
+                    original_order = column_order_cache[column_order_key]
                     
-                    # Remove helper columns
-                    for col in ["_missing_schedule", "_column_order_key"]:
-                        if col in df.columns:
-                            df = df.drop(columns=[col])
+                    # Get the original DataFrame to preserve missing column values
+                    original_df = None
+                    if not use_new_parent:
+                        # Try to get the original data for this sheet
+                        country = sheet_key.split()[0]
+                        level = sheet_key.split()[1]  # e.g., "lvl1"
+                        sheet_name = f"Child SO {level}"
+                        
+                        # Find the source file for this country
+                        for wb_path in src_dir.glob(f"ALL_Service_Offering_*{country}.xlsx"):
+                            try:
+                                if wb_path in excel_cache:
+                                    excel_file = excel_cache[wb_path]
+                                    if sheet_name in excel_file.sheet_names:
+                                        original_df = pd.read_excel(excel_file, sheet_name=sheet_name)
+                                        break
+                            except Exception:
+                                continue
                     
-                    # Reorder columns to match original order if we have it
-                    if column_order_key and column_order_key in column_order_cache:
-                        original_order = column_order_cache[column_order_key]
-                        
-                        # Get the original DataFrame to preserve missing column values
-                        original_df = None
-                        if not use_new_parent:
-                            # Try to get the original data for this sheet
-                            country = sheet_key.split()[0]
-                            level = sheet_key.split()[1]  # e.g., "lvl1"
-                            sheet_name = f"Child SO {level}"
-                            
-                            # Find the source file for this country
-                            for wb_path in src_dir.glob(f"ALL_Service_Offering_*{country}.xlsx"):
-                                try:
-                                    if wb_path in excel_cache:
-                                        excel_file = excel_cache[wb_path]
-                                        if sheet_name in excel_file.sheet_names:
-                                            original_df = pd.read_excel(excel_file, sheet_name=sheet_name)
-                                            break
-                                except Exception:
-                                    continue
-                        
-                        # Add missing columns from original, preserving their values
-                        for col in original_order:
-                            if col not in df.columns:
-                                # Skip the Number column - don't add it (exact match only)
-                                if col == "Number":
-                                    continue
-                                    
-                                if original_df is not None and col in original_df.columns:
-                                    # Get original column data and ensure it matches df length
-                                    original_col_data = original_df[col]
-                                    
-                                    # Safely handle length mismatch
-                                    if len(original_col_data) >= len(df):
-                                        # Take exactly the number we need
-                                        df[col] = original_col_data.iloc[:len(df)].reset_index(drop=True)
-                                    else:
-                                        # Fill missing values with empty strings
-                                        padded_data = list(original_col_data) + [''] * (len(df) - len(original_col_data))
-                                        df[col] = padded_data[:len(df)]
+                    # Add missing columns from original, preserving their values
+                    for col in original_order:
+                        if col not in df.columns:
+                            # Skip the Number column - don't add it (exact match only)
+                            if col == "Number":
+                                continue
+                                
+                            if original_df is not None and col in original_df.columns:
+                                # Get original column data and ensure it matches df length
+                                original_col_data = original_df[col]
+                                
+                                # Safely handle length mismatch
+                                if len(original_col_data) >= len(df):
+                                    # Take exactly the number we need
+                                    df[col] = original_col_data.iloc[:len(df)].reset_index(drop=True)
                                 else:
-                                    df[col] = ''
+                                    # Fill missing values with empty strings
+                                    padded_data = list(original_col_data) + [''] * (len(df) - len(original_col_data))
+                                    df[col] = padded_data[:len(df)]
+                            else:
+                                df[col] = ''
+                    
+                    # Reorder columns to match original order, excluding Number column
+                    ordered_cols = []
+                    for col in original_order:
+                        if col in df.columns and col != "Number":
+                            ordered_cols.append(col)
+                    
+                    # Add any new columns that weren't in original
+                    new_cols = [col for col in df.columns if col not in original_order]
+                    
+                    # Reorder DataFrame
+                    df = df[ordered_cols + new_cols]
+                
+                # Extract country code from sheet_key (e.g., "PL lvl1" -> "PL")
+                cc = sheet_key.split()[0]
+                
+                # Remove Visibility group column for PL only if it wasn't in the original
+                if cc == "PL" and "Visibility group" in df.columns:
+                    original_cols = column_order_cache.get(column_order_key, [])
+                    if "Visibility group" not in original_cols:
+                        df = df.drop(columns=["Visibility group"])
+                
+                # Clean data before writing to Excel - SAFER VERSION
+                df_final = df.copy()
+                for col in df_final.columns:
+                    try:
+                        # Handle mixed types more safely
+                        df_final[col] = df_final[col].fillna('').astype(str)
                         
-                        # Reorder columns to match original order, excluding Number column
-                        ordered_cols = []
-                        for col in original_order:
-                            if col in df.columns and col != "Number":
-                                ordered_cols.append(col)
-                        
-                        # Add any new columns that weren't in original
-                        new_cols = [col for col in df.columns if col not in original_order]
-                        
-                        # Reorder DataFrame
-                        df = df[ordered_cols + new_cols]
-                    
-                    # Extract country code from sheet_key (e.g., "PL lvl1" -> "PL")
-                    cc = sheet_key.split()[0]
-                    
-                    # Remove Visibility group column for PL only if it wasn't in the original
-                    if cc == "PL" and "Visibility group" in df.columns:
-                        original_cols = column_order_cache.get(column_order_key, [])
-                        if "Visibility group" not in original_cols:
-                            df = df.drop(columns=["Visibility group"])
-                    
-                    # Clean data before writing to Excel - SAFER VERSION
-                    df_final = df.copy()
-                    for col in df_final.columns:
-                        try:
-                            # Handle mixed types more safely
-                            df_final[col] = df_final[col].fillna('').astype(str)
-                            
-                            # Replace problematic values
-                            df_final[col] = df_final[col].replace({
-                                'nan': '',
-                                'NaN': '',
-                                'None': '',
-                                'none': '',
-                                'NULL': '',
-                                'null': '',
-                                '<NA>': '',
-                                'True': 'true',
-                                'TRUE': 'true',
-                                'False': 'false',
-                                'FALSE': 'false'
-                            })
-                            
-                        except Exception as e:
-                            print(f"Warning: Error processing column {col}: {e}")
-                # Only process if rows_list is not empty and df is not None and is a DataFrame
-                if rows_list and df is not None and isinstance(df, pd.DataFrame):
-                    # Clean data before writing to Excel - SAFER VERSION
-                    df_final = df.copy()
-                    for col in df_final.columns:
-                        try:
-                            # Handle mixed types more safely
-                            df_final[col] = df_final[col].fillna('').astype(str)
-                            
-                            # Replace problematic values
-                            df_final[col] = df_final[col].replace({
-                                'nan': '',
-                                'NaN': '',
-                                'None': '',
-                                'none': '',
-                                'NULL': '',
-                                'null': '',
-                                '<NA>': '',
-                                'True': 'true',
-                                'TRUE': 'true',
-                                'False': 'false',
-                                'FALSE': 'false'
-                            })
-                            
-                        except Exception as e:
-                            print(f"Warning: Error processing column {col}: {e}")
-                            # Fallback: convert everything to string
-                            df_final[col] = df_final[col].astype(str).fillna('')
-                    
-                    # Special handling for boolean columns
-                    if "Approval required" in df_final.columns:
-                        # Keep custom values, but standardize boolean representations
-                        df_final["Approval required"] = df_final["Approval required"].replace({
-                            'True': 'false',
+                        # Replace problematic values
+                        df_final[col] = df_final[col].replace({
+                            'nan': '',
+                            'NaN': '',
+                            'None': '',
+                            'none': '',
+                            'NULL': '',
+                            'null': '',
+                            '<NA>': '',
+                            'True': 'true',
+                            'TRUE': 'true',
                             'False': 'false',
-                            'TRUE': 'false',
-                            'FALSE': 'false',
-                            '': 'false',
-                            'nan': 'false'
-                        }).fillna('false')
+                            'FALSE': 'false'
+                        })
                         
-                        # Only keep non-false values if they're meaningful
-                        mask = ~df_final["Approval required"].isin(['false', '', 'nan', 'NaN', 'None'])
-                        df_final.loc[~mask, "Approval required"] = 'false'
+                    except Exception as e:
+                        print(f"Warning: Error processing column {col}: {e}")
+                        # Fallback: convert everything to string
+                        df_final[col] = df_final[col].astype(str).fillna('')
+                
+                # Special handling for boolean columns
+                if "Approval required" in df_final.columns:
+                    # Keep custom values, but standardize boolean representations
+                    df_final["Approval required"] = df_final["Approval required"].replace({
+                        'True': 'false',
+                        'False': 'false',
+                        'TRUE': 'false',
+                        'FALSE': 'false',
+                        '': 'false',
+                        'nan': 'false'
+                    }).fillna('false')
                     
-                    # Special handling for Approval group column
-                    if "Approval group" in df_final.columns:
-                        # For Approval group, clean up empty/null values to "empty"
-                        df_final["Approval group"] = df_final["Approval group"].replace({
-                            'nan': 'empty',
-                            'NaN': 'empty',
-                            'None': 'empty',
-                            'none': 'empty',
-                            'NULL': 'empty',
-                            'null': 'empty',
-                            '<NA>': 'empty',
-                            '': 'empty'
-                        }).fillna('empty')
-                    
-                    # Store the final DataFrame for later formatting use
-                    sheets[sheet_key] = df_final
-                    
-                    # Write to Excel
-                    df_final.to_excel(w, sheet_name=sheet_key, index=False)
-                # No need for else: continue, as the block is only entered if rows_list is not empty
+                    # Only keep non-false values if they're meaningful
+                    mask = ~df_final["Approval required"].isin(['false', '', 'nan', 'NaN', 'None'])
+                    df_final.loc[~mask, "Approval required"] = 'false'
+                
+                # Special handling for Approval group column
+                if "Approval group" in df_final.columns:
+                    # For Approval group, clean up empty/null values to "empty"
+                    df_final["Approval group"] = df_final["Approval group"].replace({
+                        'nan': 'empty',
+                        'NaN': 'empty',
+                        'None': 'empty',
+                        'none': 'empty',
+                        'NULL': 'empty',
+                        'null': 'empty',
+                        '<NA>': 'empty',
+                        '': 'empty'
+                    }).fillna('empty')
+                
+                # Store the final DataFrame for later formatting use
+                sheets[sheet_key] = df_final
+                
+                # Write to Excel
+                df_final.to_excel(w, sheet_name=sheet_key, index=False)
     
     # Apply formatting with red highlighting for missing schedules
     try:

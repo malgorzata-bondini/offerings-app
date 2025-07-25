@@ -1649,14 +1649,12 @@ def run_generator(
                                     
                                     # Handle aliases
                                     if aliases_on:
-                                        # Ustaw zawsze ENG alias jeśli wybrano "Use same values as Application Names" i jest aplikacja
+                                        # Zawsze kopiuj nazwę aplikacji do "Aliases (u_label) - ENG" jeśli wybrano "USE_APP_NAMES" i jest aplikacja
                                         if aliases_value == "USE_APP_NAMES" and app:
                                             exact_column_name = "Aliases (u_label) - ENG"
-                                            if exact_column_name in row.columns:
-                                                print(f"✅ Found alias column '{exact_column_name}'. Setting app name '{app}'.")
-                                                row.loc[:, exact_column_name] = app
-                                            else:
-                                                print(f"❌ Column '{exact_column_name}' not found in available columns")
+                                            if exact_column_name not in row.columns:
+                                                row[exact_column_name] = ""
+                                            row.loc[:, exact_column_name] = app
                                         # Pozostałe aliasy (per country, custom values) – tylko jeśli są selected_languages
                                         elif selected_languages:
                                             alias_value_to_set = ""
@@ -1747,7 +1745,8 @@ def run_generator(
                                         elif use_custom_commitments and commitment_country:
                                             # Use custom_commit_block function if country provided
                                             row.loc[:, "Service Commitments"] = custom_commit_block(
-                                                commitment_country, sr_or_im, rsp_enabled, rsl_enabled,
+                                                commitment_country,
+                                                sr_or_im, rsp_enabled, rsl_enabled,
                                                 rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
                                                 rsp_time, rsl_time
                                             )

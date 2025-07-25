@@ -1831,6 +1831,9 @@ def run_generator(
     # Convert lists to DataFrames once - major performance improvement!
     print(f"Converting {len(sheets_data)} sheet lists to DataFrames...")
     
+    # Initialize df to None to avoid unbound errors
+    df = None
+
     # Create output file path
     outfile = out_dir / f"Generated_Service_Offerings_{dt.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
@@ -2001,44 +2004,71 @@ def run_generator(
                             
                         except Exception as e:
                             print(f"Warning: Error processing column {col}: {e}")
+                # Only process if rows_list is not empty and df is not None and is a DataFrame
+                if rows_list and df is not None and isinstance(df, pd.DataFrame):
+                    # Clean data before writing to Excel - SAFER VERSION
+                    df_final = df.copy()
+                    for col in df_final.columns:
+                        try:
+                            # Handle mixed types more safely
+                            df_final[col] = df_final[col].fillna('').astype(str)
+                            
+                            # Replace problematic values
+                            df_final[col] = df_final[col].replace({
+                                'nan': '',
+                                'NaN': '',
+                                'None': '',
+                                'none': '',
+                                'NULL': '',
+                                'null': '',
+                                '<NA>': '',
+                                'True': 'true',
+                                'TRUE': 'true',
+                                'False': 'false',
+                                'FALSE': 'false'
+                            })
+                            
+                        except Exception as e:
+                            print(f"Warning: Error processing column {col}: {e}")
                             # Fallback: convert everything to string
                             df_final[col] = df_final[col].astype(str).fillna('')
-                
-                # Special handling for boolean columns
-                if "Approval required" in df_final.columns:
-                    # Keep custom values, but standardize boolean representations
-                    df_final["Approval required"] = df_final["Approval required"].replace({
-                        'True': 'false',
-                        'False': 'false',
-                        'TRUE': 'false',
-                        'FALSE': 'false',
-                        '': 'false',
-                        'nan': 'false'
-                    }).fillna('false')
                     
-                    # Only keep non-false values if they're meaningful
-                    mask = ~df_final["Approval required"].isin(['false', '', 'nan', 'NaN', 'None'])
-                    df_final.loc[~mask, "Approval required"] = 'false'
-                
-                # Special handling for Approval group column
-                if "Approval group" in df_final.columns:
-                    # For Approval group, clean up empty/null values to "empty"
-                    df_final["Approval group"] = df_final["Approval group"].replace({
-                        'nan': 'empty',
-                        'NaN': 'empty',
-                        'None': 'empty',
-                        'none': 'empty',
-                        'NULL': 'empty',
-                        'null': 'empty',
-                        '<NA>': 'empty',
-                        '': 'empty'
-                    }).fillna('empty')
-                
-                # Store the final DataFrame for later formatting use
-                sheets[sheet_key] = df_final
-                
-                # Write to Excel
-                df_final.to_excel(w, sheet_name=sheet_key, index=False)
+                    # Special handling for boolean columns
+                    if "Approval required" in df_final.columns:
+                        # Keep custom values, but standardize boolean representations
+                        df_final["Approval required"] = df_final["Approval required"].replace({
+                            'True': 'false',
+                            'False': 'false',
+                            'TRUE': 'false',
+                            'FALSE': 'false',
+                            '': 'false',
+                            'nan': 'false'
+                        }).fillna('false')
+                        
+                        # Only keep non-false values if they're meaningful
+                        mask = ~df_final["Approval required"].isin(['false', '', 'nan', 'NaN', 'None'])
+                        df_final.loc[~mask, "Approval required"] = 'false'
+                    
+                    # Special handling for Approval group column
+                    if "Approval group" in df_final.columns:
+                        # For Approval group, clean up empty/null values to "empty"
+                        df_final["Approval group"] = df_final["Approval group"].replace({
+                            'nan': 'empty',
+                            'NaN': 'empty',
+                            'None': 'empty',
+                            'none': 'empty',
+                            'NULL': 'empty',
+                            'null': 'empty',
+                            '<NA>': 'empty',
+                            '': 'empty'
+                        }).fillna('empty')
+                    
+                    # Store the final DataFrame for later formatting use
+                    sheets[sheet_key] = df_final
+                    
+                    # Write to Excel
+                    df_final.to_excel(w, sheet_name=sheet_key, index=False)
+                # No need for else: continue, as the block is only entered if rows_list is not empty
     
     # Apply formatting with red highlighting for missing schedules
     try:

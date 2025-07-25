@@ -624,55 +624,72 @@ with col2:
         aliases_per_country = {}
         
         if aliases_on:
-            # Option for global or per-country aliases
-            use_per_country_aliases = st.checkbox("Use different aliases per country/division", 
-                                                 value=False, 
-                                                 help="Define specific aliases for different countries or divisions")
+            # Option to use same values as app names
+            use_same_as_apps = st.checkbox("Use same values as Application Names", 
+                                          value=False,
+                                          help="When checked, aliases will automatically use the same values as the application names")
             
-            if use_per_country_aliases:
-                st.markdown("**Aliases per Country/Division**")
-                st.info("Configure aliases for specific countries/divisions. Unconfigured countries will use empty aliases.")
+            if use_same_as_apps:
+                # Show preview of what will be used
+                if new_apps:
+                    st.info(f"**Aliases will use:** {', '.join(new_apps)}")
+                else:
+                    st.warning("No application names defined. Add applications in Basic tab first.")
                 
-                # Define available countries/divisions - UPDATED with new countries
-                available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "DS CY", "DS RO", "DS TR"]
+                # Set aliases to use app names
+                aliases_value = "USE_APP_NAMES"
+                use_per_country_aliases = False
                 aliases_per_country = {}
-                
-                # Create tabs for different countries
-                alias_country_tabs = st.tabs(available_countries)
-                
-                for idx, country in enumerate(available_countries):
-                    with alias_country_tabs[idx]:
-                        st.markdown(f"**{country} Aliases**")
-                        
-                        country_alias = st.text_input(
-                            f"Alias Value for {country}",
-                            value="",
-                            key=f"alias_{country.replace(' ', '_')}",
-                            placeholder=f"e.g., {country}_ALIAS",
-                            help=f"Alias value to use specifically for {country}"
-                        )
-                        
-                        if country_alias.strip():
-                            # Map display names to backend keys
-                            backend_key = country
-                            if country == "DS CY":
-                                backend_key = "CY"
-                            elif country == "DS RO":
-                                backend_key = "RO"
-                            elif country == "DS TR":
-                                backend_key = "TR"
-                            
-                            aliases_per_country[backend_key] = country_alias.strip()
-                
-                # Set global alias to empty when using per-country
-                aliases_value = ""
             else:
-                # Global alias value
-                aliases_value = st.text_input(
-                    "Global Alias Value",
-                    value="",
-                    help="Enter the value to use for aliases (same for all countries)"
-                )
+                # Option for global or per-country aliases
+                use_per_country_aliases = st.checkbox("Use different aliases per country/division", 
+                                                     value=False, 
+                                                     help="Define specific aliases for different countries or divisions")
+                
+                if use_per_country_aliases:
+                    st.markdown("**Aliases per Country/Division**")
+                    st.info("Configure aliases for specific countries/divisions. Unconfigured countries will use empty aliases.")
+                    
+                    # Define available countries/divisions - UPDATED with new countries
+                    available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "DS CY", "DS RO", "DS TR"]
+                    aliases_per_country = {}
+                    
+                    # Create tabs for different countries
+                    alias_country_tabs = st.tabs(available_countries)
+                    
+                    for idx, country in enumerate(available_countries):
+                        with alias_country_tabs[idx]:
+                            st.markdown(f"**{country} Aliases**")
+                            
+                            country_alias = st.text_input(
+                                f"Alias Value for {country}",
+                                value="",
+                                key=f"alias_{country.replace(' ', '_')}",
+                                placeholder=f"e.g., {country}_ALIAS",
+                                help=f"Alias value to use specifically for {country}"
+                            )
+                            
+                            if country_alias.strip():
+                                # Map display names to backend keys
+                                backend_key = country
+                                if country == "DS CY":
+                                    backend_key = "CY"
+                                elif country == "DS RO":
+                                    backend_key = "RO"
+                                elif country == "DS TR":
+                                    backend_key = "TR"
+                                
+                                aliases_per_country[backend_key] = country_alias.strip()
+                    
+                    # Set global alias to empty when using per-country
+                    aliases_value = ""
+                else:
+                    # Global alias value
+                    aliases_value = st.text_input(
+                        "Global Alias Value",
+                        value="",
+                        help="Enter the value to use for aliases (same for all countries)"
+                    )
         else:
             aliases_value = ""
 

@@ -1660,8 +1660,10 @@ def run_generator(
                                     else:
                                         # Kopiuj z oryginalnego pliku
                                         row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
-                                    # Handle Visibility group - ensure it exists for PL
-                                    if country == "PL" and "Visibility group" not in row.columns:
+                                    # Handle Visibility group - copy from original base_row
+                                    if "Visibility group" in base_row.index:
+                                        row.loc[:, "Visibility group"] = base_row["Visibility group"]
+                                    else:
                                         row.loc[:, "Visibility group"] = ""
 
                                     # Handle DE special cases
@@ -1672,8 +1674,6 @@ def run_generator(
                                         # Handle LDAP columns
                                         ldap_cols = [col for col in row.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
                                         if ldap_cols:
-                                            # Clear all LDAP columns first
-                                            for ldap_col in ldap_cols:
                                                 row.loc[:, ldap_col] = ""
                                             
 

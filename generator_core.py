@@ -19,7 +19,7 @@ need_cols = [
     "Delivery Manager", "Subscribed by Location", "Phase", "Status",
     "Life Cycle Stage", "Life Cycle Status", "Support group", "Managed by Group",
     "Subscribed by Company", "Visibility group", "Business Criticality",
-    "Record view", "Approval required"  # Add these columns
+    "Record view", "Approval required", "Approval group"  # Add "Approval group"
 ]
 
 discard_lc = {"retired", "retiring", "end of life", "end of support"}
@@ -846,7 +846,8 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Visibility group": "",
         "Business Criticality": business_criticality,
         "Record view": "",  # Will be set based on SR/IM
-        "Approval required": "false" if not approval_required else approval_required_value  # Changed logic
+        "Approval required": "false" if not approval_required else approval_required_value,
+        "Approval group": "empty" if not approval_required else approval_required_value  # Add this line
     }
     
     # Set Subscribed by Location based on user choice
@@ -1601,8 +1602,10 @@ def run_generator(
                                     # Set Approval required with conditional value
                                     if approval_required:
                                         row.loc[:, "Approval required"] = approval_required_value
+                                        row.loc[:, "Approval group"] = approval_required_value  # Set to what user wrote
                                     else:
-                                        row.loc[:, "Approval required"] = "false"  # Changed from "empty" to "false"
+                                        row.loc[:, "Approval required"] = "false"
+                                        row.loc[:, "Approval group"] = "empty"  # Set to "empty" when not required
                                     
                                     # Set Subscribed by Location based on user choice
                                     if change_subscribed_location:
@@ -1835,13 +1838,16 @@ def run_generator(
                 column_order_key = None
                 if "_column_order_key" in df.columns and len(df) > 0:
                     column_order_key = df.iloc[0]["_column_order_key"]
-                
+
+                # Extract sheet_name from sheet_key for use below
+                sheet_name = sheet_key
+
                 # Track which rows have missing schedules BEFORE dropping the column
                 missing_schedule_rows = []
                 if "_missing_schedule" in df.columns:
                     missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
                     # Store this info for later use
-                    missing_schedule_info[sheet_key] = missing_schedule_rows
+                    missing_schedule_info[sheet_name] = missing_schedule_rows
                 
                 # Remove helper columns
                 for col in ["_missing_schedule", "_column_order_key"]:
@@ -1945,16 +1951,30 @@ def run_generator(
                 if "Approval required" in df_final.columns:
                     # Keep custom values, but standardize boolean representations
                     df_final["Approval required"] = df_final["Approval required"].replace({
-                        True: 'false',  # Changed: True should map to 'false' when checkbox not ticked
+                        True: 'false',
                         False: 'false', 
-                        'True': 'false',  # Changed: string 'True' should also map to 'false'
+                        'True': 'false',
                         'False': 'false',
-                        'TRUE': 'false',  # Changed: uppercase 'TRUE' should map to 'false'
+                        'TRUE': 'false',
                         'FALSE': 'false',
-                        '': 'false',  # Changed: empty should be 'false', not 'empty'
-                        'nan': 'false',  # Changed: 'nan' should be 'false', not 'empty'
+                        '': 'false',
+                        'nan': 'false',
                         'empty': 'empty'  # Only explicit 'empty' stays as 'empty'
-                    }).fillna('false')  # Changed: fillna with 'false' instead of 'empty'
+                    }).fillna('false')
+                
+                # Special handling for Approval group column
+                if "Approval group" in df_final.columns:
+                    # For Approval group, preserve user input but clean up empty/null values
+                    df_final["Approval group"] = df_final["Approval group"].replace({
+                        'nan': 'empty',
+                        'NaN': 'empty',
+                        'None': 'empty',
+                        'none': 'empty',
+                        'NULL': 'empty',
+                        'null': 'empty',
+                        '<NA>': 'empty',
+                        '': 'empty'
+                    }).fillna('empty')
                 
                 # Store the final DataFrame for later formatting use
                 sheets[sheet_key] = df_final

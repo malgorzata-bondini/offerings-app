@@ -1649,20 +1649,17 @@ def run_generator(
                                     
                                     # Handle aliases
                                     if aliases_on:
-                                        # Check if "Use same values as Application Names" is selected
+                                        # Ustaw zawsze ENG alias jeśli wybrano "Use same values as Application Names" i jest aplikacja
                                         if aliases_value == "USE_APP_NAMES" and app:
-                                            # Look for the exact column name "Aliases (u_label) - ENG"
                                             exact_column_name = "Aliases (u_label) - ENG"
                                             if exact_column_name in row.columns:
                                                 print(f"✅ Found alias column '{exact_column_name}'. Setting app name '{app}'.")
                                                 row.loc[:, exact_column_name] = app
                                             else:
                                                 print(f"❌ Column '{exact_column_name}' not found in available columns")
-                                        
-                                        # Handle other alias scenarios (per country, custom values) if selected_languages is provided
+                                        # Pozostałe aliasy (per country, custom values) – tylko jeśli są selected_languages
                                         elif selected_languages:
                                             alias_value_to_set = ""
-                                            
                                             if aliases_per_country:
                                                 if country == "PL" and recv:
                                                     alias_value_to_set = aliases_per_country.get(recv, "")
@@ -1670,11 +1667,8 @@ def run_generator(
                                                     alias_value_to_set = aliases_per_country.get(country, "")
                                             else:
                                                 alias_value_to_set = aliases_value
-                                            
-                                            # If we have a value and selected languages, find and set the alias
                                             if alias_value_to_set:
                                                 for lang in selected_languages:
-                                                    # Look for alias columns with various naming patterns
                                                     alias_patterns = [
                                                         f"Aliases (u_label) - {lang}",
                                                         f"ALIASES (U_LABEL) - {lang}",
@@ -1683,8 +1677,6 @@ def run_generator(
                                                         f"Alias - {lang}",
                                                         f"ALIAS - {lang}"
                                                     ]
-                                                    
-                                                    # Find matching column
                                                     for col in row.columns:
                                                         col_normalized = col.strip()
                                                         for pattern in alias_patterns:
@@ -1732,30 +1724,6 @@ def run_generator(
                                         # For CORP offerings in normal mode, clear the field
                                         row.loc[:, "Subscribed by Company"] = ""
                                     # For standard offerings, keep original value from source file
-                                    
-                                    
-                                    orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
-                                    
-                                    # If schedule is missing, use original commitments with user schedule
-                                    if missing_schedule:
-                                        if not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]:
-                                            # If original commitments are empty, create new ones with user schedule
-                                            row.loc[:, "Service Commitments"] = commit_block(country, schedule_suffix, rsp_duration, rsl_duration, sr_or_im)
-                                        else:
-                                            # Update original commitments with user schedule
-                                            row.loc[:, "Service Commitments"] = update_commitments(orig_comm, schedule_suffix, rsp_duration, rsl_duration, sr_or_im, country)
-                                    # For Lvl2, keep empty commitments empty
-                                    elif is_lvl2 and (not orig_comm or orig_comm in ["-", "nan", "NaN", "", None]):
-                                        row.loc[:, "Service Commitments"] = ""
-                                    else:
-                                        # Handle custom commitments - use both approaches
-                                           
-                                            match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
-                                            if match:
-                                                row.loc[:, "Subscribed by Company"] = match.group(1)
-                                            else:
-                                                # Fallback to receiver if pattern not found
-                                                row.loc[:, "Subscribed by Company"] = recv
                                     
                                     
                                     orig_comm = str(row.iloc[0]["Service Commitments"]).strip()

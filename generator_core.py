@@ -869,8 +869,8 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Subscribed by Company": "",  # Will be set during processing based on receiver and CORP type
         "Business Criticality": business_criticality,
         "Record view": "",  # Will be set based on SR/IM
-        "Approval required": "false" if not approval_required else approval_required_value,
-        "Approval group": "empty" if not approval_required else approval_required_value
+        "Approval required": "true" if approval_required else "false",  # Always use "true"/"false"
+        "Approval group": approval_required_value if approval_required else "empty"  # Use custom value for approval group
         # Removed "Visibility group" line
     }
     
@@ -1649,8 +1649,8 @@ def run_generator(
                                     
                                     # Set Approval required with conditional value
                                     if approval_required:
-                                        row.loc[:, "Approval required"] = approval_required_value
-                                        row.loc[:, "Approval group"] = approval_required_value  # Set to what user wrote
+                                        row.loc[:, "Approval required"] = "true"  # Always use "true" when checkbox is ticked
+                                        row.loc[:, "Approval group"] = approval_required_value  # Keep custom value for approval group
                                     else:
                                         row.loc[:, "Approval required"] = "false"
                                         row.loc[:, "Approval group"] = "empty"  # Set to "empty" when not required

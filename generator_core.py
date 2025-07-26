@@ -1068,6 +1068,7 @@ def run_generator(
     business_criticality="",
     approval_required=False,
     approval_required_value="empty",
+    approval_groups_per_app=None,  # Add this parameter
     change_subscribed_location=False,
     custom_subscribed_location="Global",
     use_pluralization=True):  # Add this parameter with default True
@@ -1650,7 +1651,12 @@ def run_generator(
                                     # Set Approval required with conditional value
                                     if approval_required:
                                         row.loc[:, "Approval required"] = "true"  # Always use "true" when checkbox is ticked
-                                        row.loc[:, "Approval group"] = approval_required_value  # Keep custom value for approval group
+                                        
+                                        # Use per-app approval group if configured, otherwise use global value
+                                        if approval_groups_per_app and app in approval_groups_per_app:
+                                            row.loc[:, "Approval group"] = approval_groups_per_app[app]
+                                        else:
+                                            row.loc[:, "Approval group"] = approval_required_value if approval_required_value != "PER_APP" else ""
                                     else:
                                         row.loc[:, "Approval required"] = "false"
                                         row.loc[:, "Approval group"] = "empty"  # Set to "empty" when not required

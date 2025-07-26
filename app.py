@@ -101,16 +101,48 @@ with col2:
             help="Set Approval Required to true for all generated offerings. Default is false."
         )
         
-        # Add conditional text field for approval required details
+        # Add conditional controls for approval required details
         if approval_required:
-            approval_required_value = st.text_input(
-                "Approval Required Details",
-                value="",
-                placeholder="Enter approval details (e.g., 'Manager approval needed')",
-                help="Optional details for when approval is required"
-            )
+            # Option to use same group for all apps or different per app
+            use_per_app_approval = st.checkbox("Use different approval groups per application", value=False)
+            
+            if not use_per_app_approval:
+                # Single approval group for all apps
+                approval_required_value = st.text_input(
+                    "Approval Required Details",
+                    value="",
+                    placeholder="Enter approval details (e.g., 'Manager approval needed')",
+                    help="Same approval group for all applications"
+                )
+                approval_groups_per_app = {}
+            else:
+                # Per-app approval groups
+                st.markdown("#### Approval Groups by Application")
+                st.info("Configure specific approval groups for each application.")
+                
+                approval_groups_per_app = {}
+                
+                if new_apps:
+                    # Create columns for better layout
+                    cols = st.columns(2)
+                    
+                    for i, app in enumerate(new_apps):
+                        col_idx = i % 2
+                        with cols[col_idx]:
+                            approval_groups_per_app[app] = st.text_input(
+                                f"Approval Group for {app}",
+                                value="",
+                                key=f"approval_{app}",
+                                placeholder=f"e.g., {app} Department Heads"
+                            )
+                else:
+                    st.warning("⚠️ No applications defined. Add applications in Basic tab first.")
+                
+                # Set global approval value to empty for per-app mode
+                approval_required_value = "PER_APP"
         else:
             approval_required_value = "empty"
+            approval_groups_per_app = {}
         
         # Add Subscribed by Location control
         st.markdown("---")

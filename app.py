@@ -772,6 +772,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         business_criticality=business_criticality,
                         approval_required=approval_required,
                         approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
+                        approval_groups_per_app=approval_groups_per_app if 'approval_groups_per_app' in locals() else {},  # ADD THIS LINE
                         change_subscribed_location=change_subscribed_location,
                         custom_subscribed_location=custom_subscribed_location
                     )

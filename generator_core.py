@@ -617,9 +617,13 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             current_name_str = " ".join(name_parts)
             # Check if "hardware" is in the current name (case insensitive)
             if "hardware" in current_name_str.lower():
-                name_parts.append(app.lower())  # Use lowercase for hardware
+                # Use lowercase for hardware, but keep UPS uppercase
+                if app.upper() == "UPS":
+                    name_parts.append("UPS")  # Keep UPS uppercase
+                else:
+                    name_parts.append(app.lower())  # Use lowercase for other hardware
             else:
-                name_parts.append(app)  # Keep original case
+                name_parts.append(app)  # Keep original case for non-hardware
         
         # Add "solving" for IM
         if sr_or_im == "IM":
@@ -694,7 +698,17 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Add app if provided
         if app:
-            final_parts.append(app)
+            # Build the current name string to check for "hardware"
+            current_name_str = " ".join(final_parts)
+            # Check if "hardware" is in the current name (case insensitive)
+            if "hardware" in current_name_str.lower():
+                # Use lowercase for hardware, but keep UPS uppercase
+                if app.upper() == "UPS":
+                    final_parts.append("UPS")  # Keep UPS uppercase
+                else:
+                    final_parts.append(app.lower())  # Use lowercase for other hardware
+            else:
+                final_parts.append(app)  # Keep original case for non-hardware
         
         # Add "solving" for IM
         if sr_or_im == "IM":

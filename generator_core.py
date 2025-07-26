@@ -1078,16 +1078,16 @@ def run_generator(
     def clean_approval_value(val):
         if pd.isna(val) or str(val).strip() in ['', 'nan', 'NaN', 'None', 'none', 'NULL', 'null', '<NA>']:
             return 'false'
-        val_str = str(val).strip().lower()
+        val_str = str(val).strip().lower()  # Convert to lowercase here
         if val_str in ['true', 'false']:
-            return val_str
+            return val_str  # Already lowercase
         elif val_str in ['yes', 'y', '1']:
             return 'true'
         elif val_str in ['no', 'n', '0']:
             return 'false'
         else:
-            # Keep custom values as-is (like "empty", etc.)
-            return str(val).strip()
+            # Keep custom values as-is but convert to lowercase
+            return str(val).strip().lower()
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:

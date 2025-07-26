@@ -1969,7 +1969,7 @@ def run_generator(
 
                 def _clean_approval_group(v):
                     v = _clean_cell(v)
-                    return v if v else 'empty'
+                    return v  # Just return the cleaned value without forcing "empty"
 
                 if "Approval group" in df_final.columns:
                     df_final["Approval group"] = df_final["Approval group"].apply(_clean_approval_group)

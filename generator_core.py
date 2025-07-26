@@ -1652,17 +1652,26 @@ def run_generator(
                                     if approval_required:
                                         row.loc[:, "Approval required"] = "true"  # Always use "true" when checkbox is ticked
                                         
+                                        # Debug print
+                                        print(f"DEBUG: approval_required=True, app={app}")
+                                        print(f"DEBUG: approval_groups_per_app={approval_groups_per_app}")
+                                        print(f"DEBUG: approval_required_value={approval_required_value}")
+                                        
                                         # Use per-app approval group if configured, otherwise use global value
                                         if approval_groups_per_app and app in approval_groups_per_app:
                                             app_approval_group = approval_groups_per_app[app].strip()
+                                            print(f"DEBUG: Found app-specific group: '{app_approval_group}'")
                                             # If the app-specific approval group is empty, use "empty"
                                             row.loc[:, "Approval group"] = app_approval_group if app_approval_group else "empty"
                                         else:
+                                            print(f"DEBUG: No app-specific group found, using global value")
                                             # If no per-app configuration exists, use global value (but not "PER_APP")
                                             if approval_required_value and approval_required_value != "PER_APP":
                                                 row.loc[:, "Approval group"] = approval_required_value
+                                                print(f"DEBUG: Using global value: '{approval_required_value}'")
                                             else:
                                                 row.loc[:, "Approval group"] = "empty"
+                                                print(f"DEBUG: Using fallback 'empty'")
                                     else:
                                         row.loc[:, "Approval required"] = "false"
                                         row.loc[:, "Approval group"] = "empty"  # Set to "empty" when not required

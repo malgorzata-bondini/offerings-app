@@ -1655,17 +1655,18 @@ def run_generator(
                                         # Use per-app approval group if configured, otherwise use global value
                                         if approval_groups_per_app and app in approval_groups_per_app:
                                             app_approval_group = approval_groups_per_app[app].strip()
-                                            # Use the actual value provided (even if empty) or "empty" as fallback
-                                            row.loc[:, "Approval group"] = app_approval_group if app_approval_group else "empty"
+                                            # Keep empty if the user left it empty - don't force to "empty"
+                                            row.loc[:, "Approval group"] = app_approval_group
                                         else:
                                             # If no per-app configuration exists, use global value (but not "PER_APP")
                                             if approval_required_value and approval_required_value != "PER_APP":
                                                 row.loc[:, "Approval group"] = approval_required_value
                                             else:
-                                                row.loc[:, "Approval group"] = "empty"
+                                                # Keep empty instead of forcing "empty"
+                                                row.loc[:, "Approval group"] = ""
                                     else:
                                         row.loc[:, "Approval required"] = "false"
-                                        row.loc[:, "Approval group"] = "empty"  # Set to "empty" when not required
+                                        row.loc[:, "Approval group"] = ""  # Keep empty instead of "empty"
                                     
                                     # Set Subscribed by Location based on user choice
                                     if change_subscribed_location:

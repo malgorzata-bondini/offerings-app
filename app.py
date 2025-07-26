@@ -524,7 +524,7 @@ with col2:
         with col:
             # List in alphabetical order
             require_corp = st.checkbox("CORP")
-            require_recp = st.checkbox("RecP")
+            require_recp = st.checkbox("CORP RecP")
             require_corp_dedicated = st.checkbox("CORP Dedicated Services")
             require_corp_it = st.checkbox("CORP IT")
             special_dak = st.checkbox("DAK (Business Services)")

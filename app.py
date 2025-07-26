@@ -118,7 +118,7 @@ with col2:
             else:
                 # Per-app approval groups
                 st.markdown("#### Approval Groups by Application")
-                st.info("Configure specific approval groups for each application.")
+                st.info("Configure specific approval groups for each application. Leave empty if no approval group is needed for that application.")
                 
                 approval_groups_per_app = {}
                 
@@ -133,7 +133,7 @@ with col2:
                                 f"Approval Group for {app}",
                                 value="",
                                 key=f"approval_{app}",
-                                placeholder=f"e.g., {app} Department Heads"
+                                placeholder=f"e.g., {app} Department Heads (leave empty if not needed)"
                             )
                 else:
                     st.warning("⚠️ No applications defined. Add applications in Basic tab first.")

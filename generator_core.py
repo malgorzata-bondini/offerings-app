@@ -1666,7 +1666,7 @@ def run_generator(
                                                 row.loc[:, "Approval group"] = ""
                                     else:
                                         row.loc[:, "Approval required"] = "false"
-                                        row.loc[:, "Approval group"] = ""  # Keep empty instead of "empty"
+                                        row.loc[:, "Approval group"] = "empty"  # Use literal "empty" when not required
                                     
                                     # Set Subscribed by Location based on user choice
                                     if change_subscribed_location:

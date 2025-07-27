@@ -661,7 +661,7 @@ with col2:
                     )
                     app_names_display = ["(no app)"]
             
-            # Construct the custom depend on value - directly use current values
+            # Construct the custom depend on value - TERAZ global_prod i special_it są już zdefiniowane
             if depend_on_prefix == "Global":
                 if special_it:
                     prefix_tag = "Global"  # Remove "Prod" for IT
@@ -676,24 +676,21 @@ with col2:
                     else:
                         prefix_tag = depend_on_prefix
             
-            # Show preview(s) for the custom depend on values
+            # Show preview(s) - TERAZ prefix_tag będzie poprawnie obliczony
             if new_apps:
                 if len(new_apps) == 1:
-                    # Apply pluralization to app name in preview
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
                     custom_depend_on_value = f"[{prefix_tag}] {app_name}"
-                    st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
+                    st.info(f"Preview: `{custom_depend_on_value}`")
                 else:
-                    st.info(f"Preview for each app: (Global Prod: {global_prod})")
+                    st.info(f"Preview for each app:")
                     for app in new_apps:
-                        # Apply pluralization to each app name in preview
                         app_name = get_plural_form_preview(app) if use_pluralization else app
                         st.text(f"• `[{prefix_tag}] {app_name}`")
-                    # Store prefix only - the backend will handle app names automatically
                     custom_depend_on_value = f"[{prefix_tag}]"
             else:
                 custom_depend_on_value = f"[{prefix_tag}]"
-                st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
+                st.info(f"Preview: `{custom_depend_on_value}`")
         else:
             custom_depend_on_value = ""
         

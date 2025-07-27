@@ -1733,6 +1733,8 @@ def run_generator(
                                         # Existing DE logic for Germany
                                         company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
 
+
+
                                         row.loc[:, "Subscribed by Company"] = company
                                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                         # For CORP offerings in normal mode, clear the field

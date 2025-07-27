@@ -649,10 +649,9 @@ with col2:
                 if special_it:
                     prefix_tag = depend_on_prefix  # Remove "Prod" for IT
                 else:
+                    prefix_tag = depend_on_prefix
                     if global_prod:
                         prefix_tag = f"{depend_on_prefix} Prod"
-                    else:
-                        prefix_tag = depend_on_prefix
             
             # Show preview(s) for the custom depend on values
             if new_apps:

@@ -1782,14 +1782,8 @@ def run_generator(
                                     
                                     # Always update Service Offerings | Depend On based on computed depend_tag and app
                                     if use_custom_depend_on and custom_depend_on_value:
-                                        # Use custom prefix but still include app name automatically
-                                        if app:
-                                            # Apply pluralization to app name if enabled
-                                            app_to_use = get_plural_form(app) if use_pluralization else app
-                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{custom_depend_on_value} {app_to_use}"
-                                        else:
-                                            # If no app and using custom depend on, use the custom value only if it's meant to be used without app
-                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
+                                        # Use the custom value as-is (it already includes the app name if needed)
+                                        row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
                                     else:
                                         # If custom depend on is not enabled, leave the column empty regardless of app
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = ""

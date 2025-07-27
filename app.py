@@ -235,9 +235,17 @@ with col2:
                         st.session_state.parent_offerings.pop()
                         st.rerun()
             
-            # Convert to the format expected by the backend
-            new_parent_offerings = "\n".join([pair["offering"] for pair in st.session_state.parent_offerings if pair["offering"]])
-            new_parents = "\n".join([pair["parent"] for pair in st.session_state.parent_offerings if pair["parent"]])
+            # Convert to the format expected by the backend - ZMIEŃ TO
+            # Zamiast łączyć w wieloliniowy tekst, przekaż listę par
+            valid_pairs = [pair for pair in st.session_state.parent_offerings if pair["offering"] and pair["parent"]]
+            
+            if valid_pairs:
+                # Przekaż jako listę par do backendu
+                new_parent_offerings = valid_pairs
+                new_parents = valid_pairs  # Backend będzie używać tej samej struktury
+            else:
+                new_parent_offerings = ""
+                new_parents = ""
             
             # Show preview
             if new_parent_offerings and new_parents:
@@ -787,8 +795,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
                         require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
                         use_new_parent=use_new_parent,
-                        new_parent_offering=new_parent_offerings,
-                        new_parent=new_parents,
+                        new_parent_offering="\n".join([f"{pair['offering']}|{pair['parent']}" for pair in new_parent_offerings]) if isinstance(new_parent_offerings, list) else new_parent_offerings,
+                        new_parent="\n".join([f"{pair['offering']}|{pair['parent']}" for pair in new_parents]) if isinstance(new_parents, list) else new_parents,
                         keywords_excluded=keywords_excluded if not use_new_parent else "",
                         use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
                         service_type_lvl2=service_type if 'service_type' in locals() else "",

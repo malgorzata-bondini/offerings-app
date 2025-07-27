@@ -414,12 +414,29 @@ with col2:
                     time = st.text_input(f"Time", placeholder="e.g. 2h, 1d", key=f"commit_time_{i}")
                 
                 if schedule and time:
-                    line = f"[{commitment_country}] SLA {sr_or_im} {line_type} {schedule} {priority} {time}"
+                    # Check if we should use custom prefix from Advanced tab
+                    if st.session_state.get('use_custom_depend_on', False) and st.session_state.get('depend_on_prefix'):
+                        prefix_to_use = st.session_state.get('depend_on_prefix')
+                        if prefix_to_use == "Global":
+                            if st.session_state.get('special_it', False):
+                                prefix_to_use = "Global"
+                            else:
+                                prefix_to_use = "Global Prod" if st.session_state.get('global_prod', False) else "Global"
+                        else:
+                            if st.session_state.get('special_it', False):
+                                prefix_to_use = st.session_state.get('depend_on_prefix')
+                            else:
+                                if st.session_state.get('global_prod', False):
+                                    prefix_to_use = f"{st.session_state.get('depend_on_prefix')} Prod"
+                    else:
+                        prefix_to_use = commitment_country
+                    
+                    line = f"[{prefix_to_use}] SLA {sr_or_im} {line_type} {schedule} {priority} {time}"
                     commitment_lines.append(line)
                     
                     # Add OLA for SR and RSL
                     if sr_or_im == "SR" and line_type == "RSL":
-                        ola_line = f"[{commitment_country}] OLA {sr_or_im} RSL {schedule} {priority} {time}"
+                        ola_line = f"[{prefix_to_use}] OLA {sr_or_im} RSL {schedule} {priority} {time}"
                         commitment_lines.append(ola_line)
             
             # Show preview
@@ -581,11 +598,17 @@ with col2:
             )
         else:
             delivering_tag = ""
+        
+        # Save IT checkbox to session state
+        st.session_state['special_it'] = special_it
     
     with tab7:
         # Global settings - MOVED TO TOP
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False, key="global_prod_checkbox")
+        
+        # Save to session state for access in other tabs
+        st.session_state['global_prod'] = global_prod
         
         # Remove pluralization checkbox - always use pluralization
         use_pluralization = True  # Always enabled
@@ -594,6 +617,9 @@ with col2:
         st.markdown("### Service Offerings | Depend On")
         use_custom_depend_on = st.checkbox("Use custom 'Service Offerings | Depend On' value", value=False, 
                                           help="Override automatic generation with a custom value for all rows")
+        
+        # Save to session state
+        st.session_state['use_custom_depend_on'] = use_custom_depend_on
         
         if use_custom_depend_on:
             col1, col2 = st.columns([1, 2])
@@ -605,6 +631,8 @@ with col2:
                     index=0,
                     help="Choose the service prefix"
                 )
+                # Save to session state
+                st.session_state['depend_on_prefix'] = depend_on_prefix
             
             with col2:
                 # Show which apps will be used automatically
@@ -639,18 +667,21 @@ with col2:
                     )
                     app_names_display = ["(no app)"]
             
-            # Construct the custom depend on value
+            # Construct the custom depend on value - with session state check
+            current_global_prod = st.session_state.get('global_prod', global_prod)
+            current_special_it = st.session_state.get('special_it', special_it)
+            
             if depend_on_prefix == "Global":
-                if special_it:
+                if current_special_it:
                     prefix_tag = "Global"  # Remove "Prod" for IT
                 else:
-                    prefix_tag = "Global Prod" if global_prod else "Global"
+                    prefix_tag = "Global Prod" if current_global_prod else "Global"
             else:
-                if special_it:
+                if current_special_it:
                     prefix_tag = depend_on_prefix  # Remove "Prod" for IT
                 else:
                     prefix_tag = depend_on_prefix
-                    if global_prod:
+                    if current_global_prod:
                         prefix_tag = f"{depend_on_prefix} Prod"
             
             # Show preview(s) for the custom depend on values
@@ -659,9 +690,9 @@ with col2:
                     # Apply pluralization to app name in preview
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
                     custom_depend_on_value = f"[{prefix_tag}] {app_name}"
-                    st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
+                    st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {current_global_prod})")
                 else:
-                    st.info(f"Preview for each app: (Global Prod: {global_prod})")
+                    st.info(f"Preview for each app: (Global Prod: {current_global_prod})")
                     for app in new_apps:
                         # Apply pluralization to each app name in preview
                         app_name = get_plural_form_preview(app) if use_pluralization else app
@@ -670,7 +701,7 @@ with col2:
                     custom_depend_on_value = f"[{prefix_tag}]"
             else:
                 custom_depend_on_value = f"[{prefix_tag}]"
-                st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
+                st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {current_global_prod})")
         else:
             custom_depend_on_value = ""
         

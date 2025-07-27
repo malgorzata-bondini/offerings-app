@@ -1312,8 +1312,8 @@ def run_generator(
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
 
-                    # Use zip_longest to repeat the parent value for all offerings
-                    for offering, parent in zip_longest(parent_offerings_list, parents_list, fillvalue=parents_list[0] if parents_list else ""):
+                    # Pair each offering with its corresponding parent, one per row
+                    for offering, parent in zip(parent_offerings_list, parents_list):
                         new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                         synthetic_rows.append(new_row)
                     

@@ -1320,17 +1320,15 @@ def run_generator(
                     for i in range(len(parent_offerings_list)):
                         offering = parent_offerings_list[i]
                         
-                        # Get the corresponding parent - CRITICAL: only one parent per row
+                        # Get ONLY the corresponding parent - no fallback to combine all
                         if i < len(parents_list):
-                            parent = parents_list[i]  # This should be a SINGLE parent value
+                            parent = parents_list[i]  # Use ONLY this specific parent
                         else:
-                            parent = parents_list[0] if parents_list else ""
+                            continue  # Skip if no corresponding parent
                         
                         print(f"DEBUG: Creating row {i}: offering='{offering}', parent='{parent}'")
-                        # Make sure parent is a single string, not multi-line
-                        parent_single = parent.replace('\n', ' ').strip()
                         
-                        new_row = create_new_parent_row(offering, parent_single, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
+                        new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                         synthetic_rows.append(new_row)
                     
                     # Create DataFrame from all synthetic rows

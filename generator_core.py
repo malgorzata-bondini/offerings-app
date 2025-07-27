@@ -1306,6 +1306,7 @@ def run_generator(
             try:
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
+                    synthetic_rows = []  # Initialize the list before using
                     # Split the parent offerings and parents into separate lines
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]

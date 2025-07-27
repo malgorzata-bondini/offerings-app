@@ -242,7 +242,7 @@ with col2:
                 
                 if valid_pairs:
                     new_parent_offerings = "\n".join([pair["offering"] for pair in valid_pairs])
-                    new_parents = "\n".join([pair["parent"] for pair in valid_pairs])
+                    new_parents = "\n".join([pair["parent"] for pair in valid_pairs])  # Make sure this doesn't duplicate
                 else:
                     new_parent_offerings = ""
                     new_parents = ""

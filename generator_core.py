@@ -1654,7 +1654,8 @@ def run_generator(
                                         # Use the parent from the specific base_row, NOT the global new_parent variable
                                         row.loc[:, "Parent"] = base_row.get("Parent", "")
                                     else:
-                                        row.loc[:, "Parent"] = "" # Keep this for the other mode
+                                        # Keep original Parent value from source file
+                                        row.loc[:, "Parent"] = base_row.get("Parent", "")
 
                                     row.loc[:, "Delivery Manager"] = delivery_manager
                                     

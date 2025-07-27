@@ -1306,38 +1306,10 @@ def run_generator(
             try:
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
-                    # Jeśli new_parent_offering jest listą par
-                    if isinstance(new_parent_offering, list):
-                        pairs = new_parent_offering
-                    else:
-                        # Stara logika - rozdziel wieloliniowy tekst
-                        parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
-                        parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
-                        pairs = []
-                        for i in range(max(len(parent_offerings_list), len(parents_list))):
-                            offering = parent_offerings_list[min(i, len(parent_offerings_list) - 1)] if parent_offerings_list else ""
-                            parent = parents_list[min(i, len(parents_list) - 1)] if parents_list else ""
-                            pairs.append({"offering": offering, "parent": parent})
-                    
-                    # Create multiple synthetic rows - one for each pair
-                    synthetic_rows = []
-                    for pair in pairs:
-                        if pair[0] and pair[1]:
-                            new_row = create_new_parent_row(
-                                pair[0],
-                                pair[1],
-                                country, 
-                                business_criticality, 
-                                approval_required, 
-                                approval_required_value, 
-                                change_subscribed_location, 
-                                custom_subscribed_location
-                            )
-                            synthetic_rows.append(new_row)
-                    
-                    # Create DataFrame from all synthetic rows
-                    base_pool = pd.DataFrame(synthetic_rows)
-                    
+                    # Create a new synthetic row with the specified parent offering and parent
+                    new_row = create_new_parent_row(new_parent_offering, new_parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
+                    base_pool = pd.DataFrame([new_row])
+                    # For new parent, we can process both levels with the same synthetic data
                     # Initialize schedule checking variables
                     all_country_names_for_schedules = pd.Series([], dtype=str)
                     corp_names_for_schedules = pd.Series([], dtype=str)
@@ -1746,7 +1718,6 @@ def run_generator(
                                     elif country == "DE":
                                         # Existing DE logic for Germany
                                         company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
-
                                         row.loc[:, "Subscribed by Company"] = company
                                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                         # For CORP offerings in normal mode, clear the field

@@ -1742,7 +1742,7 @@ def run_generator(
                                         else:
                                             # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
                                             row.loc[:, "Subscribed by Company"] = recv
-                                    elif country == "DE:
+                                    elif country == "DE":
                                         # Existing DE logic for Germany
                                         company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
 

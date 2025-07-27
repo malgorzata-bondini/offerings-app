@@ -1309,15 +1309,9 @@ def run_generator(
                     # Split the parent offerings and parents into separate lines
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
-                    
-                    # Create multiple synthetic rows - one for each pair
-                    synthetic_rows = []
-                    for i in range(max(len(parent_offerings_list), len(parents_list))):
-                        # Get the offering and parent for this index, or use the last available one
-                        offering = parent_offerings_list[min(i, len(parent_offerings_list) - 1)] if parent_offerings_list else ""
-                        parent = parents_list[min(i, len(parents_list) - 1)] if parents_list else ""
-                        
-                        # Create individual row with single values (not multi-line)
+
+                    # Use zip to pair each offering with its parent, only once per row
+                    for offering, parent in zip(parent_offerings_list, parents_list):
                         new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                         synthetic_rows.append(new_row)
                     

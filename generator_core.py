@@ -851,15 +851,15 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
 
 def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality="", approval_required=False, approval_required_value="empty", change_subscribed_location=False, custom_subscribed_location="Global"):
     """Create a new row with the specified parent offering and parent values"""
-    # DODAJ CZYSZCZENIE WIELOLINIOWEGO TEKSTU
-    new_parent_offering = str(new_parent_offering).strip().split('\n')[0] if new_parent_offering else ""
-    new_parent = str(new_parent).strip().split('\n')[0] if new_parent else ""
+    # USUŃ TE LINIE - POWODUJĄ KORUPCJĘ
+    # new_parent_offering = str(new_parent_offering).strip().split('\n')[0] if new_parent_offering else ""
+    # new_parent = str(new_parent).strip().split('\n')[0] if new_parent else ""
     
     # Create a basic row structure with required columns
     new_row = {
         "Name (Child Service Offering lvl 1)": "",  # Will be filled later
-        "Parent Offering": new_parent_offering,  # Już pojedyncza wartość
-        "Parent": new_parent,  # Już pojedyncza wartość
+        "Parent Offering": str(new_parent_offering).strip() if new_parent_offering else "",
+        "Parent": str(new_parent).strip() if new_parent else "",
         "Service Offerings | Depend On (Application Service)": "",
         "Service Commitments": "",
         "Delivery Manager": "",
@@ -870,11 +870,11 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Life Cycle Status": "In Use",
         "Support group": "",
         "Managed by Group": "",
-        "Subscribed by Company": "",  # Will be set during processing based on receiver and CORP type
+        "Subscribed by Company": "",
         "Business Criticality": business_criticality,
-        "Record view": "",  # Will be set based on SR/IM
-        "Approval required": "true" if approval_required else "false",  # Always use "true"/"false"
-        "Approval group": approval_required_value if approval_required else "empty"  # Use custom value for approval group
+        "Record view": "",
+        "Approval required": "true" if approval_required else "false",
+        "Approval group": approval_required_value if approval_required else "empty"
     }
     
     # Set Subscribed by Location based on user choice

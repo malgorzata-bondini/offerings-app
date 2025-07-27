@@ -1342,6 +1342,12 @@ def run_generator(
                         sg, mg = support_groups_list[0]
                         base_pool["Support group"] = sg
                         base_pool["Managed by Group"] = mg
+                    else:
+                        # Fallback to global values if no country-specific groups found
+                        base_pool["Support group"] = support_group if support_group else ""
+                        # If managed_by_group is empty, use support_group value
+                        managed_value = managed_by_group if managed_by_group and managed_by_group.strip() else support_group
+                        base_pool["Managed by Group"] = managed_value if managed_value else ""
                     
                     # Initialize schedule checking variables
                     all_country_names_for_schedules = pd.Series([], dtype=str)

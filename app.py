@@ -583,14 +583,14 @@ with col2:
             delivering_tag = ""
     
     with tab7:
-        # Global settings
+        # Global settings - MOVED TO TOP
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False, key="global_prod_checkbox")
         
         # Remove pluralization checkbox - always use pluralization
         use_pluralization = True  # Always enabled
         
-        # Custom Depend On setting
+        # Custom Depend On setting - NOW AFTER GLOBAL SETTINGS
         st.markdown("### Service Offerings | Depend On")
         use_custom_depend_on = st.checkbox("Use custom 'Service Offerings | Depend On' value", value=False, 
                                           help="Override automatic generation with a custom value for all rows")
@@ -659,9 +659,9 @@ with col2:
                     # Apply pluralization to app name in preview
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
                     custom_depend_on_value = f"[{prefix_tag}] {app_name}"
-                    st.info(f"Preview: `{custom_depend_on_value}`")
+                    st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
                 else:
-                    st.info("Preview for each app:")
+                    st.info(f"Preview for each app: (Global Prod: {global_prod})")
                     for app in new_apps:
                         # Apply pluralization to each app name in preview
                         app_name = get_plural_form_preview(app) if use_pluralization else app
@@ -670,7 +670,7 @@ with col2:
                     custom_depend_on_value = f"[{prefix_tag}]"
             else:
                 custom_depend_on_value = f"[{prefix_tag}]"
-                st.info(f"Preview: `{custom_depend_on_value}`")
+                st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
         else:
             custom_depend_on_value = ""
         

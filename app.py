@@ -585,7 +585,7 @@ with col2:
     with tab7:
         # Global settings
         st.markdown("### Global")
-        global_prod = st.checkbox("Global Prod", value=False)
+        global_prod = st.checkbox("Global Prod", value=False, key="global_prod_checkbox")
         
         # Remove pluralization checkbox - always use pluralization
         use_pluralization = True  # Always enabled

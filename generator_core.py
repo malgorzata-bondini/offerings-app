@@ -1316,18 +1316,13 @@ def run_generator(
                     print(f"DEBUG: parent_offerings_list = {parent_offerings_list}")
                     print(f"DEBUG: parents_list = {parents_list}")
 
-                    # Fix: Remove duplicate parents - use only unique values
-                    if len(set(parents_list)) == 1:
-                        # All parents are the same, use just one for all offerings
-                        single_parent = parents_list[0]
-                        for offering in parent_offerings_list:
-                            new_row = create_new_parent_row(offering, single_parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
-                            synthetic_rows.append(new_row)
-                    else:
-                        # Pair each offering with its corresponding parent, one per row
-                        for offering, parent in zip(parent_offerings_list, parents_list):
-                            new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
-                            synthetic_rows.append(new_row)
+                    # Force one-to-one pairing - ensure each row gets exactly one parent
+                    for i, offering in enumerate(parent_offerings_list):
+                        # Get the corresponding parent (or use the first one if not enough parents)
+                        parent = parents_list[i] if i < len(parents_list) else parents_list[0]
+                        print(f"DEBUG: Creating row {i}: offering='{offering}', parent='{parent}'")
+                        new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
+                        synthetic_rows.append(new_row)
                     
                     # Create DataFrame from all synthetic rows
                     base_pool = pd.DataFrame(synthetic_rows)

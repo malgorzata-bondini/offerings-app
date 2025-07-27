@@ -661,37 +661,44 @@ with col2:
                     )
                     app_names_display = ["(no app)"]
             
-            # Construct the custom depend on value - USE SESSION STATE FOR special_it
+            # Construct the custom depend on value - ROZDZIEL NA DWE ZMIENNE
             current_special_it = st.session_state.get('special_it', False)
             
+            # 1. PREFIX DLA NAZWY (bez Global Prod logic)
+            if depend_on_prefix == "Global":
+                name_prefix_tag = "Global"
+            else:
+                name_prefix_tag = depend_on_prefix
+            
+            # 2. PREFIX DLA SERVICE OFFERINGS | DEPEND ON (z Global Prod logic)
             if depend_on_prefix == "Global":
                 if current_special_it:
-                    prefix_tag = "Global"  # Remove "Prod" for IT
+                    depend_on_prefix_tag = "Global"  # IT ignoruje Prod
                 else:
-                    prefix_tag = "Global Prod" if global_prod else "Global"
+                    depend_on_prefix_tag = "Global Prod" if global_prod else "Global"
             else:
                 if current_special_it:
-                    prefix_tag = depend_on_prefix  # Remove "Prod" for IT
+                    depend_on_prefix_tag = depend_on_prefix  # IT ignoruje Prod
                 else:
                     if global_prod:
-                        prefix_tag = f"{depend_on_prefix} Prod"
+                        depend_on_prefix_tag = f"{depend_on_prefix} Prod"
                     else:
-                        prefix_tag = depend_on_prefix
+                        depend_on_prefix_tag = depend_on_prefix
             
-            # Show preview(s) - TERAZ prefix_tag będzie poprawnie obliczony
+            # Show preview(s) - UŻYJ depend_on_prefix_tag DLA PREVIEW
             if new_apps:
                 if len(new_apps) == 1:
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
-                    custom_depend_on_value = f"[{prefix_tag}] {app_name}"
+                    custom_depend_on_value = f"[{depend_on_prefix_tag}] {app_name}"
                     st.info(f"Preview: `{custom_depend_on_value}` (IT: {current_special_it}, Global Prod: {global_prod})")
                 else:
                     st.info(f"Preview for each app: (IT: {current_special_it}, Global Prod: {global_prod})")
                     for app in new_apps:
                         app_name = get_plural_form_preview(app) if use_pluralization else app
-                        st.text(f"• `[{prefix_tag}] {app_name}`")
-                    custom_depend_on_value = f"[{prefix_tag}]"
+                        st.text(f"• `[{depend_on_prefix_tag}] {app_name}`")
+                    custom_depend_on_value = f"[{depend_on_prefix_tag}]"
             else:
-                custom_depend_on_value = f"[{prefix_tag}]"
+                custom_depend_on_value = f"[{depend_on_prefix_tag}]"
                 st.info(f"Preview: `{custom_depend_on_value}` (IT: {current_special_it}, Global Prod: {global_prod})")
         else:
             custom_depend_on_value = ""

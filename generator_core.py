@@ -1315,27 +1315,33 @@ def run_generator(
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
 
-                    # DEBUG: Print what we're working with
-                    print(f"DEBUG: parent_offerings_list = {parent_offerings_list}")
-                    print(f"DEBUG: parents_list = {parents_list}")
-
-                    # Create exactly one row per Parent Offering with exactly one Parent
+                    # Create one row per Parent Offering-Parent pair
                     for i in range(len(parent_offerings_list)):
                         offering = parent_offerings_list[i]
-                        
-                        # Get ONLY the corresponding parent - no fallback to combine all
-                        if i < len(parents_list):
-                            parent = parents_list[i]  # Use ONLY this specific parent
-                        else:
-                            continue  # Skip if no corresponding parent
-                        
-                        print(f"DEBUG: Creating row {i}: offering='{offering}', parent='{parent}'")
+                        parent = parents_list[i] if i < len(parents_list) else ""
+                        if not parent: continue
                         
                         new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                         synthetic_rows.append(new_row)
                     
+                    if not synthetic_rows:
+                        continue # No valid pairs were created
+
                     # Create DataFrame from all synthetic rows
                     base_pool = pd.DataFrame(synthetic_rows)
+                    
+                    # *** THE CRITICAL FIX IS HERE ***
+                    # Get the correct support groups and apply them to the entire base_pool
+                    support_groups_list = get_support_groups_list_for_country(
+                        country, support_group, managed_by_group, support_groups_per_country, 
+                        managed_by_groups_per_country, None # No division context here
+                    )
+                    
+                    # Use the first available group pair for all synthetic rows
+                    if support_groups_list:
+                        sg, mg = support_groups_list[0]
+                        base_pool["Support group"] = sg
+                        base_pool["Managed by Group"] = mg
                     
                     # Initialize schedule checking variables
                     all_country_names_for_schedules = pd.Series([], dtype=str)
@@ -1740,7 +1746,7 @@ def run_generator(
                                         if require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                             # For CORP offerings, extract what comes after CORP
                                             # Example: [SR DS CY CORP HS DE Dedicated Services] -> "HS DE"
-                                            match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
+                                            match = re.search(r'\\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
                                             if match:
                                                 row.loc[:, "Subscribed by Company"] = match.group(1)
                                             else:

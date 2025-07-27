@@ -915,36 +915,39 @@ def get_managed_by_group_for_country(country, managed_by_group, managed_by_group
     # Fall back to global managed_by_group, or support_group_for_country if empty
     return managed_by_group if managed_by_group else support_group_for_country
 
-def get_support_groups_list_for_country(country, support_group, support_groups_per_country, 
+def get_support_groups_list_for_country(country, support_group, managed_by_group, support_groups_per_country, 
                                        managed_by_groups_per_country, division=None):
     """Get list of support groups for a country (handles multiple groups for DE)"""
-    # Get support groups
-    if country == "PL" and division:
-        division_key = f"{division} PL"
-        country_support_groups = support_groups_per_country.get(division_key, support_group) if support_groups_per_country else support_group
-        country_managed_groups = managed_by_groups_per_country.get(division_key, "") if managed_by_groups_per_country else ""
-    else:
-        country_support_groups = support_groups_per_country.get(country, support_group) if support_groups_per_country else support_group
-        country_managed_groups = managed_by_groups_per_country.get(country, "") if managed_by_groups_per_country else ""
-    
+    # Determine the source for support and managed groups (per-country or global)
+    country_support_groups = support_group
+    if support_groups_per_country and country in support_groups_per_country:
+        country_support_groups = support_groups_per_country[country]
+
+    country_managed_groups = managed_by_group
+    if managed_by_groups_per_country and country in managed_by_groups_per_country:
+        country_managed_groups = managed_by_groups_per_country[country]
+
     # Handle multiple groups (separated by newlines)
     if country_support_groups and '\n' in str(country_support_groups):
         support_list = [sg.strip() for sg in str(country_support_groups).split('\n') if sg.strip()]
-        managed_list = []
-        if country_managed_groups and '\n' in str(country_managed_groups):
-            managed_list = [mg.strip() for mg in str(country_managed_groups).split('\n') if mg.strip()]
-        else:
-            managed_list = [country_managed_groups.strip()] * len(support_list) if country_managed_groups else support_list
+        managed_list_final = []
         
-        # Ensure managed_list has same length as support_list
-        while len(managed_list) < len(support_list):
-            managed_list.append(support_list[len(managed_list)])
+        managed_list_raw = []
+        if country_managed_groups and '\n' in str(country_managed_groups):
+            managed_list_raw = [mg.strip() for mg in str(country_managed_groups).split('\n') if mg.strip()]
+        
+        # Pair them up, falling back to the corresponding support group if a managed group is missing
+        for i, sg in enumerate(support_list):
+            mg = managed_list_raw[i] if i < len(managed_list_raw) and managed_list_raw[i] else sg
+            managed_list_final.append(mg)
             
-        return list(zip(support_list, managed_list))
+        return list(zip(support_list, managed_list_final))
     else:
-        # Single support group
-        single_support = country_support_groups or support_group or ""
-        single_managed = country_managed_groups or single_support or ""
+        # Single support group logic
+        single_support = country_support_groups or ""
+        # If managed group is empty, default to support group. Otherwise, use it.
+        single_managed = country_managed_groups if country_managed_groups else single_support
+        
         return [(single_support, single_managed)] if single_support else [("", "")]
 
 def get_schedule_suffixes_for_country(country, receiver, schedule_settings_per_country, default_schedule_suffixes):
@@ -1627,7 +1630,7 @@ def run_generator(
                                 else:
                                     # For other countries, use the existing logic
                                     support_groups_list = get_support_groups_list_for_country(
-                                        country, support_group, support_groups_per_country, 
+                                        country, support_group, managed_by_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
                                     )
                                 
@@ -1720,7 +1723,7 @@ def run_generator(
                                         row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
                                     # Handle DE special cases
                                     if country == "DE":
-                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
+                                        company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
                                         row.loc[:, "Subscribed by Company"] = company
                                         
                                         # Handle LDAP columns
@@ -1741,11 +1744,8 @@ def run_generator(
                                             if match:
                                                 row.loc[:, "Subscribed by Company"] = match.group(1)
                                             else:
-                                                # Fallback to receiver if pattern not found
+                                                # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
                                                 row.loc[:, "Subscribed by Company"] = recv
-                                        else:
-                                            # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
-                                            row.loc[:, "Subscribed by Company"] = recv
                                     elif country == "DE":
                                         # Existing DE logic for Germany
                                        

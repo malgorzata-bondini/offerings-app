@@ -1690,10 +1690,14 @@ def run_generator(
                                         row.loc[:, "Approval required"] = "false"
                                         row.loc[:, "Approval group"] = "empty"  # Use literal "empty" when not required
                                     
-                                    # Set Subscribed by Location based on user choice
+                                    # Set Subscribed by Location based on user choice or original value
                                     if change_subscribed_location:
                                         row.loc[:, "Subscribed by Location"] = custom_subscribed_location
+                                    elif not use_new_parent:
+                                        # Copy from original file if not using new parent
+                                        row.loc[:, "Subscribed by Location"] = base_row.get("Subscribed by Location", "")
                                     else:
+                                        # Default to "Global" if synthetic row
                                         row.loc[:, "Subscribed by Location"] = "Global"
                                     
                                     # Apply support group and managed by group

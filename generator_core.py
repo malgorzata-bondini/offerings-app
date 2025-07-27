@@ -1788,13 +1788,17 @@ def run_generator(
                                             app_to_use = get_plural_form(app) if use_pluralization else app
                                             # Check if Global Prod is enabled
                                             if global_prod:
-                                                row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{custom_depend_on_value} Prod] {app_to_use}"
+                                                # Replace the closing ] with Prod]
+                                                prefix_with_prod = custom_depend_on_value.replace(']', ' Prod]')
+                                                row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{prefix_with_prod} {app_to_use}"
                                             else:
                                                 row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{custom_depend_on_value} {app_to_use}"
                                         else:
                                             # If no app, use just the prefix
                                             if global_prod:
-                                                row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{custom_depend_on_value} Prod]"
+                                                # Replace the closing ] with Prod]
+                                                prefix_with_prod = custom_depend_on_value.replace(']', ' Prod]')
+                                                row.loc[:, "Service Offerings | Depend On (Application Service)"] = prefix_with_prod
                                             else:
                                                 row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
                                     else:

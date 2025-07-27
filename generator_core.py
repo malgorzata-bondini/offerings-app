@@ -851,15 +851,11 @@ def custom_commit_block(cc, sr_or_im, rsp_enabled, rsl_enabled, rsp_schedule, rs
 
 def create_new_parent_row(new_parent_offering, new_parent, country, business_criticality="", approval_required=False, approval_required_value="empty", change_subscribed_location=False, custom_subscribed_location="Global"):
     """Create a new row with the specified parent offering and parent values"""
-    # USUŃ TE LINIE - POWODUJĄ KORUPCJĘ
-    # new_parent_offering = str(new_parent_offering).strip().split('\n')[0] if new_parent_offering else ""
-    # new_parent = str(new_parent).strip().split('\n')[0] if new_parent else ""
-    
     # Create a basic row structure with required columns
     new_row = {
         "Name (Child Service Offering lvl 1)": "",  # Will be filled later
-        "Parent Offering": str(new_parent_offering).strip() if new_parent_offering else "",
-        "Parent": str(new_parent).strip() if new_parent else "",
+        "Parent Offering": new_parent_offering,  # Use the user-provided value
+        "Parent": new_parent,  # Use the user-provided value (not hardcoded)
         "Service Offerings | Depend On (Application Service)": "",
         "Service Commitments": "",
         "Delivery Manager": "",
@@ -870,11 +866,12 @@ def create_new_parent_row(new_parent_offering, new_parent, country, business_cri
         "Life Cycle Status": "In Use",
         "Support group": "",
         "Managed by Group": "",
-        "Subscribed by Company": "",
+        "Subscribed by Company": "",  # Will be set during processing based on receiver and CORP type
         "Business Criticality": business_criticality,
-        "Record view": "",
-        "Approval required": "true" if approval_required else "false",
-        "Approval group": approval_required_value if approval_required else "empty"
+        "Record view": "",  # Will be set based on SR/IM
+        "Approval required": "true" if approval_required else "false",  # Always use "true"/"false"
+        "Approval group": approval_required_value if approval_required else "empty"  # Use custom value for approval group
+        # Removed "Visibility group" line
     }
     
     # Set Subscribed by Location based on user choice
@@ -1313,52 +1310,24 @@ def run_generator(
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
                     
-                    # DEBUG - pokaż co otrzymał backend
-                    st.write(f"🔍 **DEBUG - Backend otrzymał:**")
-                    st.write(f"new_parent_offering: `{repr(new_parent_offering)}`")
-                    st.write(f"new_parent: `{repr(new_parent)}`")
-                    st.write(f"parent_offerings_list: {parent_offerings_list}")
-                    st.write(f"parents_list: {parents_list}")
-                    
-                    # Create multiple synthetic rows - TYLKO KOMPLETNE PARY
+                    # Create multiple synthetic rows - one for each pair
                     synthetic_rows = []
-                    # ZMIEŃ z max() na min() - tylko kompletne pary
-                    num_pairs = min(len(parent_offerings_list), len(parents_list))
-                    
-                    st.write(f"🔍 **Przetwarzam {num_pairs} par:**")
-                    
-                    for i in range(num_pairs):
-                        # Tylko gdy oba są dostępne
-                        offering = parent_offerings_list[i]
-                        parent = parents_list[i]
+                    for i in range(max(len(parent_offerings_list), len(parents_list))):
+                        # Get the offering and parent for this index, or use the last available one
+                        offering = parent_offerings_list[min(i, len(parent_offerings_list) - 1)] if parent_offerings_list else ""
+                        parent = parents_list[min(i, len(parents_list) - 1)] if parents_list else ""
                         
-                        # DEBUG
-                        st.write(f"Para {i+1}: offering=`{offering}`, parent=`{parent}`")
-                        st.write(f"Parent zawiera newline: {chr(10) in parent}")
-                        
-                        # Sprawdź czy oba są niepuste
-                        if offering and parent:
-                            new_row = create_new_parent_row(
-                                offering,  # Pojedyncza wartość
-                                parent,    # Pojedyncza wartość
-                                country, 
-                                business_criticality, 
-                                approval_required, 
-                                approval_required_value, 
-                                change_subscribed_location, 
-                                custom_subscribed_location
-                            )
-                            # DEBUG
-                            st.write(f"Utworzony wiersz Parent: `{repr(new_row['Parent'])}`")
-                            synthetic_rows.append(new_row)
+                        # Create individual row with single values (not multi-line)
+                        new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
+                        synthetic_rows.append(new_row)
                     
                     # Create DataFrame from all synthetic rows
                     base_pool = pd.DataFrame(synthetic_rows)
-                    st.write(f"🔍 **base_pool shape: {base_pool.shape}**")
-                    if not base_pool.empty:
-                        st.write("base_pool Parent values:")
-                        for idx, row in base_pool.iterrows():
-                            st.write(f"Row {idx}: `{repr(row['Parent'])}`")
+                    
+                    # Initialize schedule checking variables
+                    all_country_names_for_schedules = pd.Series([], dtype=str)
+                    corp_names_for_schedules = pd.Series([], dtype=str)
+                    non_corp_names_for_schedules = pd.Series([], dtype=str)
                 else:
                     # ORIGINAL LOGIC - read from cached Excel file
                     if wb not in excel_cache:
@@ -1631,6 +1600,21 @@ def run_generator(
                                 
                                 # Get support groups list
                                 if country == "PL":
+                                    # For PL, directly use the receiver-specific support group
+                                    # The receiver is the key (e.g., "HS PL" or "DS PL")
+                                    key = recv  # recv is already correctly set to "HS PL" or "DS PL"
+                                    country_supports = support_groups_per_country.get(key, "")
+                                    country_managed = managed_by_groups_per_country.get(key, "")
+                                    
+                                    # For PL, we expect only one support group per receiver
+                                    if country_supports:
+                                        sg = str(country_supports).strip()
+                                        mg = str(country_managed or sg).strip()
+                                        support_groups_list = [(sg, mg)]
+                                    else:
+                                        # Fallback to empty if no support group configured for this receiver
+                                        support_groups_list = [("", "")]
+                                else:
                                     # For other countries, use the existing logic
                                     support_groups_list = get_support_groups_list_for_country(
                                         country, support_group, support_groups_per_country, 

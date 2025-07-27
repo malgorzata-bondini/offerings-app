@@ -1648,17 +1648,7 @@ def run_generator(
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
-                                    
-                                    # Handle Parent column properly
-                                    if use_new_parent:
-                                        # When using new parent, the Parent value is already correctly set in base_row
-                                        # Don't overwrite it - just copy the existing value
-                                        if "Parent" in base_row.index:
-                                            row.loc[:, "Parent"] = base_row["Parent"]
-                                    else:
-                                        # For normal mode, clear Parent column
-                                        row.loc[:, "Parent"] = ""
-                                    
+                                    row.loc[:, "Parent"] = new_parent if use_new_parent else ""
                                     row.loc[:, "Delivery Manager"] = delivery_manager
                                     
                                     # Apply business criticality if provided

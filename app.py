@@ -235,9 +235,20 @@ with col2:
                         st.session_state.parent_offerings.pop()
                         st.rerun()
             
-            # Convert to the format expected by the backend
-            new_parent_offerings = "\n".join([pair["offering"] for pair in st.session_state.parent_offerings if pair["offering"]])
-            new_parents = "\n".join([pair["parent"] for pair in st.session_state.parent_offerings if pair["parent"]])
+            # Convert to the format expected by the backend - POPRAW TO
+            # Zamiast łączyć w wieloliniowy tekst, przekaż każdą parę osobno
+            if st.session_state.parent_offerings:
+                # Wyślij tylko pierwszą parę - backend nie obsługuje wielu par poprawnie
+                first_pair = st.session_state.parent_offerings[0]
+                new_parent_offerings = first_pair["offering"] if first_pair["offering"] else ""
+                new_parents = first_pair["parent"] if first_pair["parent"] else ""
+                
+                # Jeśli są dodatkowe pary, przetwórz je osobno
+                if len(st.session_state.parent_offerings) > 1:
+                    st.warning("⚠️ Multiple pairs detected. Only the first pair will be processed. Please run generator separately for each pair.")
+            else:
+                new_parent_offerings = ""
+                new_parents = ""
             
             # Show preview
             if new_parent_offerings and new_parents:

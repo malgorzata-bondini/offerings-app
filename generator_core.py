@@ -1316,10 +1316,10 @@ def run_generator(
                     print(f"DEBUG: parent_offerings_list = {parent_offerings_list}")
                     print(f"DEBUG: parents_list = {parents_list}")
 
-                    # Simple one-to-one pairing - each offering gets exactly ONE parent
-                    for i in range(len(parent_offerings_list)):
+                    # Create exactly one row per Parent Offering-Parent pair
+                    for i in range(min(len(parent_offerings_list), len(parents_list))):
                         offering = parent_offerings_list[i]
-                        parent = parents_list[i] if i < len(parents_list) else parents_list[0]
+                        parent = parents_list[i]
                         print(f"DEBUG: Creating row {i}: offering='{offering}', parent='{parent}'")
                         new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                         synthetic_rows.append(new_row)

@@ -661,14 +661,16 @@ with col2:
                     )
                     app_names_display = ["(no app)"]
             
-            # Construct the custom depend on value - TERAZ global_prod i special_it są już zdefiniowane
+            # Construct the custom depend on value - USE SESSION STATE FOR special_it
+            current_special_it = st.session_state.get('special_it', False)
+            
             if depend_on_prefix == "Global":
-                if special_it:
+                if current_special_it:
                     prefix_tag = "Global"  # Remove "Prod" for IT
                 else:
                     prefix_tag = "Global Prod" if global_prod else "Global"
             else:
-                if special_it:
+                if current_special_it:
                     prefix_tag = depend_on_prefix  # Remove "Prod" for IT
                 else:
                     if global_prod:
@@ -681,16 +683,16 @@ with col2:
                 if len(new_apps) == 1:
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
                     custom_depend_on_value = f"[{prefix_tag}] {app_name}"
-                    st.info(f"Preview: `{custom_depend_on_value}`")
+                    st.info(f"Preview: `{custom_depend_on_value}` (IT: {current_special_it}, Global Prod: {global_prod})")
                 else:
-                    st.info(f"Preview for each app:")
+                    st.info(f"Preview for each app: (IT: {current_special_it}, Global Prod: {global_prod})")
                     for app in new_apps:
                         app_name = get_plural_form_preview(app) if use_pluralization else app
                         st.text(f"• `[{prefix_tag}] {app_name}`")
                     custom_depend_on_value = f"[{prefix_tag}]"
             else:
                 custom_depend_on_value = f"[{prefix_tag}]"
-                st.info(f"Preview: `{custom_depend_on_value}`")
+                st.info(f"Preview: `{custom_depend_on_value}` (IT: {current_special_it}, Global Prod: {global_prod})")
         else:
             custom_depend_on_value = ""
         

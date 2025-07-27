@@ -1316,9 +1316,9 @@ def run_generator(
                     print(f"DEBUG: parent_offerings_list = {parent_offerings_list}")
                     print(f"DEBUG: parents_list = {parents_list}")
 
-                    # Force one-to-one pairing - ensure each row gets exactly one parent
-                    for i, offering in enumerate(parent_offerings_list):
-                        # Get the corresponding parent (or use the first one if not enough parents)
+                    # Simple one-to-one pairing - each offering gets exactly ONE parent
+                    for i in range(len(parent_offerings_list)):
+                        offering = parent_offerings_list[i]
                         parent = parents_list[i] if i < len(parents_list) else parents_list[0]
                         print(f"DEBUG: Creating row {i}: offering='{offering}', parent='{parent}'")
                         new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
@@ -1734,6 +1734,7 @@ def run_generator(
                                             row.loc[:, "Subscribed by Company"] = recv
                                     elif country == "DE":
                                         # Existing DE logic for Germany
+                                       
                                         # For CORP offerings in normal mode, clear the field
                                         row.loc[:, "Subscribed by Company"] = ""
                                     # For standard offerings, keep original value from source file

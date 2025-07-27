@@ -1735,6 +1735,7 @@ def run_generator(
                                     elif country == "DE":
                                         # Existing DE logic for Germany
                                        
+                                       
                                         # For CORP offerings in normal mode, clear the field
                                         row.loc[:, "Subscribed by Company"] = ""
                                     # For standard offerings, keep original value from source file
@@ -1965,35 +1966,16 @@ def run_generator(
                 # Clean data before writing to Excel - SAFER VERSION
                 df_final = df.copy()
                 
-                # Clean cell values safely
-                def _clean_cell(x):
-                    """
-                    Normalise cell values before saving to Excel.
-                    Turns NaNs/None/NULL-like tokens into empty strings.
-                    Leaves everything else untouched (but stripped).
-                    """
-                    if pd.isna(x):
-                        return ''
-                    s = str(x).strip()
-                    if s.lower() in {'nan', 'none', 'null', '<na>', 'n/a'}:
-                        return ''
-                    return s
-
-                # Use _clean_cell directly with applymap for DataFrame, apply for Series
-                if isinstance(df_final, pd.DataFrame):
-                    df_final = df_final.map(_clean_cell)
-                elif isinstance(df_final, pd.Series):
-                    df_final = df_final.apply(_clean_cell)
-
-                # Keep the dedicated treatment for the two boolean-ish columns
-                df_final["Approval required"] = df_final["Approval required"].apply(clean_approval_value)
-
-                def _clean_approval_group(v):
-                    v = _clean_cell(v)
-                    return v  # Just return the cleaned value without forcing "empty"
-
-                if "Approval group" in df_final.columns:
-                    df_final["Approval group"] = df_final["Approval group"].apply(_clean_approval_group)
+                # Only clean specific columns that need it, leave others untouched
+                for col in df_final.columns:
+                    if col == "Approval required":
+                        df_final[col] = df_final[col].apply(clean_approval_value)
+                    elif col == "Approval group":
+                        # Only clean empty/null values, keep everything else as-is
+                        df_final[col] = df_final[col].apply(lambda x: "" if pd.isna(x) or str(x).strip() in ['nan', 'NaN', 'None', 'null', '<NA>'] else str(x).strip())
+                    else:
+                        # For other columns, only replace obvious nulls with empty strings
+                        df_final[col] = df_final[col].apply(lambda x: "" if pd.isna(x) else x)
                 
                 # Store the final DataFrame for later formatting use
                 sheets[sheet_key] = df_final
@@ -2044,28 +2026,18 @@ def run_generator(
                     try:
                         cell_length = len(str(cell.value)) if cell.value else 0
                         if cell_length > max_length:
-                          max_length = min(cell_length, 100)  # cap at 100 to prevent issues
+                          max_length = min(cell_length, 50)  # cap at 50 to prevent issues
                     except:
                         pass
                 
                 ws.column_dimensions[col_letter].width = max_length + 2
                 
-                # Apply text wrapping and clean cell values - SAFER VERSION
+                # Only apply text wrapping, don't modify cell values
                 for cell in col:
                     try:
                         if hasattr(cell, 'alignment'):
                             cell.alignment = Alignment(wrap_text=True)
-                        
-                        # Clean up cell values more safely
-                        from openpyxl.cell.cell import MergedCell
-                        if not isinstance(cell, MergedCell) and hasattr(cell, 'value') and cell.value is not None:
-                            cell_val = str(cell.value).strip()
-                            # Only clean up obviously invalid values
-                            if cell_val.lower() in ['nan', 'none', 'null', '<na>', 'n/a'] or cell_val == '':
-                                cell.value = None  # Use None instead of empty string for Excel
-                            # Keep other values as-is to avoid corruption
-                    except Exception as e:
-                        # Don't print warnings for every cell - just continue
+                    except:
                         continue
         
         wb.save(outfile)

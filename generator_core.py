@@ -1649,13 +1649,13 @@ def run_generator(
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
                                     
-                                    # CORRECTED LOGIC FOR PARENT COLUMN
+                                    # UPROSZCZONA LOGIKA DLA KOLUMNY PARENT
                                     if use_new_parent:
-                                        # Use the parent from the specific base_row, NOT the global new_parent variable
+                                        # W trybie "New Parent", base_row jest syntetyczny i zawiera nowego parenta z UI.
+                                        # Musimy jawnie ustawić tę wartość w generowanym wierszu.
                                         row.loc[:, "Parent"] = base_row.get("Parent", "")
-                                    else:
-                                        # Keep original Parent value from source file
-                                        row.loc[:, "Parent"] = base_row.get("Parent", "")
+                                    # W trybie standardowym, `row` jest już kopią `base_row` i zawiera
+                                    # prawidłową wartość "Parent". Nie ma potrzeby jej ponownie przypisywać.
 
                                     row.loc[:, "Delivery Manager"] = delivery_manager
                                     

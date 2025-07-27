@@ -1648,7 +1648,8 @@ def run_generator(
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
-                                    row.loc[:, "Parent"] = new_parent if use_new_parent else ""
+                                    if not use_new_parent:
+                                        row.loc[:, "Parent"] = ""
                                     row.loc[:, "Delivery Manager"] = delivery_manager
                                     
                                     # Apply business criticality if provided

@@ -1310,16 +1310,29 @@ def run_generator(
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
                     
-                    # Create multiple synthetic rows - one for each pair
+                    # Create multiple synthetic rows - TYLKO KOMPLETNE PARY
                     synthetic_rows = []
-                    for i in range(max(len(parent_offerings_list), len(parents_list))):
-                        # Get the offering and parent for this index, or use the last available one
-                        offering = parent_offerings_list[min(i, len(parent_offerings_list) - 1)] if parent_offerings_list else ""
-                        parent = parents_list[min(i, len(parents_list) - 1)] if parents_list else ""
+                    # ZMIEŃ z max() na min() - tylko kompletne pary
+                    num_pairs = min(len(parent_offerings_list), len(parents_list))
+                    
+                    for i in range(num_pairs):
+                        # Tylko gdy oba są dostępne
+                        offering = parent_offerings_list[i]
+                        parent = parents_list[i]
                         
-                        # Create individual row with single values (not multi-line)
-                        new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
-                        synthetic_rows.append(new_row)
+                        # Sprawdź czy oba są niepuste
+                        if offering and parent:
+                            new_row = create_new_parent_row(
+                                offering,  # Pojedyncza wartość
+                                parent,    # Pojedyncza wartość
+                                country, 
+                                business_criticality, 
+                                approval_required, 
+                                approval_required_value, 
+                                change_subscribed_location, 
+                                custom_subscribed_location
+                            )
+                            synthetic_rows.append(new_row)
                     
                     # Create DataFrame from all synthetic rows
                     base_pool = pd.DataFrame(synthetic_rows)
@@ -1729,7 +1742,7 @@ def run_generator(
                                         else:
                                             # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
                                             row.loc[:, "Subscribed by Company"] = recv
-                                    elif country == "DE":
+                                    elif country == "DE:
                                         # Existing DE logic for Germany
                                         company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
 

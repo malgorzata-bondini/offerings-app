@@ -1317,8 +1317,17 @@ def run_generator(
                         offering = parent_offerings_list[min(i, len(parent_offerings_list) - 1)] if parent_offerings_list else ""
                         parent = parents_list[min(i, len(parents_list) - 1)] if parents_list else ""
                         
-                        # Create individual row with single values (not multi-line)
-                        new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
+                        # ZMIEŃ TO - przekaż POJEDYNCZE wartości, nie całe listy
+                        new_row = create_new_parent_row(
+                            offering,  # Pojedyncza wartość, nie lista
+                            parent,    # Pojedyncza wartość, nie lista  
+                            country, 
+                            business_criticality, 
+                            approval_required, 
+                            approval_required_value, 
+                            change_subscribed_location, 
+                            custom_subscribed_location
+                        )
                         synthetic_rows.append(new_row)
                     
                     # Create DataFrame from all synthetic rows

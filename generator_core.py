@@ -1648,14 +1648,7 @@ def run_generator(
                                     
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
-                                    
-                                    # CORRECTED LOGIC FOR PARENT COLUMN
-                                    if use_new_parent:
-                                        # Use the parent from the specific base_row, NOT the global new_parent variable
-                                        row.loc[:, "Parent"] = base_row.get("Parent", "")
-                                    else:
-                                        row.loc[:, "Parent"] = "" # Keep this for the other mode
-
+                                    row.loc[:, "Parent"] = new_parent if use_new_parent else ""
                                     row.loc[:, "Delivery Manager"] = delivery_manager
                                     
                                     # Apply business criticality if provided

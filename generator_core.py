@@ -1307,7 +1307,7 @@ def run_generator(
             try:
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
-                    synthetic_rows = []  # Initialize the list before using
+                    synthetic_rows = []
                     # Split the parent offerings and parents into separate lines
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
@@ -1316,12 +1316,21 @@ def run_generator(
                     print(f"DEBUG: parent_offerings_list = {parent_offerings_list}")
                     print(f"DEBUG: parents_list = {parents_list}")
 
-                    # Create exactly one row per Parent Offering-Parent pair
-                    for i in range(min(len(parent_offerings_list), len(parents_list))):
+                    # Create exactly one row per Parent Offering with exactly one Parent
+                    for i in range(len(parent_offerings_list)):
                         offering = parent_offerings_list[i]
-                        parent = parents_list[i]
+                        
+                        # Get the corresponding parent - CRITICAL: only one parent per row
+                        if i < len(parents_list):
+                            parent = parents_list[i]  # This should be a SINGLE parent value
+                        else:
+                            parent = parents_list[0] if parents_list else ""
+                        
                         print(f"DEBUG: Creating row {i}: offering='{offering}', parent='{parent}'")
-                        new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
+                        # Make sure parent is a single string, not multi-line
+                        parent_single = parent.replace('\n', ' ').strip()
+                        
+                        new_row = create_new_parent_row(offering, parent_single, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                         synthetic_rows.append(new_row)
                     
                     # Create DataFrame from all synthetic rows
@@ -1894,18 +1903,13 @@ def run_generator(
                 print(f"  Processing {sheet_key}: {len(rows_list)} rows")
                 df = pd.DataFrame(rows_list)
                 
-                # Get the column order key from the first row
-                column_order_key = None
-                if "_column_order_key" in df.columns and len(df) > 0:
-                    column_order_key = df.iloc[0]["_column_order_key"]
-
-                # Extract sheet_name from sheet_key for use below
-                sheet_name = sheet_key
-
-                # Track which rows have missing schedules BEFORE dropping the column
                 missing_schedule_rows = []
+                column_order_key = None  # Ensure column_order_key is always defined
                 if "_missing_schedule" in df.columns:
                     missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
+                    # Extract sheet_name and column_order_key from sheet_key
+                    sheet_name = sheet_key
+                    column_order_key = sheet_key.replace(" lvl1", "_Child SO lvl1").replace(" lvl2", "_Child SO lvl2")
                     # Store this info for later use
                     missing_schedule_info[sheet_name] = missing_schedule_rows
                 
@@ -1915,7 +1919,7 @@ def run_generator(
                         df = df.drop(columns=[col])
                 
                 # Reorder columns to match original order if we have it
-                if column_order_key and column_order_key in column_order_cache:
+                if column_order_key is not None and column_order_key in column_order_cache:
                     original_order = column_order_cache[column_order_key]
                     
                     # Get the original DataFrame to preserve missing column values

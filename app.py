@@ -585,7 +585,14 @@ with col2:
     with tab7:
         # Global settings - MOVED TO TOP
         st.markdown("### Global")
-        global_prod = st.checkbox("Global Prod", value=False, key="global_prod_checkbox")
+        
+        # Save global_prod to session state and use it for preview
+        if st.checkbox("Global Prod", value=False, key="global_prod_checkbox"):
+            st.session_state.global_prod = True
+            global_prod = True
+        else:
+            st.session_state.global_prod = False
+            global_prod = False
         
         # Remove pluralization checkbox - always use pluralization
         use_pluralization = True  # Always enabled
@@ -639,18 +646,20 @@ with col2:
                     )
                     app_names_display = ["(no app)"]
             
-            # Construct the custom depend on value
+            # Construct the custom depend on value - USE SESSION STATE VALUE
+            current_global_prod = st.session_state.get('global_prod', False)
+            
             if depend_on_prefix == "Global":
                 if special_it:
                     prefix_tag = "Global"  # Remove "Prod" for IT
                 else:
-                    prefix_tag = "Global Prod" if global_prod else "Global"
+                    prefix_tag = "Global Prod" if current_global_prod else "Global"
             else:
                 if special_it:
                     prefix_tag = depend_on_prefix  # Remove "Prod" for IT
                 else:
                     prefix_tag = depend_on_prefix
-                    if global_prod:
+                    if current_global_prod:
                         prefix_tag = f"{depend_on_prefix} Prod"
             
             # Show preview(s) for the custom depend on values
@@ -659,9 +668,9 @@ with col2:
                     # Apply pluralization to app name in preview
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
                     custom_depend_on_value = f"[{prefix_tag}] {app_name}"
-                    st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
+                    st.info(f"Preview: `{custom_depend_on_value}`")
                 else:
-                    st.info(f"Preview for each app: (Global Prod: {global_prod})")
+                    st.info(f"Preview for each app:")
                     for app in new_apps:
                         # Apply pluralization to each app name in preview
                         app_name = get_plural_form_preview(app) if use_pluralization else app
@@ -670,7 +679,7 @@ with col2:
                     custom_depend_on_value = f"[{prefix_tag}]"
             else:
                 custom_depend_on_value = f"[{prefix_tag}]"
-                st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
+                st.info(f"Preview: `{custom_depend_on_value}`")
         else:
             custom_depend_on_value = ""
         

@@ -1312,8 +1312,13 @@ def run_generator(
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
 
+                    # DEBUG: Print what we're working with
+                    print(f"DEBUG: parent_offerings_list = {parent_offerings_list}")
+                    print(f"DEBUG: parents_list = {parents_list}")
+
                     # Pair each offering with its corresponding parent, one per row
                     for offering, parent in zip(parent_offerings_list, parents_list):
+                        print(f"DEBUG: Creating row with offering='{offering}', parent='{parent}'")
                         new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                         synthetic_rows.append(new_row)
                     
@@ -1727,12 +1732,6 @@ def run_generator(
                                             row.loc[:, "Subscribed by Company"] = recv
                                     elif country == "DE":
                                         # Existing DE logic for Germany
-                                        company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
-
-
-
-                                        row.loc[:, "Subscribed by Company"] = company
-                                    elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                         # For CORP offerings in normal mode, clear the field
                                         row.loc[:, "Subscribed by Company"] = ""
                                     # For standard offerings, keep original value from source file

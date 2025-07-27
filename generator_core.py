@@ -1306,29 +1306,34 @@ def run_generator(
             try:
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
-                    # Split the parent offerings and parents into separate lines
-                    parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
-                    parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
+                    # Jeśli new_parent_offering jest listą par
+                    if isinstance(new_parent_offering, list):
+                        pairs = new_parent_offering
+                    else:
+                        # Stara logika - rozdziel wieloliniowy tekst
+                        parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
+                        parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
+                        pairs = []
+                        for i in range(max(len(parent_offerings_list), len(parents_list))):
+                            offering = parent_offerings_list[min(i, len(parent_offerings_list) - 1)] if parent_offerings_list else ""
+                            parent = parents_list[min(i, len(parents_list) - 1)] if parents_list else ""
+                            pairs.append({"offering": offering, "parent": parent})
                     
                     # Create multiple synthetic rows - one for each pair
                     synthetic_rows = []
-                    for i in range(max(len(parent_offerings_list), len(parents_list))):
-                        # Get the offering and parent for this index, or use the last available one
-                        offering = parent_offerings_list[min(i, len(parent_offerings_list) - 1)] if parent_offerings_list else ""
-                        parent = parents_list[min(i, len(parents_list) - 1)] if parents_list else ""
-                        
-                        # ZMIEŃ TO - przekaż POJEDYNCZE wartości, nie całe listy
-                        new_row = create_new_parent_row(
-                            offering,  # Pojedyncza wartość, nie lista
-                            parent,    # Pojedyncza wartość, nie lista  
-                            country, 
-                            business_criticality, 
-                            approval_required, 
-                            approval_required_value, 
-                            change_subscribed_location, 
-                            custom_subscribed_location
-                        )
-                        synthetic_rows.append(new_row)
+                    for pair in pairs:
+                        if pair[0] and pair[1]:
+                            new_row = create_new_parent_row(
+                                pair[0],
+                                pair[1],
+                                country, 
+                                business_criticality, 
+                                approval_required, 
+                                approval_required_value, 
+                                change_subscribed_location, 
+                                custom_subscribed_location
+                            )
+                            synthetic_rows.append(new_row)
                     
                     # Create DataFrame from all synthetic rows
                     base_pool = pd.DataFrame(synthetic_rows)

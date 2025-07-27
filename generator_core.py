@@ -11,7 +11,6 @@ from openpyxl.comments import Comment
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
 import streamlit as st  # Add this import
-from itertools import zip_longest
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
@@ -915,39 +914,36 @@ def get_managed_by_group_for_country(country, managed_by_group, managed_by_group
     # Fall back to global managed_by_group, or support_group_for_country if empty
     return managed_by_group if managed_by_group else support_group_for_country
 
-def get_support_groups_list_for_country(country, support_group, managed_by_group, support_groups_per_country, 
+def get_support_groups_list_for_country(country, support_group, support_groups_per_country, 
                                        managed_by_groups_per_country, division=None):
     """Get list of support groups for a country (handles multiple groups for DE)"""
-    # Determine the source for support and managed groups (per-country or global)
-    country_support_groups = support_group
-    if support_groups_per_country and country in support_groups_per_country:
-        country_support_groups = support_groups_per_country[country]
-
-    country_managed_groups = managed_by_group
-    if managed_by_groups_per_country and country in managed_by_groups_per_country:
-        country_managed_groups = managed_by_groups_per_country[country]
-
+    # Get support groups
+    if country == "PL" and division:
+        division_key = f"{division} PL"
+        country_support_groups = support_groups_per_country.get(division_key, support_group) if support_groups_per_country else support_group
+        country_managed_groups = managed_by_groups_per_country.get(division_key, "") if managed_by_groups_per_country else ""
+    else:
+        country_support_groups = support_groups_per_country.get(country, support_group) if support_groups_per_country else support_group
+        country_managed_groups = managed_by_groups_per_country.get(country, "") if managed_by_groups_per_country else ""
+    
     # Handle multiple groups (separated by newlines)
     if country_support_groups and '\n' in str(country_support_groups):
         support_list = [sg.strip() for sg in str(country_support_groups).split('\n') if sg.strip()]
-        managed_list_final = []
-        
-        managed_list_raw = []
+        managed_list = []
         if country_managed_groups and '\n' in str(country_managed_groups):
-            managed_list_raw = [mg.strip() for mg in str(country_managed_groups).split('\n') if mg.strip()]
+            managed_list = [mg.strip() for mg in str(country_managed_groups).split('\n') if mg.strip()]
+        else:
+            managed_list = [country_managed_groups.strip()] * len(support_list) if country_managed_groups else support_list
         
-        # Pair them up, falling back to the corresponding support group if a managed group is missing
-        for i, sg in enumerate(support_list):
-            mg = managed_list_raw[i] if i < len(managed_list_raw) and managed_list_raw[i] else sg
-            managed_list_final.append(mg)
+        # Ensure managed_list has same length as support_list
+        while len(managed_list) < len(support_list):
+            managed_list.append(support_list[len(managed_list)])
             
-        return list(zip(support_list, managed_list_final))
+        return list(zip(support_list, managed_list))
     else:
-        # Single support group logic
-        single_support = country_support_groups or ""
-        # If managed group is empty, default to support group. Otherwise, use it.
-        single_managed = country_managed_groups if country_managed_groups else single_support
-        
+        # Single support group
+        single_support = country_support_groups or support_group or ""
+        single_managed = country_managed_groups or single_support or ""
         return [(single_support, single_managed)] if single_support else [("", "")]
 
 def get_schedule_suffixes_for_country(country, receiver, schedule_settings_per_country, default_schedule_suffixes):
@@ -1310,44 +1306,23 @@ def run_generator(
             try:
                 # IF USING NEW PARENT, CREATE SYNTHETIC ROW
                 if use_new_parent:
-                    synthetic_rows = []
                     # Split the parent offerings and parents into separate lines
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
-
-                    # Create one row per Parent Offering-Parent pair
-                    for i in range(len(parent_offerings_list)):
-                        offering = parent_offerings_list[i]
-                        parent = parents_list[i] if i < len(parents_list) else ""
-                        if not parent: continue
+                    
+                    # Create multiple synthetic rows - one for each pair
+                    synthetic_rows = []
+                    for i in range(max(len(parent_offerings_list), len(parents_list))):
+                        # Get the offering and parent for this index, or use the last available one
+                        offering = parent_offerings_list[min(i, len(parent_offerings_list) - 1)] if parent_offerings_list else ""
+                        parent = parents_list[min(i, len(parents_list) - 1)] if parents_list else ""
                         
+                        # Create individual row with single values (not multi-line)
                         new_row = create_new_parent_row(offering, parent, country, business_criticality, approval_required, approval_required_value, change_subscribed_location, custom_subscribed_location)
                         synthetic_rows.append(new_row)
                     
-                    if not synthetic_rows:
-                        continue # No valid pairs were created
-
                     # Create DataFrame from all synthetic rows
                     base_pool = pd.DataFrame(synthetic_rows)
-                    
-                    # *** THE CRITICAL FIX IS HERE ***
-                    # Get the correct support groups and apply them to the entire base_pool
-                    support_groups_list = get_support_groups_list_for_country(
-                        country, support_group, managed_by_group, support_groups_per_country, 
-                        managed_by_groups_per_country, None # No division context here
-                    )
-                    
-                    # Use the first available group pair for all synthetic rows
-                    if support_groups_list:
-                        sg, mg = support_groups_list[0]
-                        base_pool["Support group"] = sg
-                        base_pool["Managed by Group"] = mg
-                    else:
-                        # Fallback to global values if no country-specific groups found
-                        base_pool["Support group"] = support_group if support_group else ""
-                        # If managed_by_group is empty, use support_group value
-                        managed_value = managed_by_group if managed_by_group and managed_by_group.strip() else support_group
-                        base_pool["Managed by Group"] = managed_value if managed_value else ""
                     
                     # Initialize schedule checking variables
                     all_country_names_for_schedules = pd.Series([], dtype=str)
@@ -1642,7 +1617,7 @@ def run_generator(
                                 else:
                                     # For other countries, use the existing logic
                                     support_groups_list = get_support_groups_list_for_country(
-                                        country, support_group, managed_by_group, support_groups_per_country, 
+                                        country, support_group, support_groups_per_country, 
                                         managed_by_groups_per_country, division
                                     )
                                 
@@ -1735,7 +1710,7 @@ def run_generator(
                                         row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
                                     # Handle DE special cases
                                     if country == "DE":
-                                        company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
+                                        company, ldap = get_de_company_and_ldap(support_group_for_country, recv, base_row)
                                         row.loc[:, "Subscribed by Company"] = company
                                         
                                         # Handle LDAP columns
@@ -1752,16 +1727,23 @@ def run_generator(
                                         if require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                             # For CORP offerings, extract what comes after CORP
                                             # Example: [SR DS CY CORP HS DE Dedicated Services] -> "HS DE"
-                                            match = re.search(r'\\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
+                                            match = re.search(r'\[.*?CORP\s+([A-Z]{2}\s+[A-Z]{2})', new_name)
                                             if match:
                                                 row.loc[:, "Subscribed by Company"] = match.group(1)
                                             else:
-                                                # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
+                                                # Fallback to receiver if pattern not found
                                                 row.loc[:, "Subscribed by Company"] = recv
+                                        else:
+                                            # For non-CORP in new parent mode, use receiver (e.g., "HS PL", "DS PL")
+                                            row.loc[:, "Subscribed by Company"] = recv
                                     elif country == "DE":
                                         # Existing DE logic for Germany
-                                       
-                                       
+                                        company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
+
+
+
+                                        row.loc[:, "Subscribed by Company"] = company
+                                    elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                         # For CORP offerings in normal mode, clear the field
                                         row.loc[:, "Subscribed by Company"] = ""
                                     # For standard offerings, keep original value from source file
@@ -1920,13 +1902,18 @@ def run_generator(
                 print(f"  Processing {sheet_key}: {len(rows_list)} rows")
                 df = pd.DataFrame(rows_list)
                 
+                # Get the column order key from the first row
+                column_order_key = None
+                if "_column_order_key" in df.columns and len(df) > 0:
+                    column_order_key = df.iloc[0]["_column_order_key"]
+
+                # Extract sheet_name from sheet_key for use below
+                sheet_name = sheet_key
+
+                # Track which rows have missing schedules BEFORE dropping the column
                 missing_schedule_rows = []
-                column_order_key = None  # Ensure column_order_key is always defined
                 if "_missing_schedule" in df.columns:
                     missing_schedule_rows = df[df["_missing_schedule"] == True].index.tolist()
-                    # Extract sheet_name and column_order_key from sheet_key
-                    sheet_name = sheet_key
-                    column_order_key = sheet_key.replace(" lvl1", "_Child SO lvl1").replace(" lvl2", "_Child SO lvl2")
                     # Store this info for later use
                     missing_schedule_info[sheet_name] = missing_schedule_rows
                 
@@ -1936,7 +1923,7 @@ def run_generator(
                         df = df.drop(columns=[col])
                 
                 # Reorder columns to match original order if we have it
-                if column_order_key is not None and column_order_key in column_order_cache:
+                if column_order_key and column_order_key in column_order_cache:
                     original_order = column_order_cache[column_order_key]
                     
                     # Get the original DataFrame to preserve missing column values
@@ -1987,16 +1974,35 @@ def run_generator(
                 # Clean data before writing to Excel - SAFER VERSION
                 df_final = df.copy()
                 
-                # Only clean specific columns that need it, leave others untouched
-                for col in df_final.columns:
-                    if col == "Approval required":
-                        df_final[col] = df_final[col].apply(clean_approval_value)
-                    elif col == "Approval group":
-                        # Only clean empty/null values, keep everything else as-is
-                        df_final[col] = df_final[col].apply(lambda x: "" if pd.isna(x) or str(x).strip() in ['nan', 'NaN', 'None', 'null', '<NA>'] else str(x).strip())
-                    else:
-                        # For other columns, only replace obvious nulls with empty strings
-                        df_final[col] = df_final[col].apply(lambda x: "" if pd.isna(x) else x)
+                # Clean cell values safely
+                def _clean_cell(x):
+                    """
+                    Normalise cell values before saving to Excel.
+                    Turns NaNs/None/NULL-like tokens into empty strings.
+                    Leaves everything else untouched (but stripped).
+                    """
+                    if pd.isna(x):
+                        return ''
+                    s = str(x).strip()
+                    if s.lower() in {'nan', 'none', 'null', '<na>', 'n/a'}:
+                        return ''
+                    return s
+
+                # Use _clean_cell directly with applymap for DataFrame, apply for Series
+                if isinstance(df_final, pd.DataFrame):
+                    df_final = df_final.map(_clean_cell)
+                elif isinstance(df_final, pd.Series):
+                    df_final = df_final.apply(_clean_cell)
+
+                # Keep the dedicated treatment for the two boolean-ish columns
+                df_final["Approval required"] = df_final["Approval required"].apply(clean_approval_value)
+
+                def _clean_approval_group(v):
+                    v = _clean_cell(v)
+                    return v  # Just return the cleaned value without forcing "empty"
+
+                if "Approval group" in df_final.columns:
+                    df_final["Approval group"] = df_final["Approval group"].apply(_clean_approval_group)
                 
                 # Store the final DataFrame for later formatting use
                 sheets[sheet_key] = df_final
@@ -2047,18 +2053,28 @@ def run_generator(
                     try:
                         cell_length = len(str(cell.value)) if cell.value else 0
                         if cell_length > max_length:
-                          max_length = min(cell_length, 50)  # cap at 50 to prevent issues
+                          max_length = min(cell_length, 100)  # cap at 100 to prevent issues
                     except:
                         pass
                 
                 ws.column_dimensions[col_letter].width = max_length + 2
                 
-                # Only apply text wrapping, don't modify cell values
+                # Apply text wrapping and clean cell values - SAFER VERSION
                 for cell in col:
                     try:
                         if hasattr(cell, 'alignment'):
                             cell.alignment = Alignment(wrap_text=True)
-                    except:
+                        
+                        # Clean up cell values more safely
+                        from openpyxl.cell.cell import MergedCell
+                        if not isinstance(cell, MergedCell) and hasattr(cell, 'value') and cell.value is not None:
+                            cell_val = str(cell.value).strip()
+                            # Only clean up obviously invalid values
+                            if cell_val.lower() in ['nan', 'none', 'null', '<na>', 'n/a'] or cell_val == '':
+                                cell.value = None  # Use None instead of empty string for Excel
+                            # Keep other values as-is to avoid corruption
+                    except Exception as e:
+                        # Don't print warnings for every cell - just continue
                         continue
         
         wb.save(outfile)

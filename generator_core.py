@@ -1313,15 +1313,28 @@ def run_generator(
                     parent_offerings_list = [line.strip() for line in new_parent_offering.split('\n') if line.strip()]
                     parents_list = [line.strip() for line in new_parent.split('\n') if line.strip()]
                     
+                    # DEBUG - pokaż co otrzymał backend
+                    st.write(f"🔍 **DEBUG - Backend otrzymał:**")
+                    st.write(f"new_parent_offering: `{repr(new_parent_offering)}`")
+                    st.write(f"new_parent: `{repr(new_parent)}`")
+                    st.write(f"parent_offerings_list: {parent_offerings_list}")
+                    st.write(f"parents_list: {parents_list}")
+                    
                     # Create multiple synthetic rows - TYLKO KOMPLETNE PARY
                     synthetic_rows = []
                     # ZMIEŃ z max() na min() - tylko kompletne pary
                     num_pairs = min(len(parent_offerings_list), len(parents_list))
                     
+                    st.write(f"🔍 **Przetwarzam {num_pairs} par:**")
+                    
                     for i in range(num_pairs):
                         # Tylko gdy oba są dostępne
                         offering = parent_offerings_list[i]
                         parent = parents_list[i]
+                        
+                        # DEBUG
+                        st.write(f"Para {i+1}: offering=`{offering}`, parent=`{parent}`")
+                        st.write(f"Parent zawiera newline: {chr(10) in parent}")
                         
                         # Sprawdź czy oba są niepuste
                         if offering and parent:
@@ -1335,15 +1348,17 @@ def run_generator(
                                 change_subscribed_location, 
                                 custom_subscribed_location
                             )
+                            # DEBUG
+                            st.write(f"Utworzony wiersz Parent: `{repr(new_row['Parent'])}`")
                             synthetic_rows.append(new_row)
                     
                     # Create DataFrame from all synthetic rows
                     base_pool = pd.DataFrame(synthetic_rows)
-                    
-                    # Initialize schedule checking variables
-                    all_country_names_for_schedules = pd.Series([], dtype=str)
-                    corp_names_for_schedules = pd.Series([], dtype=str)
-                    non_corp_names_for_schedules = pd.Series([], dtype=str)
+                    st.write(f"🔍 **base_pool shape: {base_pool.shape}**")
+                    if not base_pool.empty:
+                        st.write("base_pool Parent values:")
+                        for idx, row in base_pool.iterrows():
+                            st.write(f"Row {idx}: `{repr(row['Parent'])}`")
                 else:
                     # ORIGINAL LOGIC - read from cached Excel file
                     if wb not in excel_cache:
@@ -1616,21 +1631,6 @@ def run_generator(
                                 
                                 # Get support groups list
                                 if country == "PL":
-                                    # For PL, directly use the receiver-specific support group
-                                    # The receiver is the key (e.g., "HS PL" or "DS PL")
-                                    key = recv  # recv is already correctly set to "HS PL" or "DS PL"
-                                    country_supports = support_groups_per_country.get(key, "")
-                                    country_managed = managed_by_groups_per_country.get(key, "")
-                                    
-                                    # For PL, we expect only one support group per receiver
-                                    if country_supports:
-                                        sg = str(country_supports).strip()
-                                        mg = str(country_managed or sg).strip()
-                                        support_groups_list = [(sg, mg)]
-                                    else:
-                                        # Fallback to empty if no support group configured for this receiver
-                                        support_groups_list = [("", "")]
-                                else:
                                     # For other countries, use the existing logic
                                     support_groups_list = get_support_groups_list_for_country(
                                         country, support_group, support_groups_per_country, 

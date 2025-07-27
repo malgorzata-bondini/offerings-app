@@ -428,6 +428,8 @@ with col2:
                             else:
                                 if st.session_state.get('global_prod', False):
                                     prefix_to_use = f"{st.session_state.get('depend_on_prefix')} Prod"
+                                else:
+                                    prefix_to_use = st.session_state.get('depend_on_prefix')
                     else:
                         prefix_to_use = commitment_country
                     
@@ -607,9 +609,6 @@ with col2:
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod", value=False, key="global_prod_checkbox")
         
-        # Save to session state for access in other tabs
-        st.session_state['global_prod'] = global_prod
-        
         # Remove pluralization checkbox - always use pluralization
         use_pluralization = True  # Always enabled
         
@@ -617,9 +616,6 @@ with col2:
         st.markdown("### Service Offerings | Depend On")
         use_custom_depend_on = st.checkbox("Use custom 'Service Offerings | Depend On' value", value=False, 
                                           help="Override automatic generation with a custom value for all rows")
-        
-        # Save to session state
-        st.session_state['use_custom_depend_on'] = use_custom_depend_on
         
         if use_custom_depend_on:
             col1, col2 = st.columns([1, 2])
@@ -631,8 +627,6 @@ with col2:
                     index=0,
                     help="Choose the service prefix"
                 )
-                # Save to session state
-                st.session_state['depend_on_prefix'] = depend_on_prefix
             
             with col2:
                 # Show which apps will be used automatically
@@ -667,20 +661,17 @@ with col2:
                     )
                     app_names_display = ["(no app)"]
             
-            # Construct the custom depend on value - with session state check
-            current_global_prod = st.session_state.get('global_prod', global_prod)
-            current_special_it = st.session_state.get('special_it', special_it)
-            
+            # Construct the custom depend on value - directly use current values
             if depend_on_prefix == "Global":
-                if current_special_it:
+                if special_it:
                     prefix_tag = "Global"  # Remove "Prod" for IT
                 else:
-                    prefix_tag = "Global Prod" if current_global_prod else "Global"
+                    prefix_tag = "Global Prod" if global_prod else "Global"
             else:
-                if current_special_it:
+                if special_it:
                     prefix_tag = depend_on_prefix  # Remove "Prod" for IT
                 else:
-                    if current_global_prod:
+                    if global_prod:
                         prefix_tag = f"{depend_on_prefix} Prod"
                     else:
                         prefix_tag = depend_on_prefix
@@ -691,9 +682,9 @@ with col2:
                     # Apply pluralization to app name in preview
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
                     custom_depend_on_value = f"[{prefix_tag}] {app_name}"
-                    st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {current_global_prod})")
+                    st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
                 else:
-                    st.info(f"Preview for each app: (Global Prod: {current_global_prod})")
+                    st.info(f"Preview for each app: (Global Prod: {global_prod})")
                     for app in new_apps:
                         # Apply pluralization to each app name in preview
                         app_name = get_plural_form_preview(app) if use_pluralization else app
@@ -702,7 +693,7 @@ with col2:
                     custom_depend_on_value = f"[{prefix_tag}]"
             else:
                 custom_depend_on_value = f"[{prefix_tag}]"
-                st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {current_global_prod})")
+                st.info(f"Preview: `{custom_depend_on_value}` (Global Prod: {global_prod})")
         else:
             custom_depend_on_value = ""
         

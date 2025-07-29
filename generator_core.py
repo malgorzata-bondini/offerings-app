@@ -133,7 +133,7 @@ def get_division_and_country(parent_content, country, delivering_tag):
     
     return division, country
 
-def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_type_lvl2, exclude_prod_from_keywords):
+def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_type_lvl2):
     """Build name for Lvl2 entries - SR/IM is added to both Parent Offering parsing and final name"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -194,7 +194,7 @@ def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_typ
     
     # Check if name contains Microsoft - if so, don't add Prod
     name_so_far = " ".join(name_parts).lower()
-    if "microsoft" not in name_so_far and not exclude_prod_from_keywords:
+    if "microsoft" not in name_so_far:
         name_parts.append("Prod")
     
     # Add service type if provided (e.g., "Application issue")
@@ -208,7 +208,7 @@ def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_typ
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)
 
-def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, exclude_prod_from_keywords):
+def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP IT offerings"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -269,17 +269,14 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # Check if keywords should exclude Prod
-    if not exclude_prod_from_keywords:
-        name_parts.append("Prod")
-    
+    # name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
     # Join and ensure incident naming
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)
 
-def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, exclude_prod_from_keywords):
+def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP Dedicated Services offerings"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -332,17 +329,14 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # Check if keywords should exclude Prod
-    if not exclude_prod_from_keywords:
-        name_parts.append("Prod")
-    
+    name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
     # Join and ensure incident naming
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)
 
-def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, exclude_prod_from_keywords):
+def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for RecP offerings"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -419,17 +413,316 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # Check if keywords should exclude Prod
-    if not exclude_prod_from_keywords:
-        name_parts.append("Prod")
-    
+    name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
     # Join and ensure incident naming
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)
 
-def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, exclude_prod_from_keywords):
+def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None, receiver=None):
+    """Build standard name when not CORP"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
+    
+    # Apply pluralization to catalog name for hardware items
+    catalog_name_plural = get_plural_form(catalog_name)
+    
+    # Extract country from parent content
+    parts = parent_content.split()
+    country = ""
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
+            country = part
+            break
+    
+    # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
+    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security"]
+    parent_lower = parent_offering.lower()
+    catalog_lower = catalog_name.lower()
+    parent_content_lower = parent_content.lower()
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                      for keyword in no_prod_keywords)
+    
+    if special_dept == "Medical":
+        # Extract division and country from parent content
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        topic_parts = []
+        
+        for i, part in enumerate(parts):
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+            elif part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
+                topic_parts.append(part)
+        
+        topic = " ".join(topic_parts) if topic_parts else "Software"
+        
+        # Build Medical name - NO PROD
+        prefix_parts = [sr_or_im]
+        
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
+        
+        prefix_parts.append("Medical")
+        
+        # Use topic from parent and lowercase catalog name
+        final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
+    
+    elif special_dept == "DAK":
+        # Replace DAK with Business Services - NO PROD
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR", "DAK"]:
+                country = part
+        
+        prefix_parts = [sr_or_im]
+        
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
+        
+        prefix_parts.append("Business Services")
+        
+        # Add app only if provided - NO PROD
+        if app:
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} {schedule_suffix}"
+        else:
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
+    
+    elif special_dept == "HR":
+        # HR - NO PROD
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+        
+        prefix_parts = [sr_or_im]
+        
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            if division:
+                prefix_parts.append(division)
+            if country:
+                prefix_parts.append(country)
+        
+        prefix_parts.append("HR")
+        
+        # Extract the topic from parent content
+        topic_parts = []
+        for part in parts:
+            if part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper()):
+                topic_parts.append(part)
+        
+        topic = " ".join(topic_parts) if topic_parts else "Software"
+        
+        # Add app if provided - NO PROD
+        if app:
+            final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {app} {schedule_suffix}"
+        else:
+            final_name = f"[{' '.join(prefix_parts)}] {topic} {catalog_name.lower()} {schedule_suffix}"
+        return ensure_incident_naming(final_name)
+    
+    elif special_dept == "IT":
+        # IT - special handling
+        parts = parent_content.split()
+        division = ""
+        country = ""
+        topic = ""
+        
+        # Find division, country and topic
+        topic_parts = []
+        for i, part in enumerate(parts):
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
+                country = part
+            else:
+                # Collect all remaining words as topic (e.g., "Security & Privacy", "Hardware", etc.)
+                if part not in ["HS", "DS", "RecP"] and not (len(part) == 2 and part.isupper()):
+                    topic_parts.append(part)
+        
+        # Join all topic parts to get the full topic phrase
+        topic = " ".join(topic_parts) if topic_parts else ""
+        
+        # If no topic found, use the first significant word from catalog name
+        if not topic:
+            catalog_words = catalog_name.split()
+            for word in catalog_words:
+                if word.lower() not in ["the", "a", "an", "and", "or", "for", "of", "in", "on", "to"]:
+                    topic = word
+                    break
+        
+        prefix_parts = [sr_or_im]
+        
+        # For DE with receiver, extract division from receiver (e.g., "HS DE" -> "HS")
+        if country == "DE" and receiver:
+            recv_division = receiver.split()[0]  # Extract HS or DS
+            prefix_parts.append(recv_division)
+        # Special handling for UA, MD, RO, and TR - always use DS
+        elif country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.append("DS")
+        elif division:
+            prefix_parts.append(division)
+        else:
+            # Default to HS if no division found
+            prefix_parts.append("HS")
+        
+        if country:
+            prefix_parts.append(country)
+        prefix_parts.append("IT")
+        
+        # For IT, build the name with topic BEFORE the brackets
+        # Format: [SR DS MD IT] Hardware configuration laptop Mon-Fri 8-16
+        name_parts = []
+        
+        if topic:
+            # Topic goes BEFORE the brackets
+            name_parts.append(f"[{' '.join(prefix_parts)}] {topic}")
+        else:
+            name_parts.append(f"[{' '.join(prefix_parts)}]")
+        
+        name_parts.append(catalog_name.lower())
+        
+        # Add app if provided
+        if app:
+            # Build the current name string to check for "hardware"
+            current_name_str = " ".join(name_parts)
+            # Check if "hardware" is in the current name (case insensitive)
+            if "hardware" in current_name_str.lower():
+                # Use lowercase for hardware, but keep UPS uppercase
+                if app.upper() == "UPS":
+                    name_parts.append("UPS")  # Keep UPS uppercase
+                else:
+                    name_parts.append(app.lower())  # Use lowercase for other hardware
+            else:
+                name_parts.append(app)  # Keep original case for non-hardware
+        
+        # Add "solving" for IM
+        if sr_or_im == "IM":
+            name_parts.append("solving")
+        
+        # Check if topic contains any no-prod keywords
+        topic_lower = topic.lower() if topic else ""
+        topic_exclude_prod = any(keyword in topic_lower for keyword in no_prod_keywords)
+        
+        # Only add Prod if no hardware/mailbox/network/mobile/security keywords in any source
+        if not exclude_prod and not topic_exclude_prod:
+            name_parts.append("Prod")
+        
+        name_parts.append(schedule_suffix)
+        
+        # Join and ensure incident naming
+        final_name = " ".join(name_parts)
+        return ensure_incident_naming(final_name)
+    
+    else:
+        # Standard case - replace Parent with SR/IM and add IT for RecP entries
+        parts = parent_content.split()
+        division = ""
+        country_code = ""
+        dept = ""
+        other_parts = []
+        
+        # Parse parent content to extract components
+        for part in parts:
+            if part in ["HS", "DS"]:
+                division = part
+            elif len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
+                country_code = part
+            elif part in ["IT", "HR", "Medical", "Business Services"]:
+                dept = part
+            else:
+                other_parts.append(part)
+        
+        # Build the new name components
+        name_parts = [sr_or_im]
+        
+        # Special handling for UA, MD, RO, and TR - always use DS
+        if country in ["UA", "MD", "RO", "TR"]:
+            name_parts.append("DS")
+        elif division:
+            name_parts.append(division)
+        else:
+            # Default to HS if no division found
+            name_parts.append("HS")
+        
+        if country_code:
+            name_parts.append(country_code)
+        
+        # Add other parts (like RecP, Software, etc.)
+        name_parts.extend(other_parts)
+        
+        # For RecP entries, add IT department if not already present
+        if "RecP" in other_parts and not dept:
+            name_parts.append("IT")
+        elif dept:
+            name_parts.append(dept)
+        
+        # Build the final name
+        prefix = f"[{' '.join(name_parts)}]"
+        
+        # Add catalog name
+        final_parts = [prefix, catalog_name]
+        
+        # Check if we should add Prod
+        catalog_lower = catalog_name.lower()
+        exclude_prod = any(keyword in catalog_lower for keyword in ["hardware", "mailbox", "network", "mobile", "security"])
+        
+        # Add app if provided
+        if app:
+            # Build the current name string to check for "hardware"
+            current_name_str = " ".join(final_parts)
+            # Check if "hardware" is in the current name (case insensitive)
+            if "hardware" in current_name_str.lower():
+                # Use lowercase for hardware, but keep UPS uppercase
+                if app.upper() == "UPS":
+                    final_parts.append("UPS")  # Keep UPS uppercase
+                else:
+                    final_parts.append(app.lower())  # Use lowercase for other hardware
+            else:
+                final_parts.append(app)  # Keep original case for non-hardware
+        
+        # Add "solving" for IM
+        if sr_or_im == "IM":
+            final_parts.append("solving")
+        
+        if not exclude_prod:
+            final_parts.append("Prod")
+        
+        final_parts.append(schedule_suffix)
+        
+        final_name = " ".join(final_parts)
+        return ensure_incident_naming(final_name)
+
+def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for CORP offerings"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -470,27 +763,15 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     
     if sr_or_im == "SR":
         if app:
-            if exclude_prod_from_keywords:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} {schedule_suffix}"
-            else:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
         else:
-            if exclude_prod_from_keywords:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {schedule_suffix}"
-            else:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
     else:
         # For IM: always add solving after the app (or after catalog if no app)
         if app:
-            if exclude_prod_from_keywords:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving {schedule_suffix}"
-            else:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving Prod {schedule_suffix}"
         else:
-            if exclude_prod_from_keywords:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving {schedule_suffix}"
-            else:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
     
     return ensure_incident_naming(final_name)
 
@@ -762,28 +1043,6 @@ def get_plural_form(word):
     # If not found, return original word
     return word
 
-def should_exclude_prod_based_on_keywords(keywords_parent, keywords_child):
-    """Check if any keyword should exclude Prod from name"""
-    no_prod_keywords = [
-        "hardware", "mailbox", "network", "mobile", "security",
-        "onboarding", "offboarding", "employee", "whitelist", 
-        "blacklist", "blacklist/whitelist", "generic"
-    ]
-    
-    # Combine all keywords
-    all_keywords = []
-    if keywords_parent:
-        all_keywords.extend([k.strip().lower() for k in keywords_parent.replace(',', '\n').split('\n') if k.strip()])
-    if keywords_child:
-        all_keywords.extend([k.strip().lower() for k in keywords_child.replace(',', '\n').split('\n') if k.strip()])
-    
-    # Check if any keyword matches no_prod_keywords
-    for keyword in all_keywords:
-        for no_prod in no_prod_keywords:
-            if no_prod in keyword or keyword in no_prod:
-                return True
-    return False
-
 def run_generator(
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
@@ -797,7 +1056,7 @@ def run_generator(
     rsp_schedule="", rsl_schedule="",
     rsp_priority="", rsl_priority="",
     rsp_time="", rsl_time="",
-    require_corp_it=False, require_corp_dedicated=False, require_dedicated=False,
+    require_corp_it=False, require_corp_dedicated=False, require_dedicated=False,  # <-- ADD require_dedicated=False
     use_new_parent=False, new_parent_offering="", new_parent="",
     keywords_excluded="",
     use_lvl2=False, service_type_lvl2="",
@@ -812,7 +1071,7 @@ def run_generator(
     approval_groups_per_app=None,
     change_subscribed_location=False,
     custom_subscribed_location="Global",
-    use_pluralization=True):
+    use_pluralization=True):  # Add this parameter with default True
     """
     Main generator function.
     """
@@ -1171,9 +1430,6 @@ def run_generator(
                 print(f"Processing {total_base_rows} base rows...")
                 start_time = time.time()
                 
-                # Najpierw na początku run_generator oblicz:
-                exclude_prod_from_keywords = should_exclude_prod_based_on_keywords(keywords_parent, keywords_child)
-
                 for row_idx, (idx, base_row) in enumerate(base_pool.iterrows()):
                     if row_idx % 10 == 0 and row_idx > 0:
                         elapsed = time.time() - start_time
@@ -1264,27 +1520,27 @@ def run_generator(
                                 # Build name based on type
                                 if is_lvl2:
                                     new_name = build_lvl2_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, service_type_lvl2, exclude_prod_from_keywords
+                                        parent_full, sr_or_im, app, schedule_suffix, service_type_lvl2
                                     )
                                 elif require_corp:
                                     new_name = build_corp_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag, exclude_prod_from_keywords
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
                                 elif require_recp:
                                     new_name = build_recp_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag, exclude_prod_from_keywords
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
                                 elif require_corp_it:
                                     new_name = build_corp_it_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag, exclude_prod_from_keywords
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
                                 elif require_corp_dedicated:
                                     new_name = build_corp_dedicated_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag, exclude_prod_from_keywords
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
-                                elif require_dedicated:
+                                elif require_dedicated:  # <-- THIS BLOCK
                                     new_name = build_dedicated_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, "", exclude_prod_from_keywords
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, ""  # <-- CHANGE delivering_tag TO ""
                                     )
                                 else:
                                     # Standard naming
@@ -1313,11 +1569,11 @@ def run_generator(
                                         # Build new parent offering with updated division
                                         new_parent_offering_str = f"[Parent {' '.join(new_parts)}] {catalog_name}"
                                         new_name = build_standard_name(
-                                            new_parent_offering_str, sr_or_im, app, schedule_suffix, special_dept, recv, keywords_parent, keywords_child, exclude_prod_from_keywords
+                                            new_parent_offering_str, sr_or_im, app, schedule_suffix, special_dept, recv
                                         )
                                     else:
                                         new_name = build_standard_name(
-                                            parent_full, sr_or_im, app, schedule_suffix, special_dept, recv, keywords_parent, keywords_child, exclude_prod_from_keywords
+                                            parent_full, sr_or_im, app, schedule_suffix, special_dept, recv
                                         )
                                 
                                 # Normalize the name for comparison (remove extra spaces)
@@ -1443,6 +1699,9 @@ def run_generator(
                                         row.loc[:, "Subscribed by Location"] = custom_subscribed_location
                                     elif not use_new_parent:
                                         # Copy from original file if not using new parent
+                                        row.loc[:, "Subscribed by Location"] = base_row.get("Subscribed by Location", "")
+                                    else:
+                                        # Default to "Global" if synthetic row
                                         row.loc[:, "Subscribed by Location"] = "Global"
                                     
                                     # Apply support group and managed by group
@@ -1840,24 +2099,21 @@ def run_generator(
     # Return the output file path
     return outfile
 
-def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, exclude_prod_from_keywords):
+def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for Dedicated Services offerings (without CORP)"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     parts = parent_content.split()
     country = ""
     topic = ""
-    
     for part in parts:
         if len(part) == 2 and part.isupper() and part not in ["HS", "DS"]:
             country = part
         elif part not in ["HS", "DS", "Parent", "RecP"] and not (len(part) == 2 and part.isupper()):
             topic = part
             break
-    
     prefix_parts = [sr_or_im]
     division, country_code = get_division_and_country(parent_content, country, delivering_tag)
-    
     if delivering_tag:
         delivering_parts = delivering_tag.split()
         if country in ["UA", "MD", "RO", "TR"]:
@@ -1866,24 +2122,15 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
             prefix_parts.extend(delivering_parts)
     else:
         prefix_parts.extend([division, country])
-    
     # NO CORP here!
     prefix_parts.append("Dedicated Services")
-    
     name_prefix = f"[{' '.join(prefix_parts)}]"
     name_parts = [name_prefix, catalog_name]
-    
     if app:
         name_parts.append(app)
-    
     if sr_or_im == "IM":
         name_parts.append("solving")
-    
-    # Check if keywords should exclude Prod
-    if not exclude_prod_from_keywords:
-        name_parts.append("Prod")
-    
+    name_parts.append("Prod")
     name_parts.append(schedule_suffix)
-    
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)

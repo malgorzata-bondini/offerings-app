@@ -420,7 +420,7 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)
 
-def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None, receiver=None):
+def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None, receiver=None, add_prod=True):
     """Build standard name when not CORP"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -513,16 +513,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     
     elif special_dept == "HR":
         # HR - NO PROD
-        parts = parent_content.split()
-        division = ""
-        country = ""
-        for part in parts:
-            if part in ["HS", "DS"]:
-                division = part
-            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
-                country = part
-        
         prefix_parts = [sr_or_im]
+        division = ""  # Initialize division to avoid unbound error
         
         # Special handling for UA, MD, RO, and TR - always use DS
         if country in ["UA", "MD", "RO", "TR"]:
@@ -633,8 +625,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         topic_lower = topic.lower() if topic else ""
         topic_exclude_prod = any(keyword in topic_lower for keyword in no_prod_keywords)
         
-        # Only add Prod if no hardware/mailbox/network/mobile/security keywords in any source
-        if not exclude_prod and not topic_exclude_prod:
+        # Only add Prod if user wants it AND no hardware/mailbox/network/mobile/security keywords in any source
+        if add_prod and not exclude_prod and not topic_exclude_prod:
             name_parts.append("Prod")
         
         name_parts.append(schedule_suffix)
@@ -714,7 +706,8 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         if sr_or_im == "IM":
             final_parts.append("solving")
         
-        if not exclude_prod:
+        # Only add Prod if user wants it AND no hardware/mailbox/network/mobile/security keywords
+        if add_prod and not exclude_prod:
             final_parts.append("Prod")
         
         final_parts.append(schedule_suffix)
@@ -1545,37 +1538,9 @@ def run_generator(
                                     )
                                 else:
                                     # Standard naming
-                                    if country == "DE" and recv:
-                                        # Extract parent content to build proper name with DS/HS
-                                        parent_content = extract_parent_info(parent_full)
-                                        catalog_name = extract_catalog_name(parent_full)
-                                        
-                                        # Replace parent division with receiver division
-                                        parts = parent_content.split()
-                                        new_parts = [sr_or_im]
-                                        
-                                        # Add receiver division (DS or HS from recv)
-                                        recv_division = recv.split()[0]  # Extract DS or HS from "DS DE" or "HS DE"
-                                        new_parts.append(recv_division)
-                                        
-                                        # Add country and other parts
-                                        for part in parts:
-                                            if part in ["HS", "DS"]:
-                                                continue  # Skip original division
-                                            elif len(part) == 2 and part.isupper() and part not in ["IT", "HR"]:
-                                                new_parts.append(part)  # Add country
-                                            elif part in ["IT", "HR", "Medical", "Business Services"] or (part not in ["HS", "DS"] and not (len(part) == 2 and part.isupper())):
-                                                new_parts.append(part)  # Add dept or other parts
-                                        
-                                        # Build new parent offering with updated division
-                                        new_parent_offering_str = f"[Parent {' '.join(new_parts)}] {catalog_name}"
-                                        new_name = build_standard_name(
-                                            new_parent_offering_str, sr_or_im, app, schedule_suffix, special_dept, recv
-                                        )
-                                    else:
-                                        new_name = build_standard_name(
-                                            parent_full, sr_or_im, app, schedule_suffix, special_dept, recv
-                                        )
+                                    new_name = build_standard_name(
+                                        parent_full, sr_or_im, app, schedule_suffix, special_dept, recv, add_prod
+                                    )
                                 
                                 # Normalize the name for comparison (remove extra spaces)
                                 new_name_normalized = ' '.join(new_name.split())
@@ -1655,6 +1620,34 @@ def run_generator(
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
                                     
                                     # UPROSZCZONA LOGIKA DLA KOLUMNY PARENT
+                                    if use_new_parent:
+                                        # W trybie "New Parent", base_row jest syntetyczny i zawiera nowego parenta z UI.
+                                        # Musimy jawnie ustawić tę wartość w generowanym wierszu.
+                                        row.loc[:, "Parent"] = base_row.get("Parent", "")
+                                    # W trybie standardowym, `row` jest już kopią `base_row` i zawiera
+                                    # prawidłową wartość "Parent". Nie ma potrzeby jej ponownie przypisywać.
+
+                                    row.loc[:, "Delivery Manager"] = delivery_manager
+                                    
+                                    # Apply business criticality if provided
+                                    if business_criticality:
+                                        row.loc[:, "Business Criticality"] = business_criticality
+                                    # Otherwise, keep the original value from source file
+                                    
+                                    # Set Record view based on SR/IM selection
+                                    if sr_or_im == "SR":
+                                        row.loc[:, "Record view"] = "Request Item"
+                                    elif sr_or_im == "IM":
+                                        row.loc[:, "Record view"] = "Incident, Major Incident"
+                                    
+                                    # Set Approval required with conditional value
+                                    if approval_required:
+                                        row.loc[:, "Approval required"] = "true"  # Always use "true" when checkbox is ticked
+                                        
+                                        # Use per-app approval group if configured, otherwise use global value
+                                        if approval_groups_per_app and app in approval_groups_per_app:
+                                            app_approval_group = approval_groups_per_app[app].strip()
+                                            # Keep empty if the user left it empty - don't force to "empty"
                                     if use_new_parent:
                                         # W trybie "New Parent", base_row jest syntetyczny i zawiera nowego parenta z UI.
                                         # Musimy jawnie ustawić tę wartość w generowanym wierszu.

@@ -436,35 +436,13 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             country = part
             break
     
-    # Check for specific catalog phrases that should NOT have "Prod"
-    no_prod_catalog_phrases = [
-        "onboarding of an employee",
-        "offboarding of an employee", 
-        "change employee information",
-        "restore from backup",
-        "blacklist/whitelist email or website",
-        "generic request",
-        "granting permissions for onboarding new employee",
-        "granting permissions for onboarding new external employee",
-        "revoking permissions of offboarding employee",
-        "granting permissions for onboarding", 
-        "granting permissions for offboarding", 
-        "revoking permissions of offboarding",
-        "revoking permissions for offboarding"
-    ]
-    
-    catalog_lower = catalog_name.lower()
-    exclude_prod_by_catalog = any(phrase in catalog_lower for phrase in no_prod_catalog_phrases)
-    
     # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
     no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security"]
     parent_lower = parent_offering.lower()
+    catalog_lower = catalog_name.lower()
     parent_content_lower = parent_content.lower()
-    exclude_prod_by_keywords = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
-                                 for keyword in no_prod_keywords)
-    
-    # Combine both exclusion criteria
-    exclude_prod = exclude_prod_by_catalog or exclude_prod_by_keywords
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                      for keyword in no_prod_keywords)
     
     if special_dept == "Medical":
         # Extract division and country from parent content
@@ -1078,7 +1056,7 @@ def run_generator(
     rsp_schedule="", rsl_schedule="",
     rsp_priority="", rsl_priority="",
     rsp_time="", rsl_time="",
-    require_corp_it=False, require_corp_dedicated=False, require_dedicated=False,  # <-- ADD require_dedicated=False
+    require_corp_it=False, require_corp_dedicated=False, require_dedicated=False,
     use_new_parent=False, new_parent_offering="", new_parent="",
     keywords_excluded="",
     use_lvl2=False, service_type_lvl2="",
@@ -1093,7 +1071,8 @@ def run_generator(
     approval_groups_per_app=None,
     change_subscribed_location=False,
     custom_subscribed_location="Global",
-    use_pluralization=True):  # Add this parameter with default True
+    use_pluralization=True,
+    add_prod=True):  # Add this new parameter
     """
     Main generator function.
     """
@@ -1560,9 +1539,9 @@ def run_generator(
                                     new_name = build_corp_dedicated_name(
                                         parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
-                                elif require_dedicated:  # <-- THIS BLOCK
+                                elif require_dedicated:
                                     new_name = build_dedicated_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, ""  # <-- CHANGE delivering_tag TO ""
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, "", add_prod
                                     )
                                 else:
                                     # Standard naming
@@ -1880,6 +1859,9 @@ def run_generator(
                                         row_dict["_missing_schedule"] = False
                                     
                                     # Store the column order key for this sheet
+                                    row_dict["_column_order_key"] = column_key
+                                    
+                                    sheets_data[sheet_key].append(row_dict)
                             
             except Exception as e:
                 # Skip if sheet doesn't exist or other error
@@ -2118,7 +2100,7 @@ def run_generator(
     # Return the output file path
     return outfile
 
-def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
+def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, add_prod=True):
     """Build name for Dedicated Services offerings (without CORP)"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -2149,7 +2131,9 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
         name_parts.append(app)
     if sr_or_im == "IM":
         name_parts.append("solving")
-    name_parts.append("Prod")
+    # Add Prod only if user wants it
+    if add_prod:
+        name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)

@@ -436,13 +436,28 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             country = part
             break
     
+    # Check for specific catalog names that should NOT have "Prod"
+    no_prod_catalog_names = [
+        "onboarding of an employee",
+        "offboarding of an employee", 
+        "change employee information",
+        "restore from backup",
+        "blacklist/whitelist email or website",
+        "generic request"
+    ]
+    
+    catalog_lower = catalog_name.lower()
+    exclude_prod_by_catalog = any(no_prod_name in catalog_lower for no_prod_name in no_prod_catalog_names)
+    
     # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
     no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security"]
     parent_lower = parent_offering.lower()
-    catalog_lower = catalog_name.lower()
     parent_content_lower = parent_content.lower()
-    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
-                      for keyword in no_prod_keywords)
+    exclude_prod_by_keywords = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                                 for keyword in no_prod_keywords)
+    
+    # Combine both exclusion criteria
+    exclude_prod = exclude_prod_by_catalog or exclude_prod_by_keywords
     
     if special_dept == "Medical":
         # Extract division and country from parent content

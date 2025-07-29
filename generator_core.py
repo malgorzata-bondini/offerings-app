@@ -758,9 +758,13 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         # Add catalog name
         final_parts = [prefix, catalog_name]
         
-        # Check if we should add Prod
+        # ⭐ SPRAWDŹ CZY DODAWAĆ "PROD" - UŻYWAJ ROZSZERZONEJ LISTY!
+        # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
+        parent_lower = parent_offering.lower()
         catalog_lower = catalog_name.lower()
-        exclude_prod = any(keyword in catalog_lower for keyword in ["hardware", "mailbox", "network", "mobile", "security"])
+        parent_content_lower = parent_content.lower()
+        exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                          for keyword in no_prod_keywords)
         
         # Add app if provided
         if app:
@@ -780,6 +784,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         if sr_or_im == "IM":
             final_parts.append("solving")
         
+        # ⭐ UŻYWAJ exclude_prod ZAMIAST WŁASNEGO SPRAWDZANIA
         if not exclude_prod:
             final_parts.append("Prod")
         
@@ -1725,6 +1730,7 @@ def run_generator(
                                     if matching:
                                         support_groups_list = matching
                                 
+                               
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
                                     # Skip duplicates based on name, receiver, app, schedule, support and managed groups

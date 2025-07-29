@@ -82,6 +82,9 @@ with col2:
         
         sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
         
+        # Add Prod checkbox right after Service Type
+        add_prod = st.checkbox("Add 'Prod' to names", value=True, help="Whether to include 'Prod' in generated service offering names")
+        
         # Move Delivery Manager here - right after Service Type
         delivery_manager = st.text_input("Delivery Manager", value="")
     
@@ -730,9 +733,6 @@ with col2:
         use_per_country_aliases = False
         aliases_per_country = {}
 
-# NEW CHECKBOX FOR ADDING 'PROD'
-add_prod = st.checkbox("Add 'Prod' to names", value=True, help="Whether to include 'Prod' in generated service offering names")
-
 st.markdown("---")
 
 # MODIFY THIS VALIDATION SECTION
@@ -790,7 +790,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         commitment_country=commitment_country if 'commitment_country' in locals() else None,
                         require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
                         require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
-                        require_dedicated=require_dedicated if 'require_dedicated' in locals() else False,  # <-- ADD THIS LINE
+                        require_dedicated=require_dedicated if 'require_dedicated' in locals() else False,
                         use_new_parent=use_new_parent,
                         new_parent_offering=new_parent_offerings,
                         new_parent=new_parents,
@@ -808,7 +808,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
                         approval_groups_per_app=approval_groups_per_app if 'approval_groups_per_app' in locals() else {},
                         change_subscribed_location=change_subscribed_location,
-                        custom_subscribed_location=custom_subscribed_location
+                        custom_subscribed_location=custom_subscribed_location,
+                        add_prod=add_prod  # Add this parameter
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

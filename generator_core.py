@@ -138,18 +138,6 @@ def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_typ
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
     
-    # ⭐ DODAJ SPRAWDZANIE SŁÓW KLUCZOWYCH
-    no_prod_keywords = [
-        "hardware", "mailbox", "network", "mobile", "security",
-        "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
-        "blacklist/whitelist", "generic"
-    ]
-    
-    parent_offering_lower = parent_offering.lower()
-    catalog_name_lower = catalog_name.lower()
-    exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 
-                      for keyword in no_prod_keywords)
-    
     # Check if SR/IM already exists in parent content
     parts = parent_content.split()
     has_sr_im = "SR" in parts or "IM" in parts
@@ -204,14 +192,9 @@ def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_typ
     if app:
         name_parts.append(app)
     
-    # ⭐ SPRAWDŹ CZY DODAWAĆ "PROD" - z dodatkowým sprawdzeniem Microsoft
+    # Check if name contains Microsoft - if so, don't add Prod
     name_so_far = " ".join(name_parts).lower()
-    has_microsoft = "microsoft" in name_so_far
-    
-    # Nie dodawaj "Prod" jeśli:
-    # 1. Jest Microsoft ALBO
-    # 2. Są słowa kluczowe z bufora bezpieczeństwa
-    if not has_microsoft and not exclude_prod:
+    if "microsoft" not in name_so_far:
         name_parts.append("Prod")
     
     # Add service type if provided (e.g., "Application issue")
@@ -229,18 +212,6 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     """Build name for CORP IT offerings"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
-    
-    # ⭐ DODAJ SPRAWDZANIE SŁÓW KLUCZOWYCH
-    no_prod_keywords = [
-        "hardware", "mailbox", "network", "mobile", "security",
-        "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
-        "blacklist/whitelist", "generic"
-    ]
-    
-    parent_offering_lower = parent_offering.lower()
-    catalog_name_lower = catalog_name.lower()
-    exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 
-                      for keyword in no_prod_keywords)
     
     # Extract parts from parent content
     parts = parent_content.split()
@@ -264,12 +235,12 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     if delivering_tag:
         delivering_parts = delivering_tag.split()
         # For MD/UA/RO/TR, override with DS
-        if country in ["UA", "MD", "RO", "TR"]:
-            prefix_parts.extend(["DS", country])
+        if country_code in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country_code])
         else:
             prefix_parts.extend(delivering_parts)
     else:
-        prefix_parts.extend([division, country])
+        prefix_parts.extend([division, country_code])
     
     prefix_parts.append("CORP")
     
@@ -298,10 +269,7 @@ def build_corp_it_name(parent_offering, sr_or_im, app, schedule_suffix, receiver
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # ⭐ SPRAWDŹ CZY DODAWAĆ "PROD"
-    if not exclude_prod:
-        name_parts.append("Prod")
-    
+    # name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
     # Join and ensure incident naming
@@ -312,18 +280,6 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     """Build name for CORP Dedicated Services offerings"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
-    
-    # ⭐ DODAJ SPRAWDZANIE SŁÓW KLUCZOWYCH
-    no_prod_keywords = [
-        "hardware", "mailbox", "network", "mobile", "security",
-        "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
-        "blacklist/whitelist", "generic"
-    ]
-    
-    parent_offering_lower = parent_offering.lower()
-    catalog_name_lower = catalog_name.lower()
-    exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 
-                      for keyword in no_prod_keywords)
     
     # Extract parts from parent content
     parts = parent_content.split()
@@ -347,12 +303,12 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     if delivering_tag:
         delivering_parts = delivering_tag.split()
         # For MD/UA/RO/TR, override with DS
-        if country in ["UA", "MD", "RO", "TR"]:
-            prefix_parts.extend(["DS", country])
+        if country_code in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country_code])
         else:
             prefix_parts.extend(delivering_parts)
     else:
-        prefix_parts.extend([division, country])
+        prefix_parts.extend([division, country_code])
     
     prefix_parts.append("CORP")
     
@@ -373,10 +329,7 @@ def build_corp_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, r
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # ⭐ SPRAWDŹ CZY DODAWAĆ "PROD"
-    if not exclude_prod:
-        name_parts.append("Prod")
-    
+    name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
     # Join and ensure incident naming
@@ -387,18 +340,6 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     """Build name for RecP offerings"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
-    
-    # ⭐ DODAJ SPRAWDZANIE SŁÓW KLUCZOWYCH
-    no_prod_keywords = [
-        "hardware", "mailbox", "network", "mobile", "security",
-        "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
-        "blacklist/whitelist", "generic"
-    ]
-    
-    parent_offering_lower = parent_offering.lower()
-    catalog_name_lower = catalog_name.lower()
-    exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 
-                      for keyword in no_prod_keywords)
     
     # Extract parts from parent content
     parts = parent_content.split()
@@ -426,8 +367,8 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
             break
     
     # For MD/UA/RO/TR, always use DS
-    if country in ["UA", "MD", "RO", "TR"]:
-        prefix_parts.extend(["DS", country])
+    if country_code in ["UA", "MD", "RO", "TR"]:
+        prefix_parts.extend(["DS", country_code])
     else:
         if parent_division:
             prefix_parts.append(parent_division)
@@ -440,16 +381,16 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     if delivering_tag:
         delivering_parts = delivering_tag.split()
         # For MD/UA/RO/TR, override with DS
-        if country in ["UA", "MD", "RO", "TR"]:
-            prefix_parts.extend(["DS", country])
+        if country_code in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country_code])
         else:
             prefix_parts.extend(delivering_parts)
     else:
         # For MD/UA/RO/TR, use DS
-        if country in ["UA", "MD", "RO", "TR"]:
-            prefix_parts.extend(["DS", country])
+        if country_code in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country_code])
         else:
-            prefix_parts.extend([division, country])
+            prefix_parts.extend([division, country_code])
     
     prefix_parts.append("IT")
     
@@ -472,10 +413,7 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # ⭐ SPRAWDŹ CZY DODAWAĆ "PROD"
-    if not exclude_prod:
-        name_parts.append("Prod")
-    
+    name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     
     # Join and ensure incident naming
@@ -490,20 +428,14 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
     # Apply pluralization to catalog name for hardware items
     catalog_name_plural = get_plural_form(catalog_name)
     
-    # Extract country from parent content
-    parts = parent_content.split()
-    country = ""
-    for part in parts:
-        if len(part) == 2 and part.isupper() and part not in ["HS", "DS", "IT", "HR"]:
-            country = part
-            break
-    
-    # ⭐ ZDEFINIUJ LISTĘ I SPRAWDZENIE NA SAMYM POCZĄTKU FUNKCJI
+    # Updated no_prod_keywords list
     no_prod_keywords = [
         "hardware", "mailbox", "network", "mobile", "security",
         "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
         "blacklist/whitelist", "generic"
     ]
+    
+    # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
     parent_lower = parent_offering.lower()
     catalog_lower = catalog_name.lower()
     parent_content_lower = parent_content.lower()
@@ -732,7 +664,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         name_parts = [sr_or_im]
         
         # Special handling for UA, MD, RO, and TR - always use DS
-        if country in ["UA", "MD", "RO", "TR"]:
+        if country_code in ["UA", "MD", "RO", "TR"]:
             name_parts.append("DS")
         elif division:
             name_parts.append(division)
@@ -758,15 +690,28 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         # Add catalog name
         final_parts = [prefix, catalog_name]
         
+        # Check if we should add Prod
+        catalog_lower = catalog_name.lower()
+        exclude_prod = any(keyword in catalog_lower for keyword in ["hardware", "mailbox", "network", "mobile", "security"])
+        
         # Add app if provided
         if app:
-            final_parts.append(app)
+            # Build the current name string to check for "hardware"
+            current_name_str = " ".join(final_parts)
+            # Check if "hardware" is in the current name (case insensitive)
+            if "hardware" in current_name_str.lower():
+                # Use lowercase for hardware, but keep UPS uppercase
+                if app.upper() == "UPS":
+                    final_parts.append("UPS")  # Keep UPS uppercase
+                else:
+                    final_parts.append(app.lower())  # Use lowercase for other hardware
+            else:
+                final_parts.append(app)  # Keep original case for non-hardware
         
         # Add "solving" for IM
         if sr_or_im == "IM":
             final_parts.append("solving")
         
-        # ⭐ UŻYWAJ ZMIENNEJ exclude_prod ZDEFINIOWANEJ NA POCZĄTKU
         if not exclude_prod:
             final_parts.append("Prod")
         
@@ -779,18 +724,6 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     """Build name for CORP offerings"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
-    
-    # ⭐ DODAJ TO DO KAŻDEJ FUNKCJI BUDUJĄCEJ NAZWY
-    no_prod_keywords = [
-        "hardware", "mailbox", "network", "mobile", "security",
-        "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
-        "blacklist/whitelist", "generic"
-    ]
-    
-    parent_offering_lower = parent_offering.lower()
-    catalog_name_lower = catalog_name.lower()
-    exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 
-                      for keyword in no_prod_keywords)
     
     # Extract parts from parent content
     parts = parent_content.split()
@@ -812,13 +745,13 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     # Add delivering tag parts (who delivers the service - from user input)
     if delivering_tag:
         delivering_parts = delivering_tag.split()
-        # For MD/UA/RO/TR, override with DS
-        if country in ["UA", "MD", "RO", "TR"]:
-            prefix_parts.extend(["DS", country])
+        # For MD/UA/RO/TR, override with DS - use country_code instead of country
+        if country_code in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country_code])
         else:
             prefix_parts.extend(delivering_parts[:2])  # Take division and country from delivering tag
     else:
-        prefix_parts.extend([division, country])
+        prefix_parts.extend([division, country_code])
     
     prefix_parts.extend(["CORP", receiver])
     
@@ -828,28 +761,15 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     
     if sr_or_im == "SR":
         if app:
-            # ⭐ SPRAWDŹ CZY DODAWAĆ "PROD"
-            if exclude_prod:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} {schedule_suffix}"
-            else:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} Prod {schedule_suffix}"
         else:
-            if exclude_prod:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {schedule_suffix}"
-            else:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} Prod {schedule_suffix}"
     else:
         # For IM: always add solving after the app (or after catalog if no app)
         if app:
-            if exclude_prod:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving {schedule_suffix}"
-            else:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} {app} solving Prod {schedule_suffix}"
         else:
-            if exclude_prod:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving {schedule_suffix}"
-            else:
-                final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
+            final_name = f"[{' '.join(prefix_parts)}] {catalog_name} solving Prod {schedule_suffix}"
     
     return ensure_incident_naming(final_name)
 
@@ -873,8 +793,6 @@ def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
 def update_commitments(orig, sched, rsp, rsl, sr_or_im, country):
     """Update existing commitments and ensure OLA is present"""
     out = []
-    has_ola = False
-    country_code = None
     
     for line in str(orig).splitlines():
         line = line.strip()
@@ -1149,25 +1067,32 @@ def run_generator(
     approval_groups_per_app=None,
     change_subscribed_location=False,
     custom_subscribed_location="Global",
-    use_pluralization=True,
-    add_prod_to_dedicated=True):  # ⭐ DODAJ TEN PARAMETR
+    use_pluralization=True):
     """
     Main generator function.
     """
-    # Define helper function for cleaning approval values
-    def clean_approval_value(val):
-        if pd.isna(val) or str(val).strip() in ['', 'nan', 'NaN', 'None', 'none', 'NULL', 'null', '<NA>']:
-            return 'false'
-        val_str = str(val).strip().lower()  # Convert to lowercase here
-        if val_str in ['true', 'false']:
-            return val_str  # Already lowercase
-        elif val_str in ['yes', 'y', '1']:
-            return 'true'
-        elif val_str in ['no', 'n', '0']:
-            return 'false'
-        else:
-            # Keep custom values as-is but convert to lowercase
-            return str(val).strip().lower()
+    
+    # Updated no_prod_keywords list with all specified keywords
+    no_prod_keywords = [
+        "hardware", "mailbox", "network", "mobile", "security",
+        "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
+        "blacklist/whitelist", "generic"
+    ]
+    
+    def should_exclude_prod(parent_offering, child_name, catalog_name=""):
+        """Check if 'Prod' should be excluded based on keywords in parent offering or child name"""
+        # Convert all inputs to lowercase for case-insensitive comparison
+        parent_lower = str(parent_offering).lower()
+        child_lower = str(child_name).lower()
+        catalog_lower = str(catalog_name).lower()
+        
+        # Check if any no_prod_keyword appears in parent offering, child name, or catalog name
+        for keyword in no_prod_keywords:
+            if (keyword in parent_lower or 
+                keyword in child_lower or 
+                keyword in catalog_lower):
+                return True
+        return False
 
     # Initialize per-country support groups dictionaries if not provided
     if support_groups_per_country is None:
@@ -1289,9 +1214,9 @@ def run_generator(
 
     def name_prefix_ok(name):
         # Make prefix check case-insensitive and handle extra spaces
-        name = name.strip().upper()
-        # Check if name starts with [Parent, [SR, or [IM (case-insensitive)
-        return name.startswith('[PARENT ') or name.startswith(f"[{sr_or_im.upper()} ")
+        name = name.strip()
+        # Check if name starts with [SR or [IM (case-insensitive)
+        return name.upper().startswith(f"[{sr_or_im.upper()} ") or name.upper().startswith(f"[{sr_or_im.upper()}\t")
 
     # Process apps - split on comma, newline, or semicolon
     all_apps = []
@@ -1495,7 +1420,8 @@ def run_generator(
                         mask = (df.apply(row_keywords_ok, axis=1)
                                 & df.apply(row_excluded_keywords_ok, axis=1)
                                 & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
-                                & df.apply(lc_ok, axis=1))
+                                & df.apply(lc_ok, axis=1)
+                                & (df["Service Commitments"].astype(str).str.strip().replace({"nan": ""}) != "-"))
 
                     base_pool = df.loc[mask]
                     print(f"Final matching rows: {len(base_pool)}")
@@ -1616,9 +1542,9 @@ def run_generator(
                                     new_name = build_corp_dedicated_name(
                                         parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
-                                elif require_dedicated:
+                                elif require_dedicated:  # <-- THIS BLOCK
                                     new_name = build_dedicated_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, "", add_prod_to_dedicated  # ⭐ DODAJ PARAMETR
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, ""  # <-- CHANGE delivering_tag TO ""
                                     )
                                 else:
                                     # Standard naming
@@ -1711,7 +1637,6 @@ def run_generator(
                                     if matching:
                                         support_groups_list = matching
                                 
-                               
                                 # Create offerings for each support group combination
                                 for support_group_for_country, managed_by_group_for_country in support_groups_list:
                                     # Skip duplicates based on name, receiver, app, schedule, support and managed groups
@@ -1752,6 +1677,35 @@ def run_generator(
                                         row.loc[:, "Record view"] = "Request Item"
                                     elif sr_or_im == "IM":
                                         row.loc[:, "Record view"] = "Incident, Major Incident"
+                                    
+                                    # Set Approval required with conditional value
+                                    if approval_required:
+                                        row.loc[:, "Approval required"] = "true"  # Always use "true" when checkbox is ticked
+                                        
+                                        # Use per-app approval group if configured, otherwise use global value
+                                        if approval_groups_per_app and app in approval_groups_per_app:
+                                            app_approval_group = approval_groups_per_app[app].strip()
+                                            # Keep empty if the user left it empty - don't force to "empty"
+                                            row.loc[:, "Approval group"] = app_approval_group
+                                        else:
+                                            # If no per-app configuration exists, use global value (but not "PER_APP")
+                                            if approval_required_value and approval_required_value != "PER_APP":
+                                                row.loc[:, "Approval group"] = approval_required_value
+                                            else:
+                                                # Keep empty instead of forcing "empty"
+                                                row.loc[:, "Approval group"] = ""
+                                    else:
+                                        row.loc[:, "Approval required"] = "false"
+                                        row.loc[:, "Approval group"] = "empty"  # Use literal "empty" when not required
+                                    
+                                    # Set Subscribed by Location based on user choice or original value
+                                    if change_subscribed_location:
+                                        row.loc[:, "Subscribed by Location"] = custom_subscribed_location
+                                    elif not use_new_parent:
+                                        # Copy from original file if not using new parent
+                                        row.loc[:, "Subscribed by Location"] = base_row.get("Subscribed by Location", "")
+                                    else:
+                                        # Default to "Global" if synthetic row
                                         row.loc[:, "Subscribed by Location"] = "Global"
                                     
                                     # Apply support group and managed by group
@@ -2050,6 +2004,15 @@ def run_generator(
                     df_final = df_final.apply(_clean_cell)
 
                 # Keep the dedicated treatment for the two boolean-ish columns
+                def clean_approval_value(v):
+                    """Clean approval required values to ensure they are 'true' or 'false'"""
+                    v = _clean_cell(v)
+                    if v.lower() in ['true', '1', 'yes', 'y']:
+                        return 'true'
+                    elif v.lower() in ['false', '0', 'no', 'n']:
+                        return 'false'
+                    return 'false'  # default to false for any unclear values
+                
                 df_final["Approval required"] = df_final["Approval required"].apply(clean_approval_value)
 
                 def _clean_approval_group(v):
@@ -2149,7 +2112,7 @@ def run_generator(
     # Return the output file path
     return outfile
 
-def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, add_prod=True):
+def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
     """Build name for Dedicated Services offerings (without CORP)"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -2166,12 +2129,12 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
     division, country_code = get_division_and_country(parent_content, country, delivering_tag)
     if delivering_tag:
         delivering_parts = delivering_tag.split()
-        if country in ["UA", "MD", "RO", "TR"]:
-            prefix_parts.extend(["DS", country])
+        if country_code in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country_code])
         else:
             prefix_parts.extend(delivering_parts)
     else:
-        prefix_parts.extend([division, country])
+        prefix_parts.extend([division, country_code])
     # NO CORP here!
     prefix_parts.append("Dedicated Services")
     name_prefix = f"[{' '.join(prefix_parts)}]"
@@ -2181,25 +2144,22 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # ⭐ ROZSZERZONA LISTA SŁÓW KLUCZOWYCH BLOKUJĄCYCH "PROD"
+    # Check for keywords that exclude "Prod"
     no_prod_keywords = [
         "hardware", "mailbox", "network", "mobile", "security",
         "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
         "blacklist/whitelist", "generic"
     ]
     
-    # Check if any excluded keyword is present
-    parent_offering_lower = parent_offering.lower()
-    catalog_name_lower = catalog_name.lower()
-    exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 
-                      for keyword in no_prod_keywords)
+    # Check if any no_prod_keyword appears in parent offering or catalog name
+    parent_lower = str(parent_offering).lower()
+    catalog_lower = str(catalog_name).lower()
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower for keyword in no_prod_keywords)
     
-    # Dodaj "Prod" tylko jeśli:
-    # 1. Użytkownik chce (add_prod=True)
-    # 2. I nie ma słów kluczowych z bufora
-    if add_prod and not exclude_prod:
+    if not exclude_prod:
         name_parts.append("Prod")
     
     name_parts.append(schedule_suffix)
+    
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)

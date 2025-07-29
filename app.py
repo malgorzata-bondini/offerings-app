@@ -190,6 +190,13 @@ with col2:
         if use_new_parent:
             st.info("📝 Enter the exact Parent Offering and Parent values to use")
             
+            # ⭐ DODAJ TEN CHECKBOX TUTAJ
+            add_prod_to_dedicated = st.checkbox(
+                "Add 'Prod' to generated names", 
+                value=True,
+                help="When unchecked, 'Prod' won't be added to generated names (safety buffer still applies for hardware, incident, etc.)"
+            )
+            
             # Initialize session state for dynamic parent offerings
             if 'parent_offerings' not in st.session_state:
                 st.session_state.parent_offerings = [{"offering": "", "parent": ""}]
@@ -734,6 +741,8 @@ st.markdown("---")
 
 # MODIFY THIS VALIDATION SECTION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
+    # Define add_prod_to_dedicated before using it
+    add_prod_to_dedicated = True  # or set to False if that's the default you want
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
     elif use_new_parent and (not new_parent_offerings or not new_parents):
@@ -805,7 +814,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
                         approval_groups_per_app=approval_groups_per_app if 'approval_groups_per_app' in locals() else {},
                         change_subscribed_location=change_subscribed_location,
-                        custom_subscribed_location=custom_subscribed_location
+                        custom_subscribed_location=custom_subscribed_location,
+                        add_prod_to_dedicated=add_prod_to_dedicated if use_new_parent else True  # Tylko dla New Parent
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

@@ -578,21 +578,22 @@ with col2:
             require_recp = st.checkbox("CORP RecP")
             require_corp_dedicated = st.checkbox("CORP Dedicated Services")
             require_corp_it = st.checkbox("CORP IT")
+            require_dedicated = st.checkbox("Dedicated Services")  # <-- ADD THIS LINE
             special_dak = st.checkbox("DAK (Business Services)")
             special_hr = st.checkbox("HR")
             special_it = st.checkbox("IT")
             special_medical = st.checkbox("Medical")
         
         # Ensure only one is selected
-        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated])
+        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated, require_dedicated])  # <-- ADD require_dedicated
         if all_selected > 1:
             st.error("⚠️ Please select only one naming type")
             # Reset all to handle multiple selection
-            require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = False
+            require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = require_dedicated = False  # <-- ADD require_dedicated
         elif all_selected == 0:
             st.info("📌 Standard naming will be used")
         
-        if require_corp or require_recp or require_corp_it or require_corp_dedicated:
+        if require_corp or require_recp or require_corp_it or require_corp_dedicated or require_dedicated:  # <-- ADD require_dedicated
             delivering_tag = st.text_input(
                 "Who delivers the service", 
                 value="",
@@ -763,7 +764,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         schedule_suffixes=schedule_suffixes,
                         delivery_manager=delivery_manager,
                         global_prod=global_prod,
-                        use_pluralization=use_pluralization,  # Add this line
+                        use_pluralization=use_pluralization,
                         rsp_duration=rsp_duration,
                         rsl_duration=rsl_duration,
                         sr_or_im=sr_or_im,
@@ -786,6 +787,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         commitment_country=commitment_country if 'commitment_country' in locals() else None,
                         require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
                         require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
+                        require_dedicated=require_dedicated if 'require_dedicated' in locals() else False,  # <-- ADD THIS LINE
                         use_new_parent=use_new_parent,
                         new_parent_offering=new_parent_offerings,
                         new_parent=new_parents,
@@ -801,7 +803,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         business_criticality=business_criticality,
                         approval_required=approval_required,
                         approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
-                        approval_groups_per_app=approval_groups_per_app if 'approval_groups_per_app' in locals() else {},  # ADD THIS LINE
+                        approval_groups_per_app=approval_groups_per_app if 'approval_groups_per_app' in locals() else {},
                         change_subscribed_location=change_subscribed_location,
                         custom_subscribed_location=custom_subscribed_location
                     )

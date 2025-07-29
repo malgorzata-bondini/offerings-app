@@ -444,8 +444,11 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         "restore from backup",
         "blacklist/whitelist email or website",
         "generic request",
-        "granting permissions for onboarding",
+        "granting permissions for onboarding new employee",
+        "granting permissions for onboarding new external employee",
+        "granting permissions for onboarding", 
         "granting permissions for offboarding", 
+        "revoking permissions of offboarding employee",
         "revoking permissions of offboarding",
         "revoking permissions for offboarding"
     ]
@@ -1877,9 +1880,6 @@ def run_generator(
                                         row_dict["_missing_schedule"] = False
                                     
                                     # Store the column order key for this sheet
-                                    row_dict["_column_order_key"] = column_key
-                                    
-                                    sheets_data[sheet_key].append(row_dict)
                             
             except Exception as e:
                 # Skip if sheet doesn't exist or other error

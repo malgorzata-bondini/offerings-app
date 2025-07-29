@@ -1538,9 +1538,9 @@ def run_generator(
                                     new_name = build_corp_dedicated_name(
                                         parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
-                                elif require_dedicated:  # <-- ADD THIS BLOCK
+                                elif require_dedicated:  # <-- THIS BLOCK
                                     new_name = build_dedicated_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, ""  # <-- CHANGE delivering_tag TO ""
                                     )
                                 else:
                                     # Standard naming

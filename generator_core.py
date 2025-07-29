@@ -446,9 +446,9 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         "generic request",
         "granting permissions for onboarding new employee",
         "granting permissions for onboarding new external employee",
+        "revoking permissions of offboarding employee",
         "granting permissions for onboarding", 
         "granting permissions for offboarding", 
-        "revoking permissions of offboarding employee",
         "revoking permissions of offboarding",
         "revoking permissions for offboarding"
     ]

@@ -741,9 +741,12 @@ st.markdown("---")
 
 # MODIFY THIS VALIDATION SECTION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
-    # Define add_prod_to_dedicated before using it - POPRAWIONY DEFAULT
-    if 'add_prod_to_dedicated' not in locals():
-        add_prod_to_dedicated = False  # ⭐ ZMIENIONO z True na False
+    # Ensure add_prod_to_dedicated is always defined
+    add_prod_to_dedicated = False  # Default value if not set anywhere
+    if 'add_prod_to_dedicated' in locals():
+        add_prod_to_dedicated = locals()['add_prod_to_dedicated']
+    elif 'add_prod_to_dedicated' in globals():
+        add_prod_to_dedicated = globals()['add_prod_to_dedicated']
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
     elif use_new_parent and (not new_parent_offerings or not new_parents):

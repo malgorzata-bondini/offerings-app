@@ -2123,7 +2123,6 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
     else:
         prefix_parts.extend([division, country])
     # NO CORP here!
-    prefix_parts.append(receiver)
     prefix_parts.append("Dedicated Services")
     name_prefix = f"[{' '.join(prefix_parts)}]"
     name_parts = [name_prefix, catalog_name]

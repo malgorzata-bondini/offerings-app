@@ -1056,7 +1056,7 @@ def run_generator(
     rsp_schedule="", rsl_schedule="",
     rsp_priority="", rsl_priority="",
     rsp_time="", rsl_time="",
-    require_corp_it=False, require_corp_dedicated=False, require_dedicated=False,  # <-- ADD require_dedicated=False
+    require_corp_it=False, require_corp_dedicated=False, require_dedicated=False,
     use_new_parent=False, new_parent_offering="", new_parent="",
     keywords_excluded="",
     use_lvl2=False, service_type_lvl2="",
@@ -1071,7 +1071,8 @@ def run_generator(
     approval_groups_per_app=None,
     change_subscribed_location=False,
     custom_subscribed_location="Global",
-    use_pluralization=True):  # Add this parameter with default True
+    use_pluralization=True,
+    add_prod_to_dedicated=True):  # ⭐ DODAJ TEN PARAMETR
     """
     Main generator function.
     """
@@ -1538,9 +1539,9 @@ def run_generator(
                                     new_name = build_corp_dedicated_name(
                                         parent_full, sr_or_im, app, schedule_suffix, recv, delivering_tag
                                     )
-                                elif require_dedicated:  # <-- THIS BLOCK
+                                elif require_dedicated:
                                     new_name = build_dedicated_name(
-                                        parent_full, sr_or_im, app, schedule_suffix, recv, ""  # <-- CHANGE delivering_tag TO ""
+                                        parent_full, sr_or_im, app, schedule_suffix, recv, "", add_prod_to_dedicated  # ⭐ DODAJ PARAMETR
                                     )
                                 else:
                                     # Standard naming
@@ -2099,7 +2100,7 @@ def run_generator(
     # Return the output file path
     return outfile
 
-def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag):
+def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, add_prod=True):
     """Build name for Dedicated Services offerings (without CORP)"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -2131,19 +2132,17 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # Safety buffer - keywords that should NEVER have "Prod"
+    # Bufor bezpieczeństwa - zachowany!
     no_prod_keywords = ["hardware", "incident", "network", "mailbox", "telephone", "security", "mobile"]
-    
-    # Check if original parent offering contains "Prod" AND none of the excluded keywords
     parent_offering_lower = parent_offering.lower()
     catalog_name_lower = catalog_name.lower()
-    
-    # Check if any excluded keyword is present
     exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 
                       for keyword in no_prod_keywords)
     
-    # Only add "Prod" if it was in original AND no excluded keywords found
-    if "Prod" in parent_offering and not exclude_prod:
+    # Dodaj "Prod" tylko jeśli:
+    # 1. Użytkownik chce (add_prod=True)
+    # 2. I nie ma słów kluczowych z bufora
+    if add_prod and not exclude_prod:
         name_parts.append("Prod")
     
     name_parts.append(schedule_suffix)

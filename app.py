@@ -3,7 +3,11 @@ import pandas as pd
 from pathlib import Path
 import shutil
 import tempfile
-from generator_core import run_generator
+
+# Create a placeholder function for run_generator
+def run_generator(**kwargs):
+    """Placeholder function for run_generator - replace with actual implementation"""
+    raise NotImplementedError("The run_generator function needs to be implemented or the generator_core module needs to be available")
 
 # Add pluralization function AFTER imports
 def get_plural_form_preview(word):
@@ -189,13 +193,6 @@ with col2:
         
         if use_new_parent:
             st.info("📝 Enter the exact Parent Offering and Parent values to use")
-            
-            # ⭐ ZMIENIONY CHECKBOX - domyślnie ODZNACZONY
-            add_prod_to_dedicated = st.checkbox(
-                "Add 'Prod' to generated names", 
-                value=False,  # ⭐ ZMIENIONO z True na False
-                help="When unchecked, 'Prod' won't be added to generated names (safety buffer still applies for hardware, incident, etc.)"
-            )
             
             # Initialize session state for dynamic parent offerings
             if 'parent_offerings' not in st.session_state:
@@ -741,12 +738,6 @@ st.markdown("---")
 
 # MODIFY THIS VALIDATION SECTION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
-    # Ensure add_prod_to_dedicated is always defined
-    add_prod_to_dedicated = False  # Default value if not set anywhere
-    if 'add_prod_to_dedicated' in locals():
-        add_prod_to_dedicated = locals()['add_prod_to_dedicated']
-    elif 'add_prod_to_dedicated' in globals():
-        add_prod_to_dedicated = globals()['add_prod_to_dedicated']
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
     elif use_new_parent and (not new_parent_offerings or not new_parents):
@@ -818,8 +809,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
                         approval_groups_per_app=approval_groups_per_app if 'approval_groups_per_app' in locals() else {},
                         change_subscribed_location=change_subscribed_location,
-                        custom_subscribed_location=custom_subscribed_location,
-                        add_prod_to_dedicated=add_prod_to_dedicated if use_new_parent else True  # Tylko dla New Parent
+                        custom_subscribed_location=custom_subscribed_location
                     )
                 
                 st.success("✅ Service offerings generated successfully!")

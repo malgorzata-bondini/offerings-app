@@ -498,11 +498,11 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             country = part
             break
     
-    # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
+    # ⭐ ZDEFINIUJ LISTĘ I SPRAWDZENIE NA SAMYM POCZĄTKU FUNKCJI
     no_prod_keywords = [
         "hardware", "mailbox", "network", "mobile", "security",
         "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
-        "blacklist/whitelist", "generic"  # ⭐ DODAJ TE SŁOWA
+        "blacklist/whitelist", "generic"
     ]
     parent_lower = parent_offering.lower()
     catalog_lower = catalog_name.lower()
@@ -758,33 +758,15 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         # Add catalog name
         final_parts = [prefix, catalog_name]
         
-        # ⭐ SPRAWDŹ CZY DODAWAĆ "PROD" - UŻYWAJ ROZSZERZONEJ LISTY!
-        # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
-        parent_lower = parent_offering.lower()
-        catalog_lower = catalog_name.lower()
-        parent_content_lower = parent_content.lower()
-        exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
-                          for keyword in no_prod_keywords)
-        
         # Add app if provided
         if app:
-            # Build the current name string to check for "hardware"
-            current_name_str = " ".join(final_parts)
-            # Check if "hardware" is in the current name (case insensitive)
-            if "hardware" in current_name_str.lower():
-                # Use lowercase for hardware, but keep UPS uppercase
-                if app.upper() == "UPS":
-                    final_parts.append("UPS")  # Keep UPS uppercase
-                else:
-                    final_parts.append(app.lower())  # Use lowercase for other hardware
-            else:
-                final_parts.append(app)  # Keep original case for non-hardware
+            final_parts.append(app)
         
         # Add "solving" for IM
         if sr_or_im == "IM":
             final_parts.append("solving")
         
-        # ⭐ UŻYWAJ exclude_prod ZAMIAST WŁASNEGO SPRAWDZANIA
+        # ⭐ UŻYWAJ ZMIENNEJ exclude_prod ZDEFINIOWANEJ NA POCZĄTKU
         if not exclude_prod:
             final_parts.append("Prod")
         

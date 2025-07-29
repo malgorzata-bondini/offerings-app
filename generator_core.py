@@ -420,7 +420,7 @@ def build_recp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)
 
-def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None, receiver=None):
+def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special_dept=None, receiver=None, keywords_parent=None, keywords_child=None):
     """Build standard name when not CORP"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
@@ -633,8 +633,11 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         topic_lower = topic.lower() if topic else ""
         topic_exclude_prod = any(keyword in topic_lower for keyword in no_prod_keywords)
         
+        # Check if keywords should exclude Prod
+        exclude_prod_from_keywords = should_exclude_prod_based_on_keywords(keywords_parent, keywords_child)
+        
         # Only add Prod if no hardware/mailbox/network/mobile/security keywords in any source
-        if not exclude_prod and not topic_exclude_prod:
+        if not exclude_prod and not topic_exclude_prod and not exclude_prod_from_keywords:
             name_parts.append("Prod")
         
         name_parts.append(schedule_suffix)
@@ -711,8 +714,11 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
                 final_parts.append(app)  # Keep original case for non-hardware
         
         # Add "solving" for IM
-        if sr_or_im == "IM":
-            final_parts.append("solving")
+        # Check if keywords should exclude Prod
+        exclude_prod_from_keywords = should_exclude_prod_based_on_keywords(keywords_parent, keywords_child)
+        
+        if not exclude_prod and not exclude_prod_from_keywords:
+            final_parts.append("Prod")
         
         if not exclude_prod:
             final_parts.append("Prod")
@@ -1043,6 +1049,28 @@ def get_plural_form(word):
     # If not found, return original word
     return word
 
+def should_exclude_prod_based_on_keywords(keywords_parent, keywords_child):
+    """Check if any keyword should exclude Prod from name"""
+    no_prod_keywords = [
+        "hardware", "mailbox", "network", "mobile", "security",
+        "onboarding", "offboarding", "employee", "whitelist", 
+        "blacklist", "blacklist/whitelist", "generic"
+    ]
+    
+    # Combine all keywords
+    all_keywords = []
+    if keywords_parent:
+        all_keywords.extend([k.strip().lower() for k in keywords_parent.replace(',', '\n').split('\n') if k.strip()])
+    if keywords_child:
+        all_keywords.extend([k.strip().lower() for k in keywords_child.replace(',', '\n').split('\n') if k.strip()])
+    
+    # Check if any keyword matches no_prod_keywords
+    for keyword in all_keywords:
+        for no_prod in no_prod_keywords:
+            if no_prod in keyword or keyword in no_prod:
+                return True
+    return False
+
 def run_generator(
     keywords_parent, keywords_child, new_apps, schedule_suffixes,
     delivery_manager, global_prod,
@@ -1056,7 +1084,7 @@ def run_generator(
     rsp_schedule="", rsl_schedule="",
     rsp_priority="", rsl_priority="",
     rsp_time="", rsl_time="",
-    require_corp_it=False, require_corp_dedicated=False, require_dedicated=False,  # <-- ADD require_dedicated=False
+    require_corp_it=False, require_corp_dedicated=False, require_dedicated=False,
     use_new_parent=False, new_parent_offering="", new_parent="",
     keywords_excluded="",
     use_lvl2=False, service_type_lvl2="",
@@ -1071,7 +1099,7 @@ def run_generator(
     approval_groups_per_app=None,
     change_subscribed_location=False,
     custom_subscribed_location="Global",
-    use_pluralization=True):  # Add this parameter with default True
+    use_pluralization=True):
     """
     Main generator function.
     """
@@ -1569,11 +1597,11 @@ def run_generator(
                                         # Build new parent offering with updated division
                                         new_parent_offering_str = f"[Parent {' '.join(new_parts)}] {catalog_name}"
                                         new_name = build_standard_name(
-                                            new_parent_offering_str, sr_or_im, app, schedule_suffix, special_dept, recv
+                                            new_parent_offering_str, sr_or_im, app, schedule_suffix, special_dept, recv, keywords_parent, keywords_child
                                         )
                                     else:
                                         new_name = build_standard_name(
-                                            parent_full, sr_or_im, app, schedule_suffix, special_dept, recv
+                                            parent_full, sr_or_im, app, schedule_suffix, special_dept, recv, keywords_parent, keywords_child
                                         )
                                 
                                 # Normalize the name for comparison (remove extra spaces)

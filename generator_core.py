@@ -2130,7 +2130,22 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
         name_parts.append(app)
     if sr_or_im == "IM":
         name_parts.append("solving")
-    name_parts.append("Prod")
+    
+    # Safety buffer - keywords that should NEVER have "Prod"
+    no_prod_keywords = ["hardware", "incident", "network", "mailbox", "telephone", "security", "mobile"]
+    
+    # Check if original parent offering contains "Prod" AND none of the excluded keywords
+    parent_offering_lower = parent_offering.lower()
+    catalog_name_lower = catalog_name.lower()
+    
+    # Check if any excluded keyword is present
+    exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 
+                      for keyword in no_prod_keywords)
+    
+    # Only add "Prod" if it was in original AND no excluded keywords found
+    if "Prod" in parent_offering and not exclude_prod:
+        name_parts.append("Prod")
+    
     name_parts.append(schedule_suffix)
     final_name = " ".join(name_parts)
     return ensure_incident_naming(final_name)

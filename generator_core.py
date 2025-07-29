@@ -14,22 +14,6 @@ import streamlit as st  # Add this import
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
-# Global constant for keywords that exclude "Prod" from offering names
-NO_PROD_KEYWORDS = [
-    "hardware",           # Hardware items
-    "mailbox",           # Email/mailbox related
-    "network",           # Network infrastructure
-    "mobile",            # Mobile devices/services
-    "security",          # Security related offerings
-    "onboarding",        # Employee onboarding
-    "offboarding",       # Employee offboarding
-    "employee",          # General employee services
-    "whitelist",         # Access control lists
-    "blacklist",         # Access control lists
-    "blacklist/whitelist",  # Combined access control
-    "generic"            # Generic services
-]
-
 need_cols = [
     "Name (Child Service Offering lvl 1)", "Parent Offering",
     "Service Offerings | Depend On (Application Service)", "Service Commitments",
@@ -208,12 +192,9 @@ def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_typ
     if app:
         name_parts.append(app)
     
-    # Check if name contains keywords that exclude "Prod"
+    # Check if name contains Microsoft - if so, don't add Prod
     name_so_far = " ".join(name_parts).lower()
-    should_exclude_prod = any(keyword in name_so_far or keyword in parent_offering.lower() 
-                             for keyword in NO_PROD_KEYWORDS)
-    
-    if not should_exclude_prod:
+    if "microsoft" not in name_so_far:
         name_parts.append("Prod")
     
     # Add service type if provided (e.g., "Application issue")
@@ -456,11 +437,12 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             break
     
     # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
+    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security", "onboarding", "offboarding"]
     parent_lower = parent_offering.lower()
     catalog_lower = catalog_name.lower()
     parent_content_lower = parent_content.lower()
     exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
-                      for keyword in NO_PROD_KEYWORDS)
+                      for keyword in no_prod_keywords)
     
     if special_dept == "Medical":
         # Extract division and country from parent content
@@ -649,9 +631,9 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Check if topic contains any no-prod keywords
         topic_lower = topic.lower() if topic else ""
-        topic_exclude_prod = any(keyword in topic_lower for keyword in NO_PROD_KEYWORDS)
+        topic_exclude_prod = any(keyword in topic_lower for keyword in no_prod_keywords)
         
-        # Only add Prod if no keywords in any source
+        # Only add Prod if no hardware/mailbox/network/mobile/security keywords in any source
         if not exclude_prod and not topic_exclude_prod:
             name_parts.append("Prod")
         
@@ -712,7 +694,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         
         # Check if we should add Prod
         catalog_lower = catalog_name.lower()
-        exclude_prod = any(keyword in catalog_lower for keyword in NO_PROD_KEYWORDS)
+        exclude_prod = any(keyword in catalog_lower for keyword in ["hardware", "mailbox", "network", "mobile", "security", "onboarding", "offboarding"])
         
         # Add app if provided
         if app:
@@ -1646,98 +1628,95 @@ def run_generator(
                                 # For DE, limit groups to those matching the current receiver if any, else keep all
                                 if country == "DE" and recv:
                                     prefix = recv
-                                    # Filter support groups to only those that match the receiver
-                                    support_groups_list = [sg for sg in support_groups_list if sg[0].startswith(prefix)]
+                                    matching = [(sg, mg) for sg, mg in support_groups_list
+                                                if sg.strip().startswith(prefix)]
+                                    if matching:
+                                        support_groups_list = matching
                                 
-                                # Apply support groups - take the first available group for each
-                                if support_groups_list:
-                                    # For PL, directly use the receiver-specific support group
-                                    if country == "PL":
-                                        sg, mg = support_groups_list[0]
-                                        support_group_for_country = sg
-                                        managed_by_group_for_country = mg
-                                    else:
-                                        # For other countries, use the existing logic
-                                        support_group_for_country = support_groups_list[0][0]
-                                        managed_by_group_for_country = support_groups_list[0][1] if len(support_groups_list[0]) > 1 else ""
-                                else:
-                                    support_group_for_country = ""
-                                    managed_by_group_for_country = ""
-                                
-                                # Update the row with new values
-                                key = f"{new_name_normalized}_{app}_{schedule_suffix}"
-                                if key in seen:
-                                    raise ValueError(f"Duplicate detected: {key}")
-                                seen.add(key)
-                                row = base_row_df.copy()
-                                
-                                # Update the name
-                                row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
-                                
-                                # UPROSZCZONA LOGIKA DLA KOLUMNY PARENT
-                                if use_new_parent:
-                                    # W trybie "New Parent", base_row jest syntetyczny i zawiera nowego parenta z UI.
-                                    # Musimy jawnie ustawić tę wartość w generowanym wierszu.
-                                    row.loc[:, "Parent"] = base_row.get("Parent", "")
-                                # W trybie standardowym, `row` jest już kopią `base_row` i zawiera
-                                # prawidłową wartość "Parent". Nie ma potrzeby jej ponownie przypisywać.
-
-                                row.loc[:, "Delivery Manager"] = delivery_manager
-                                
-                                # Apply business criticality if provided
-                                if business_criticality:
-                                    row.loc[:, "Business Criticality"] = business_criticality
-                                # Otherwise, keep the original value from source file
-                                
-                                # Set Record view based on SR/IM selection
-                                if sr_or_im == "SR":
-                                    row.loc[:, "Record view"] = "Request Item"
-                                elif sr_or_im == "IM":
-                                    row.loc[:, "Record view"] = "Incident, Major Incident"
-                                
-                                # Set Approval required with conditional value
-                                if approval_required:
-                                    row.loc[:, "Approval required"] = "true"  # Always use "true" when checkbox is ticked
+                                # Create offerings for each support group combination
+                                for support_group_for_country, managed_by_group_for_country in support_groups_list:
+                                    # Skip duplicates based on name, receiver, app, schedule, support and managed groups
+                                    key = (
+                                        new_name_normalized,
+                                        recv,
+                                        app,
+                                        schedule_suffix,
+                                        support_group_for_country,
+                                        managed_by_group_for_country
+                                    )
                                     
-                                    # Use per-app approval group if configured, otherwise use global value
-                                    if approval_groups_per_app and app in approval_groups_per_app:
-                                        app_approval_group = approval_groups_per_app[app].strip()
-                                        # Keep empty if the user left it empty - don't force to "empty"
-                                        row.loc[:, "Approval group"] = app_approval_group
-                                    else:
-                                        # If no per-app configuration exists, use global value (but not "PER_APP")
-                                        if approval_required_value and approval_required_value != "PER_APP":
-                                            row.loc[:, "Approval group"] = approval_required_value
+                                    if key in seen:
+                                        continue
+                                    seen.add(key)
+                                    row = base_row_df.copy()
+                                    
+                                    # Update the name
+                                    row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
+                                    
+                                    # UPROSZCZONA LOGIKA DLA KOLUMNY PARENT
+                                    if use_new_parent:
+                                        # W trybie "New Parent", base_row jest syntetyczny i zawiera nowego parenta z UI.
+                                        # Musimy jawnie ustawić tę wartość w generowanym wierszu.
+                                        row.loc[:, "Parent"] = base_row.get("Parent", "")
+                                    # W trybie standardowym, `row` jest już kopią `base_row` i zawiera
+                                    # prawidłową wartość "Parent". Nie ma potrzeby jej ponownie przypisywać.
+
+                                    row.loc[:, "Delivery Manager"] = delivery_manager
+                                    
+                                    # Apply business criticality if provided
+                                    if business_criticality:
+                                        row.loc[:, "Business Criticality"] = business_criticality
+                                    # Otherwise, keep the original value from source file
+                                    
+                                    # Set Record view based on SR/IM selection
+                                    if sr_or_im == "SR":
+                                        row.loc[:, "Record view"] = "Request Item"
+                                    elif sr_or_im == "IM":
+                                        row.loc[:, "Record view"] = "Incident, Major Incident"
+                                    
+                                    # Set Approval required with conditional value
+                                    if approval_required:
+                                        row.loc[:, "Approval required"] = "true"  # Always use "true" when checkbox is ticked
+                                        
+                                        # Use per-app approval group if configured, otherwise use global value
+                                        if approval_groups_per_app and app in approval_groups_per_app:
+                                            app_approval_group = approval_groups_per_app[app].strip()
+                                            # Keep empty if the user left it empty - don't force to "empty"
+                                            row.loc[:, "Approval group"] = app_approval_group
                                         else:
-                                            # Keep empty instead of forcing "empty"
-                                            row.loc[:, "Approval group"] = ""
-                                else:
-                                    row.loc[:, "Approval required"] = "false"
-                                    row.loc[:, "Approval group"] = "empty"  # Use literal "empty" when not required
-                                
-                                # Set Subscribed by Location based on user choice or original value
-                                if change_subscribed_location:
-                                    row.loc[:, "Subscribed by Location"] = custom_subscribed_location
-                                elif not use_new_parent:
-                                    # Copy from original file if not using new parent
-                                    row.loc[:, "Subscribed by Location"] = base_row.get("Subscribed by Location", "")
-                                else:
-                                    # Default to "Global" if synthetic row
-                                    row.loc[:, "Subscribed by Location"] = "Global"
-                                
-                                # Apply support group and managed by group
-                                row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
-                                row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
-                                
-                                # Handle aliases
-                                exact_column_name = "Aliases (u_label) - ENG"
-                                if exact_column_name not in row.columns:
-                                    row[exact_column_name] = ""
-                                if aliases_on and aliases_value == "USE_APP_NAMES":
-                                    row.loc[:, exact_column_name] = app if app else ""
-                                else:
-                                    # Kopiuj z oryginalnego pliku
-                                    row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
+                                            # If no per-app configuration exists, use global value (but not "PER_APP")
+                                            if approval_required_value and approval_required_value != "PER_APP":
+                                                row.loc[:, "Approval group"] = approval_required_value
+                                            else:
+                                                # Keep empty instead of forcing "empty"
+                                                row.loc[:, "Approval group"] = ""
+                                    else:
+                                        row.loc[:, "Approval required"] = "false"
+                                        row.loc[:, "Approval group"] = "empty"  # Use literal "empty" when not required
+                                    
+                                    # Set Subscribed by Location based on user choice or original value
+                                    if change_subscribed_location:
+                                        row.loc[:, "Subscribed by Location"] = custom_subscribed_location
+                                    elif not use_new_parent:
+                                        # Copy from original file if not using new parent
+                                        row.loc[:, "Subscribed by Location"] = base_row.get("Subscribed by Location", "")
+                                    else:
+                                        # Default to "Global" if synthetic row
+                                        row.loc[:, "Subscribed by Location"] = "Global"
+                                    
+                                    # Apply support group and managed by group
+                                    row.loc[:, "Support group"] = support_group_for_country if support_group_for_country else ""
+                                    row.loc[:, "Managed by Group"] = managed_by_group_for_country if managed_by_group_for_country else ""
+                                    
+                                    # Handle aliases
+                                    exact_column_name = "Aliases (u_label) - ENG"
+                                    if exact_column_name not in row.columns:
+                                        row[exact_column_name] = ""
+                                    if aliases_on and aliases_value == "USE_APP_NAMES":
+                                        row.loc[:, exact_column_name] = app if app else ""
+                                    else:
+                                        # Kopiuj z oryginalnego pliku
+                                        row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
                                     # Handle DE special cases
                                     if country == "DE":
                                         ldap_cols = [col for col in row.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]

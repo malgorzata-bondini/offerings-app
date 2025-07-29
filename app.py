@@ -190,10 +190,10 @@ with col2:
         if use_new_parent:
             st.info("📝 Enter the exact Parent Offering and Parent values to use")
             
-            # ⭐ DODAJ TEN CHECKBOX TUTAJ
+            # ⭐ ZMIENIONY CHECKBOX - domyślnie ODZNACZONY
             add_prod_to_dedicated = st.checkbox(
                 "Add 'Prod' to generated names", 
-                value=True,
+                value=False,  # ⭐ ZMIENIONO z True na False
                 help="When unchecked, 'Prod' won't be added to generated names (safety buffer still applies for hardware, incident, etc.)"
             )
             
@@ -741,8 +741,9 @@ st.markdown("---")
 
 # MODIFY THIS VALIDATION SECTION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
-    # Define add_prod_to_dedicated before using it
-    add_prod_to_dedicated = True  # or set to False if that's the default you want
+    # Define add_prod_to_dedicated before using it - POPRAWIONY DEFAULT
+    if 'add_prod_to_dedicated' not in locals():
+        add_prod_to_dedicated = False  # ⭐ ZMIENIONO z True na False
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
     elif use_new_parent and (not new_parent_offerings or not new_parents):

@@ -437,7 +437,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             break
     
     # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
-    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security"]
+    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security", "onboarding", "offboarding", "generic request", "restore from backup", "change employee information"]
     parent_lower = parent_offering.lower()
     catalog_lower = catalog_name.lower()
     parent_content_lower = parent_content.lower()
@@ -625,7 +625,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         topic_lower = topic.lower() if topic else ""
         topic_exclude_prod = any(keyword in topic_lower for keyword in no_prod_keywords)
         
-        # Only add Prod if user wants it AND no hardware/mailbox/network/mobile/security keywords in any source
+        # Only add Prod if user wants it AND no forbidden keywords in any source
         if add_prod and not exclude_prod and not topic_exclude_prod:
             name_parts.append("Prod")
         
@@ -706,7 +706,7 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
         if sr_or_im == "IM":
             final_parts.append("solving")
         
-        # Only add Prod if user wants it AND no hardware/mailbox/network/mobile/security keywords
+        # Only add Prod if user wants it AND no forbidden keywords
         if add_prod and not exclude_prod:
             final_parts.append("Prod")
         
@@ -1166,8 +1166,8 @@ def run_generator(
                         break
                 if not found:
                     return False
-        
-        return True
+    
+    return True
 
     def row_excluded_keywords_ok(row):
         """Check if row should be excluded based on excluded keywords"""
@@ -2106,6 +2106,15 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
         elif part not in ["HS", "DS", "Parent", "RecP"] and not (len(part) == 2 and part.isupper()):
             topic = part
             break
+    
+    # Check for forbidden keywords that should never have "Prod"
+    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security", "onboarding", "offboarding", "generic request", "restore from backup", "change employee information"]
+    parent_lower = parent_offering.lower()
+    catalog_lower = catalog_name.lower()
+    parent_content_lower = parent_content.lower()
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                      for keyword in no_prod_keywords)
+    
     prefix_parts = [sr_or_im]
     division, country_code = get_division_and_country(parent_content, country, delivering_tag)
     if delivering_tag:
@@ -2124,8 +2133,8 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
         name_parts.append(app)
     if sr_or_im == "IM":
         name_parts.append("solving")
-    # Add Prod only if user wants it
-    if add_prod:
+    # Add Prod only if user wants it AND no forbidden keywords
+    if add_prod and not exclude_prod:
         name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     final_name = " ".join(name_parts)

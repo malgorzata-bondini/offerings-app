@@ -593,7 +593,7 @@ with col2:
         elif all_selected == 0:
             st.info("📌 Standard naming will be used")
         
-        if require_corp or require_recp or require_corp_it or require_corp_dedicated or require_dedicated:  # <-- ADD require_dedicated
+        if require_corp or require_recp or require_corp_it or require_corp_dedicated:  # <-- REMOVE require_dedicated
             delivering_tag = st.text_input(
                 "Who delivers the service", 
                 value="",

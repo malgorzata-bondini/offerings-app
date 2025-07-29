@@ -730,6 +730,9 @@ with col2:
         use_per_country_aliases = False
         aliases_per_country = {}
 
+# NEW CHECKBOX FOR ADDING 'PROD'
+add_prod = st.checkbox("Add 'Prod' to names", value=True, help="Whether to include 'Prod' in generated service offering names")
+
 st.markdown("---")
 
 # MODIFY THIS VALIDATION SECTION

@@ -1289,9 +1289,9 @@ def run_generator(
 
     def name_prefix_ok(name):
         # Make prefix check case-insensitive and handle extra spaces
-        name = name.strip()
-        # Check if name starts with [SR or [IM (case-insensitive)
-        return name.upper().startswith(f"[{sr_or_im.upper()} ") or name.upper().startswith(f"[{sr_or_im.upper()}\t")
+        name = name.strip().upper()
+        # Check if name starts with [Parent, [SR, or [IM (case-insensitive)
+        return name.startswith('[PARENT ') or name.startswith(f"[{sr_or_im.upper()} ")
 
     # Process apps - split on comma, newline, or semicolon
     all_apps = []
@@ -1495,8 +1495,7 @@ def run_generator(
                         mask = (df.apply(row_keywords_ok, axis=1)
                                 & df.apply(row_excluded_keywords_ok, axis=1)
                                 & df["Name (Child Service Offering lvl 1)"].astype(str).apply(name_prefix_ok)
-                                & df.apply(lc_ok, axis=1)
-                                & (df["Service Commitments"].astype(str).str.strip().replace({"nan": ""}) != "-"))
+                                & df.apply(lc_ok, axis=1))
 
                     base_pool = df.loc[mask]
                     print(f"Final matching rows: {len(base_pool)}")

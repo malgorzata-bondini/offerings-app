@@ -436,18 +436,22 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             country = part
             break
     
-    # Check for specific catalog names that should NOT have "Prod"
-    no_prod_catalog_names = [
+    # Check for specific catalog phrases that should NOT have "Prod"
+    no_prod_catalog_phrases = [
         "onboarding of an employee",
         "offboarding of an employee", 
         "change employee information",
         "restore from backup",
         "blacklist/whitelist email or website",
-        "generic request"
+        "generic request",
+        "granting permissions for onboarding",
+        "granting permissions for offboarding", 
+        "revoking permissions of offboarding",
+        "revoking permissions for offboarding"
     ]
     
     catalog_lower = catalog_name.lower()
-    exclude_prod_by_catalog = any(no_prod_name in catalog_lower for no_prod_name in no_prod_catalog_names)
+    exclude_prod_by_catalog = any(phrase in catalog_lower for phrase in no_prod_catalog_phrases)
     
     # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
     no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security"]

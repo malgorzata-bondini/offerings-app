@@ -437,7 +437,11 @@ def build_standard_name(parent_offering, sr_or_im, app, schedule_suffix, special
             break
     
     # Check if catalog name, parent offering, or parent content contains keywords that exclude "Prod"
-    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security"]
+    no_prod_keywords = [
+        "hardware", "mailbox", "network", "mobile", "security",
+        "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
+        "blacklist/whitelist", "generic"
+    ]
     parent_lower = parent_offering.lower()
     catalog_lower = catalog_name.lower()
     parent_content_lower = parent_content.lower()
@@ -2132,8 +2136,14 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
     if sr_or_im == "IM":
         name_parts.append("solving")
     
-    # Bufor bezpieczeństwa - zachowany!
-    no_prod_keywords = ["hardware", "incident", "network", "mailbox", "telephone", "security", "mobile"]
+    # ⭐ ROZSZERZONA LISTA SŁÓW KLUCZOWYCH BLOKUJĄCYCH "PROD"
+    no_prod_keywords = [
+        "hardware", "mailbox", "network", "mobile", "security",
+        "onboarding", "offboarding", "employee", "whitelist", "blacklist", 
+        "blacklist/whitelist", "generic"
+    ]
+    
+    # Check if any excluded keyword is present
     parent_offering_lower = parent_offering.lower()
     catalog_name_lower = catalog_name.lower()
     exclude_prod = any(keyword in parent_offering_lower or keyword in catalog_name_lower 

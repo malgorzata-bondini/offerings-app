@@ -3,11 +3,7 @@ import pandas as pd
 from pathlib import Path
 import shutil
 import tempfile
-
-# Create a placeholder function for run_generator
-def run_generator(**kwargs):
-    """Placeholder function for run_generator - replace with actual implementation"""
-    raise NotImplementedError("The run_generator function needs to be implemented or the generator_core module needs to be available")
+from generator_core import run_generator
 
 # Add pluralization function AFTER imports
 def get_plural_form_preview(word):

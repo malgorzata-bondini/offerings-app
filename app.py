@@ -94,7 +94,7 @@ with col2:
             "Business Criticality",
             options=["", "1 - most critical", "2 - somewhat critical", "3 - less critical", "4 - not critical"],
             index=0,
-            help="Set Business Criticality for all generated offerings. If empty, original values from source files will be preserved."
+            help="Set Business Criticality for all generated offerings. If empty, original values from source files will be used."
         )
         
         # Add Approval Required control
@@ -152,7 +152,7 @@ with col2:
         change_subscribed_location = st.checkbox(
             "Change Subscribed by Location",
             value=False,
-            help="By default, Subscribed by Location will be set to 'Global'."
+            help="By default, Subscribed by Location will be set to 'Global'"
         )
         
         if change_subscribed_location:
@@ -169,7 +169,7 @@ with col2:
         st.markdown("---")
         use_lvl2 = st.checkbox(
             "Include Level 2 (Child SO lvl2)",
-            help="When checked, search in BOTH Child SO lvl1 AND Child SO lvl2 sheets in Excel."
+            help="When checked, search in BOTH Child SO lvl1 AND Child SO lvl2 sheets in Excel"
         )
         
         if use_lvl2:
@@ -376,7 +376,7 @@ with col2:
                         else:
                             schedule_settings_per_country[country] = country_schedules.strip()
         
-        st.markdown("-")
+        st.markdown("### SLA")
         col_rsp, col_rsl = st.columns(2)
         with col_rsp:
             rsp_duration = st.text_input("RSP Duration", value="")
@@ -594,7 +594,7 @@ with col2:
             # Reset all to handle multiple selection
             require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = require_dedicated = False  # <-- ADD require_dedicated
         elif all_selected == 0:
-            st.info("Standard naming will be used")
+            st.info("Standard naming will be used if nothing is selected")
         
         if require_corp or require_recp or require_corp_it or require_corp_dedicated:  # <-- REMOVE require_dedicated
             delivering_tag = st.text_input(
@@ -611,15 +611,15 @@ with col2:
     with tab7:
         # Global settings - MOVED TO TOP
         st.markdown("### Global")
-        global_prod = st.checkbox("Global Prod", value=False, key="global_prod_checkbox")
+        global_prod = st.checkbox("Global Prod value for Service Offerings column", value=False, key="global_prod_checkbox")
         
         # Remove pluralization checkbox - always use pluralization
         use_pluralization = True  # Always enabled
         
         # Custom Depend On setting - NOW AFTER GLOBAL SETTINGS
         st.markdown("### Service Offerings | Depend On")
-        use_custom_depend_on = st.checkbox("Use custom 'Service Offerings | Depend On' value", value=False, 
-                                          help="Override automatic generation")
+        use_custom_depend_on = st.checkbox("Use custom value for column 'Service Offerings | Depend On'", value=False, 
+                                          help="Overrides automatic value based on selected prefix and applications")
         
         if use_custom_depend_on:
             col1, col2 = st.columns([1, 2])
@@ -711,7 +711,7 @@ with col2:
         # Option to use same values as app names - GŁÓWNY CHECKBOX
         use_same_as_apps = st.checkbox("Use same values as Application Names", 
                                       value=False,
-                                      help="When checked, aliases will automatically use the same values as the application names in ENG column for English ONLY")
+                                      help="When checked, aliases will automatically use the same values as the application names but for English names ONLY")
 
         if use_same_as_apps:
             # Auto-enable aliases and set to use app names

@@ -112,9 +112,9 @@ with col2:
             if not use_per_app_approval:
                 # Single approval group for all apps
                 approval_required_value = st.text_input(
-                    "Approval Required Details",
+                    "Approval Details",
                     value="",
-                    placeholder="Enter approval details",
+                    placeholder="Enter approval group name",
                     help="Same approval group for all applications"
                 )
                 approval_groups_per_app = {}

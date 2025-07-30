@@ -7,7 +7,7 @@ from generator_core import run_generator
 
 # Add pluralization function AFTER imports
 def get_plural_form_preview(word):
-    """Get plural form for preview - simplified version"""
+    """Get plural form for preview"""
     plural_map = {
         "Laptop": "Laptops", "Desktop": "Desktops", "Docking station": "Docking stations",
         "Printer": "Printers", "Barcode printer": "Barcode printers", "Barcode scanner": "Barcode scanners",
@@ -36,7 +36,7 @@ with col1:
         "Upload ALL_Service_Offering Excel files",
         type=["xlsx"],
         accept_multiple_files=True,
-        help="Upload one or more Excel files with naming pattern: ALL_Service_Offering_*.xlsx"
+        help="Upload one or more Excel files with this naming pattern: ALL_Service_Offering_*.xlsx"
     )
     
     if uploaded_files:
@@ -47,7 +47,7 @@ with col1:
 with col2:
     st.header("⚙️ Configuration")
     
-    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "New Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Advanced"])
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["Basic", "New Parent Offering", "Schedule", "Service Commitments", "Groups", "Naming", "Other settings"])
     
     with tab1:
         st.subheader("Basic Settings")
@@ -55,35 +55,35 @@ with col2:
         keywords_parent = st.text_area(
             "Keywords in Parent Offering",
             value="",
-            placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
-            help="Filter by Parent Offering column"
+            placeholder="Enter keywords (one per line for OR, comma separated for AND)",
+            help="Filter by Parent Offering column in Excel"
         )
         
         keywords_child = st.text_area(
             "Keywords in Name (Child Service Offering lvl 1)",
             value="",
             placeholder="Enter keywords (one per line for OR, comma-separated for AND)",
-            help="Filter by Child Service Offering Name column"
+            help="Filter by Child Service Offering Name column in Excel"
         )
         
         keywords_excluded = st.text_area(
             "Keywords to Exclude",
             value="",
-            placeholder="Enter keywords to exclude (one per line for OR, comma-separated for AND)",
-            help="Exclude rows containing these keywords in either Parent Offering or Child Name"
+            placeholder="Enter keywords to exclude from the search(one per line for OR, comma-separated for AND)",
+            help="Exclude rows containing these keywords in either Parent Offering or Child Name column"
         )
         
         new_apps = st.text_area(
-            "Applications (one per line or comma-separated)",
+            "Applications/Other (one per line or comma-separated)",
             value="",
-            help="Optional - Enter application names. If empty, offerings will be created without application names"
+            help="It's optional - enter application names. If empty, offerings will be created without the names"
         ).strip().split('\n')
         new_apps = [a.strip() for a in new_apps if a.strip()]
         
         sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
         
         # Add Prod checkbox right after Service Type
-        add_prod = st.checkbox("Add 'Prod' to names", value=True, help="Whether to include 'Prod' in generated service offering names")
+        add_prod = st.checkbox("Add 'Prod' to naming convention", value=True, help="Decide whether to include 'Prod' in generated service offering names")
         
         # Move Delivery Manager here - right after Service Type
         delivery_manager = st.text_input("Delivery Manager", value="")
@@ -101,7 +101,7 @@ with col2:
         approval_required = st.checkbox(
             "Approval Required",
             value=False,
-            help="Set Approval Required to true for all generated offerings. Default is false."
+            help="Set Approval Required to true for all generated offerings. Default is always false."
         )
         
         # Add conditional controls for approval required details
@@ -114,14 +114,14 @@ with col2:
                 approval_required_value = st.text_input(
                     "Approval Required Details",
                     value="",
-                    placeholder="Enter approval details (e.g., 'Manager approval needed')",
+                    placeholder="Enter approval details",
                     help="Same approval group for all applications"
                 )
                 approval_groups_per_app = {}
             else:
                 # Per-app approval groups
                 st.markdown("#### Approval Groups by Application")
-                st.info("Configure specific approval groups for each application. Leave empty if no approval group is needed for that application.")
+                st.info("Configure specific approval groups for each application. Leave empty if no approval group is known.")
                 
                 approval_groups_per_app = {}
                 
@@ -136,10 +136,10 @@ with col2:
                                 f"Approval Group for {app}",
                                 value="",
                                 key=f"approval_{app}",
-                                placeholder=f"e.g., {app} Department Heads (leave empty if not needed)"
+                                placeholder=f"e.g., {app} leave empty if not needed)"
                             )
                 else:
-                    st.warning("⚠️ No applications defined. Add applications in Basic tab first.")
+                    st.warning("No applications defined. Add applications in Basic tab first.")
                 
                 # Set global approval value to empty for per-app mode
                 approval_required_value = "PER_APP"
@@ -152,15 +152,15 @@ with col2:
         change_subscribed_location = st.checkbox(
             "Change Subscribed by Location",
             value=False,
-            help="By default, Subscribed by Location will be set to 'Global'. Check this to specify a custom value."
+            help="By default, Subscribed by Location will be set to 'Global'."
         )
         
         if change_subscribed_location:
             custom_subscribed_location = st.text_input(
                 "Subscribed by Location",
                 value="",
-                placeholder="Enter custom location (e.g., 'DE', 'PL', 'Regional')",
-                help="Custom value for Subscribed by Location column"
+                placeholder="Enter custom location",
+                help="Custom value for Subscribed by Location column in Excel"
             )
         else:
             custom_subscribed_location = "Global"
@@ -169,7 +169,7 @@ with col2:
         st.markdown("---")
         use_lvl2 = st.checkbox(
             "Include Level 2 (Child SO lvl2)",
-            help="When checked, search in BOTH Child SO lvl1 AND Child SO lvl2 sheets."
+            help="When checked, search in BOTH Child SO lvl1 AND Child SO lvl2 sheets in Excel."
         )
         
         if use_lvl2:
@@ -177,7 +177,7 @@ with col2:
                 "Service Type (for Lvl2 entries)",
                 value="",
                 placeholder="e.g., Application issue, Hardware problem",
-                help="Optional - This will be added to Lvl2 entries after Prod and before the schedule"
+                help="Optional - this will be added to Lvl2 entries"
             )
         else:
             service_type = ""
@@ -186,8 +186,8 @@ with col2:
         st.subheader("Direct Parent Offering Selection")
         
         use_new_parent = st.checkbox(
-            "Use specific parent offering (instead of parent keyword search)",
-            help="When checked, you can enter a completely new Parent Offering and Parent name"
+            "Use NEW specific parent offering (instead of parent keyword search in Excel)",
+            help="When checked, you can enter a completely new Parent Offering and Parent name - not inclided in the file yet"
         )
         
         if use_new_parent:
@@ -197,7 +197,7 @@ with col2:
             if 'parent_offerings' not in st.session_state:
                 st.session_state.parent_offerings = [{"offering": "", "parent": ""}]
             
-            st.markdown("### Parent Offering Pairs")
+            st.markdown("### Parent Offering")
             
             # Display existing pairs
             for i, pair in enumerate(st.session_state.parent_offerings):
@@ -215,7 +215,7 @@ with col2:
                     pair["parent"] = st.text_input(
                         "New Parent",
                         value=pair["parent"],
-                        placeholder="e.g., PL IT Support",
+                        placeholder="e.g., PL Software Support",
                         key=f"parent_{i}"
                     )
                 
@@ -247,7 +247,7 @@ with col2:
                 st.success("✅ **Preview of Parent Offering pairs:**")
                 for i, pair in enumerate(st.session_state.parent_offerings):
                     if pair["offering"] and pair["parent"]:
-                        st.write(f"{i+1}. **Parent Offering:** `{pair['offering']}` → **New Parent:** `{pair['parent']}`")
+                        st.write(f"{i+1}. Parent Offering: `{pair['offering']}` → New Parent: `{pair['parent']}`")
         else:
             new_parent_offerings = ""
             new_parents = ""
@@ -341,11 +341,11 @@ with col2:
         st.markdown("---")
         
         # Schedule Settings per Country
-        use_per_country_schedules = st.checkbox("Use different schedules per country/division", help="Define specific schedules for different countries or divisions")
+        use_per_country_schedules = st.checkbox("Use different schedules per country", help="Define specific schedules for different countries")
         schedule_settings_per_country = {}
         
         if use_per_country_schedules:
-            st.markdown("**Schedule Settings per Country/Division**")
+            st.markdown("Schedule Settings per Country")
             
             # Define available countries/divisions - UPDATED with new countries
             available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "DS CY", "DS RO", "DS TR"]
@@ -355,7 +355,7 @@ with col2:
             
             for idx, country in enumerate(available_countries):
                 with country_tabs[idx]:
-                    st.markdown(f"**{country} Schedules**")
+                    st.markdown(f"{country} Schedules")
                     
                     country_schedules = st.text_area(
                         f"Schedules for {country}",
@@ -376,7 +376,7 @@ with col2:
                         else:
                             schedule_settings_per_country[country] = country_schedules.strip()
         
-        st.markdown("---")
+        st.markdown("-")
         col_rsp, col_rsl = st.columns(2)
         with col_rsp:
             rsp_duration = st.text_input("RSP Duration", value="")
@@ -386,22 +386,22 @@ with col2:
     with tab4:
         st.subheader("Service Commitments")
         
-        use_custom_commitments = st.checkbox("Define custom Service Commitments", help="If unchecked, commitments will be copied from source files")
+        use_custom_commitments = st.checkbox("Define custom Service Commitments", help="If unchecked, commitments will be copied from the source files")
         
         if use_custom_commitments:
             # UPDATED country list with RO and TR
             commitment_country = st.selectbox("Country", ["CY", "DE", "MD", "PL", "RO", "TR", "UA"])
             
-            st.markdown("### Service Commitments Configuration")
+            st.markdown("Service Commitments Configuration")
             
             # Initialize commitment lines list
             commitment_lines = []
             
             # Create multiple commitment entries
-            num_commitments = st.number_input("Number of commitment lines", min_value=1, max_value=10, value=2)
+            num_commitments = st.number_input("Number of commitment", min_value=1, max_value=10, value=2)
             
             for i in range(num_commitments):
-                st.markdown(f"#### Commitment Line {i+1}")
+                st.markdown(f"Commitment Line {i+1}")
                 col1, col2, col3, col4 = st.columns([1, 1, 2, 1])
                 
                 with col1:
@@ -468,15 +468,15 @@ with col2:
             managed_by_group = st.text_input(
                 "Managed by Group", 
                 value="",
-                help="Optional - if empty, will use Support Group value"
+                help="Optional - if empty, Support Group value will be copied"
             )
             # Store as single values for backward compatibility
             support_groups_per_country = {}
             managed_by_groups_per_country = {}
         else:
             # Per-country support groups
-            st.markdown("#### Support Groups by Country")
-            st.info("Select countries to configure specific support groups. Unchecked countries will use empty support groups.")
+            st.markdown("Support Groups by Country")
+            st.info("Select countries to configure.")
             
             # UPDATED countries list with new DS-only countries
             countries = ["HS PL", "DS PL", "DE", "UA", "MD", "DS CY", "DS RO", "DS TR"]
@@ -518,7 +518,7 @@ with col2:
                                     f"Managed by Group {group_idx + 1}",
                                     value="",
                                     key=f"managed_DE_{group_idx}",
-                                    placeholder=f"Optional - defaults to Support Group if empty",
+                                    placeholder=f"Optional - uses Support Group if empty",
                                     help="If empty, will use the Support Group value"
                                 )
                                 
@@ -550,7 +550,7 @@ with col2:
                                 f"Managed by Group",
                                 value="",
                                 key=f"managed_{country}",
-                                placeholder=f"Optional - defaults to Support Group if empty",
+                                placeholder=f"Optional - uses Support Group if empty",
                                 help="If empty, will use the Support Group value"
                             )
                     else:
@@ -571,7 +571,7 @@ with col2:
             managed_by_group = ""
     
     with tab6:
-        st.subheader("Select naming convention:")
+        st.subheader("Select proper naming convention:")
         
         # Create a column to ensure vertical layout - ALPHABETICAL ORDER
         col = st.container()
@@ -581,7 +581,7 @@ with col2:
             require_recp = st.checkbox("CORP RecP")
             require_corp_dedicated = st.checkbox("CORP Dedicated Services")
             require_corp_it = st.checkbox("CORP IT")
-            require_dedicated = st.checkbox("Dedicated Services")  # <-- ADD THIS LINE
+            require_dedicated = st.checkbox("Dedicated Services")
             special_dak = st.checkbox("DAK (Business Services)")
             special_hr = st.checkbox("HR")
             special_it = st.checkbox("IT")
@@ -594,11 +594,11 @@ with col2:
             # Reset all to handle multiple selection
             require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = require_dedicated = False  # <-- ADD require_dedicated
         elif all_selected == 0:
-            st.info("📌 Standard naming will be used")
+            st.info("Standard naming will be used")
         
         if require_corp or require_recp or require_corp_it or require_corp_dedicated:  # <-- REMOVE require_dedicated
             delivering_tag = st.text_input(
-                "Who delivers the service", 
+                "Who delivers the service?", 
                 value="",
                 help="E.g. HS PL, DS DE, IT, Finance, etc."
             )
@@ -619,7 +619,7 @@ with col2:
         # Custom Depend On setting - NOW AFTER GLOBAL SETTINGS
         st.markdown("### Service Offerings | Depend On")
         use_custom_depend_on = st.checkbox("Use custom 'Service Offerings | Depend On' value", value=False, 
-                                          help="Override automatic generation with a custom value for all rows")
+                                          help="Override automatic generation")
         
         if use_custom_depend_on:
             col1, col2 = st.columns([1, 2])
@@ -661,7 +661,7 @@ with col2:
                         "Application Name",
                         value="(no apps specified)",
                         disabled=True,
-                        help="Add applications in Basic tab to see them here"
+                        help="Add applications in Basic tab to see them"
                     )
                     app_names_display = ["(no app)"]
             
@@ -711,7 +711,7 @@ with col2:
         # Option to use same values as app names - GŁÓWNY CHECKBOX
         use_same_as_apps = st.checkbox("Use same values as Application Names", 
                                       value=False,
-                                      help="When checked, aliases will automatically use the same values as the application names in ENG column")
+                                      help="When checked, aliases will automatically use the same values as the application names in ENG column for English ONLY")
 
         if use_same_as_apps:
             # Auto-enable aliases and set to use app names
@@ -740,9 +740,9 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
     elif use_new_parent and (not new_parent_offerings or not new_parents):
-        st.error("⚠️ When using specific parent offering, please add at least one Parent Offering and Parent pair")
+        st.error("⚠️ When using specific parent offering, please add at least one Parent Offering")
     elif not use_new_parent and not keywords_parent and not keywords_child:
-        st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering, or use specific parent offering")
+        st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
     elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")
     elif all_selected > 1:
@@ -816,7 +816,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                 
                 with open(result_file, "rb") as f:
                     st.download_button(
-                        label="📥 Download Generated File",
+                        label="📥 Download generated file",
                         data=f.read(),
                         file_name=result_file.name,
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -838,7 +838,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center; color: gray;'>
-        Service Offerings Generator v3.8 | Support
+        Service Offerings App
     </div>
     """,
     unsafe_allow_html=True

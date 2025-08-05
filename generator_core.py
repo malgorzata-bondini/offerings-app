@@ -1185,7 +1185,7 @@ def run_generator(
                     return False  # FAIL if child doesn't match
 
     # STEP 3: Both passed (or no keywords provided)
-    return True
+    return True  # ✅ PRZENIE TO DO ŚRODKA FUNKCJI!
 
     def row_excluded_keywords_ok(row):
         """Check if row should be excluded based on excluded keywords"""
@@ -1729,8 +1729,7 @@ def run_generator(
                                     else:
                                         # Kopiuj z oryginalnego pliku
                                         row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
-                                    # Handle DE special cases
-                                    if country == "DE":
+                                    # Handle DE special cases                                    if country == "DE":
                                         ldap_cols = [col for col in row.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
                                         if ldap_cols:
                                             # Clear all LDAP columns first

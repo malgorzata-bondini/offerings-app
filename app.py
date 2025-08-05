@@ -816,37 +816,35 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                             add_prod=add_prod
                         )
                         
-                        # Handle the case where run_generator returns True (legacy behavior)
+                        # FIXED HANDLING FOR BOTH True AND Path RETURNS
                         if result_file is True:
-                            st.warning("⚠️ Generator returned legacy True value. Searching for generated file...")
-                            # Look for generated files in the output directory
+                            # Legacy behavior - search for the file
+                            import time
+                            time.sleep(0.5)  # Give file system time to sync
+                            
+                            # Search for generated files
                             excel_files = list(out_dir.glob("Generated_Service_Offerings_*.xlsx"))
                             if excel_files:
                                 # Use the most recent file
                                 result_file = max(excel_files, key=lambda p: p.stat().st_mtime)
                                 st.info(f"Found generated file: {result_file.name}")
                             else:
-                                st.error("❌ No generated files found in output directory")
-                                # List all files in output directory for debugging
-                                all_files = list(out_dir.glob("*"))
-                                if all_files:
-                                    st.error(f"Files in output directory: {[f.name for f in all_files]}")
+                                # Try alternative pattern
+                                all_xlsx = list(out_dir.glob("*.xlsx"))
+                                if all_xlsx:
+                                    result_file = max(all_xlsx, key=lambda p: p.stat().st_mtime)
+                                    st.info(f"Found file: {result_file.name}")
                                 else:
-                                    st.error("Output directory is empty")
-                                result_file = None
+                                    st.error("❌ No Excel files found in output directory")
+                                    result_file = None
                         
-                        # Debug info for other unexpected return values
-                        elif result_file is None:
-                            st.error("❌ Generator returned None. Please check the generator_core module.")
-                            result_file = None
-                        
-                        # Convert to Path if string
+                        # Convert string path to Path object
                         elif isinstance(result_file, str):
                             result_file = Path(result_file)
-                        
-                        # Verify it's a Path object
-                        elif not isinstance(result_file, Path):
-                            st.error(f"❌ Invalid result type: {type(result_file)}. Expected Path object.")
+                            
+                        # Validate it's a Path object
+                        elif result_file and not isinstance(result_file, Path):
+                            st.error(f"❌ Invalid result type: {type(result_file)}")
                             result_file = None
                             
                     except Exception as gen_error:
@@ -854,33 +852,32 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         st.exception(gen_error)
                         result_file = None
                 
-                # Check if file was generated successfully
-                if result_file and result_file.exists():
-                    # Read the generated file
+                # Check if file exists and download
+                if result_file and isinstance(result_file, Path) and result_file.exists():
+                    # Read the file
                     with open(result_file, "rb") as f:
                         file_data = f.read()
                     
                     if len(file_data) > 0:
-                        # Get filename safely
-                        file_name = result_file.name if hasattr(result_file, 'name') else "service_offerings_generated.xlsx"
-                        
                         st.success("✅ Service offerings generated successfully!")
                         st.download_button(
                             label="📥 Download generated file",
                             data=file_data,
-                            file_name=file_name,
+                            file_name=result_file.name,
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             use_container_width=True
                         )
-                        st.info(f"Generated file: {file_name} ({len(file_data):,} bytes)")
+                        st.info(f"Generated: {result_file.name} ({len(file_data):,} bytes)")
                     else:
                         st.error("❌ Generated file is empty")
                 else:
                     st.error("❌ Failed to generate file. Please check your configuration.")
+                    if result_file:
+                        st.error(f"Debug: result_file = {result_file}, exists = {result_file.exists() if isinstance(result_file, Path) else 'N/A'}")
                     
         except ValueError as e:
             error_msg = str(e)
-            if "duplicate offering" in error_msg.lower():
+            if "duplicate" in error_msg.lower() or "no matching offerings" in error_msg.lower():
                 st.error(f"❌ {error_msg}")
             else:
                 st.error(f"❌ Error: {error_msg}")

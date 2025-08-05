@@ -1869,8 +1869,26 @@ def run_generator(
                                             else:
                                                 row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
                                     else:
-                                        # If custom depend on is not enabled, leave the column empty regardless of app
-                                        row.loc[:, "Service Offerings | Depend On (Application Service)"] = ""
+                                        # Custom depend on is NOT enabled - preserve original and replace app name only
+                                        if original_depend_on and original_depend_on not in ["nan", "NaN", "", "None"]:
+                                            if app:
+                                                # Split the original value to find and replace the last word (app name)
+                                                words = original_depend_on.split()
+                                                if len(words) > 0:
+                                                    # Apply pluralization to app name if enabled
+                                                    app_to_use = get_plural_form(app) if use_pluralization else app
+                                                    # Replace the last word with the new app
+                                                    words[-1] = app_to_use
+                                                    row.loc[:, "Service Offerings | Depend On (Application Service)"] = " ".join(words)
+                                                else:
+                                                    # If no words found, just use the new app
+                                                    row.loc[:, "Service Offerings | Depend On (Application Service)"] = app if app else ""
+                                            else:
+                                                # No app specified, keep original value
+                                                row.loc[:, "Service Offerings | Depend On (Application Service)"] = original_depend_on
+                                        else:
+                                            # No original value found, leave empty
+                                            row.loc[:, "Service Offerings | Depend On (Application Service)"] = ""
                                     
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"

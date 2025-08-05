@@ -1700,7 +1700,18 @@ def run_generator(
                                     # Apply business criticality if provided
                                     if business_criticality:
                                         row.loc[:, "Business Criticality"] = business_criticality
-                                    # Otherwise, keep the original value from source file
+                                    else:
+                                        # Copy from original file if business criticality not provided
+                                        if not use_new_parent:
+                                            # Copy original value from source file
+                                            original_bc = str(base_row.get("Business Criticality", "")).strip()
+                                            if original_bc and original_bc not in ["nan", "NaN", "", "None"]:
+                                                row.loc[:, "Business Criticality"] = original_bc
+                                            else:
+                                                row.loc[:, "Business Criticality"] = ""
+                                        else:
+                                            # For new parent mode, leave empty if not specified
+                                            row.loc[:, "Business Criticality"] = ""
                                     
                                     # Set Record view based on SR/IM selection
                                     if sr_or_im == "SR":

@@ -1521,6 +1521,15 @@ def run_generator(
                     for app in all_apps:
                         # DO NOT RECALCULATE receivers here! Use the ones defined above
                         for recv in receivers:
+                            # ADD THIS CHECK RIGHT HERE - Skip if receiver doesn't match any rows in base_pool
+                            if not use_new_parent:
+                                recv_check = base_pool["Name (Child Service Offering lvl 1)"].str.contains(
+                                    rf"\b{re.escape(recv)}\b", case=False
+                                )
+                                if not recv_check.any():
+                                    print(f"Skipping receiver {recv} - no matching entries in source data")
+                                    continue  # Skip this receiver
+                            
                             # Get country-specific schedule suffixes
                             country_schedule_suffixes = get_schedule_suffixes_for_country(
                                 country, recv, schedule_settings_per_country, schedule_suffixes

@@ -818,12 +818,12 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                     st.download_button(
                         label="📥 Download generated file",
                         data=f.read(),
-                        file_name=result_file.name,
+                        file_name=str(result_file),
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True
                     )
                 
-                st.info(f"Generated file: {result_file.name}")
+                st.info(f"Generated file: {str(result_file)}")
                 
         except ValueError as e:
             if "duplicate offering" in str(e).lower():

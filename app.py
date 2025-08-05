@@ -261,6 +261,9 @@ with col2:
         schedule_type = st.checkbox("Custom schedule per period")
         create_multiple_schedules = st.checkbox("Create multiple schedules", help="Generate the same offerings with different schedules")
         
+        # Initialize schedule_suffixes
+        schedule_suffixes = []
+        
         if not schedule_type and create_multiple_schedules:
             schedule_simple = st.text_area(
                 "Schedules", 
@@ -588,15 +591,15 @@ with col2:
             special_medical = st.checkbox("Medical")
         
         # Ensure only one is selected
-        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated, require_dedicated])  # <-- ADD require_dedicated
+        all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated, require_dedicated])
         if all_selected > 1:
             st.error("⚠️ Please select only one naming type")
             # Reset all to handle multiple selection
-            require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = require_dedicated = False  # <-- ADD require_dedicated
+            require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = require_dedicated = False
         elif all_selected == 0:
             st.info("Standard naming will be used if nothing is selected")
         
-        if require_corp or require_recp or require_corp_it or require_corp_dedicated:  # <-- REMOVE require_dedicated
+        if require_corp or require_recp or require_corp_it or require_corp_dedicated:
             delivering_tag = st.text_input(
                 "Who delivers the service?", 
                 value="",
@@ -612,6 +615,9 @@ with col2:
         # Global settings - MOVED TO TOP
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod value for Service Offerings column", value=False, key="global_prod_checkbox")
+        
+        # Store in session state for use in other tabs
+        st.session_state['global_prod'] = global_prod
         
         # Remove pluralization checkbox - always use pluralization
         use_pluralization = True  # Always enabled
@@ -631,6 +637,9 @@ with col2:
                     index=0,
                     help="Choose the service prefix"
                 )
+                # Store in session state
+                st.session_state['depend_on_prefix'] = depend_on_prefix
+                st.session_state['use_custom_depend_on'] = True
             
             with col2:
                 # Show which apps will be used automatically
@@ -665,30 +674,21 @@ with col2:
                     )
                     app_names_display = ["(no app)"]
             
-            # Construct the custom depend on value - POPRAWIONA LOGIKA
+            # Construct the custom depend on value
             current_special_it = st.session_state.get('special_it', False)
             
-            # 1. PREFIX DLA NAZWY (bez Global Prod logic)
-            if depend_on_prefix == "Global":
-                name_prefix_tag = "Global"
-            else:
-                name_prefix_tag = depend_on_prefix
+            # PREFIX FOR SERVICE OFFERINGS | DEPEND ON - WITHOUT PROD (backend will add if needed)
+            depend_on_prefix_tag = depend_on_prefix
             
-            # 2. PREFIX DLA SERVICE OFFERINGS | DEPEND ON - PRZEKAŻ BEZ PROD DO BACKENDU
-            if depend_on_prefix == "Global":
-                depend_on_prefix_tag = "Global"  # Bez Prod - backend doda jeśli potrzeba
-            else:
-                depend_on_prefix_tag = depend_on_prefix  # Bez Prod - backend doda jeśli potrzeba
-            
-            # Show preview(s) - POKAŻ Z PROD DLA PREVIEW, ALE WYŚLIJ BEZ PROD
+            # Show preview(s) - WITH PROD FOR DISPLAY ONLY
             if new_apps:
                 if len(new_apps) == 1:
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
-                    # PREVIEW z Prod jeśli Global Prod jest zaznaczony
+                    # PREVIEW with Prod if Global Prod is checked
                     preview_prefix = f"{depend_on_prefix_tag} Prod" if global_prod else depend_on_prefix_tag
                     preview_value = f"[{preview_prefix}] {app_name}"
                     st.info(f"Preview: `{preview_value}` (IT: {current_special_it}, Global Prod: {global_prod})")
-                    # Ale do backendu wyślij bez Prod
+                    # But send to backend without Prod
                     custom_depend_on_value = f"[{depend_on_prefix_tag}] {app_name}"
                 else:
                     preview_prefix = f"{depend_on_prefix_tag} Prod" if global_prod else depend_on_prefix_tag
@@ -704,11 +704,12 @@ with col2:
                 custom_depend_on_value = f"[{depend_on_prefix_tag}]"
         else:
             custom_depend_on_value = ""
+            st.session_state['use_custom_depend_on'] = False
         
-        # Aliases - UPROSZCZONA WERSJA
+        # Aliases - SIMPLIFIED VERSION
         st.markdown("### Aliases")
 
-        # Option to use same values as app names - GŁÓWNY CHECKBOX
+        # Option to use same values as app names - MAIN CHECKBOX
         use_same_as_apps = st.checkbox("Use same values as Application Names", 
                                       value=False,
                                       help="When checked, aliases will automatically use the same values as the application names but for English names ONLY")
@@ -735,7 +736,7 @@ with col2:
 
 st.markdown("---")
 
-# MODIFY THIS VALIDATION SECTION
+# GENERATE BUTTON AND VALIDATION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
@@ -743,7 +744,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
         st.error("⚠️ When using specific parent offering, please add at least one Parent Offering")
     elif not use_new_parent and not keywords_parent and not keywords_child:
         st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
-    elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
+    elif not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")
     elif all_selected > 1:
         st.error("⚠️ Please select only one naming type")
@@ -753,7 +754,9 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                 src_dir = Path(temp_dir) / "input"
                 out_dir = Path(temp_dir) / "output"
                 src_dir.mkdir(exist_ok=True)
+                out_dir.mkdir(exist_ok=True)
                 
+                # Save uploaded files
                 for uploaded_file in uploaded_files:
                     file_path = src_dir / uploaded_file.name
                     with open(file_path, "wb") as f:
@@ -772,66 +775,78 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         rsl_duration=rsl_duration,
                         sr_or_im=sr_or_im,
                         require_corp=require_corp,
-                        require_recp=require_recp if 'require_recp' in locals() else False,
+                        require_recp=require_recp,
                         delivering_tag=delivering_tag,
                         support_group=support_group,
                         managed_by_group=managed_by_group,
                         aliases_on=aliases_on,
                         aliases_value=aliases_value,
-                        aliases_per_country=aliases_per_country if use_per_country_aliases else {},
+                        aliases_per_country=aliases_per_country,
                         src_dir=src_dir,
                         out_dir=out_dir,
-                        special_it=special_it if 'special_it' in locals() else False,
-                        special_hr=special_hr if 'special_hr' in locals() else False,
-                        special_medical=special_medical if 'special_medical' in locals() else False,
-                        special_dak=special_dak if 'special_dak' in locals() else False,
-                        use_custom_commitments=use_custom_commitments if 'use_custom_commitments' in locals() else False,
-                        custom_commitments_str=custom_commitments_str if 'custom_commitments_str' in locals() else "",
-                        commitment_country=commitment_country if 'commitment_country' in locals() else None,
-                        require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
-                        require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
-                        require_dedicated=require_dedicated if 'require_dedicated' in locals() else False,
+                        special_it=special_it,
+                        special_hr=special_hr,
+                        special_medical=special_medical,
+                        special_dak=special_dak,
+                        use_custom_commitments=use_custom_commitments,
+                        custom_commitments_str=custom_commitments_str,
+                        commitment_country=commitment_country,
+                        require_corp_it=require_corp_it,
+                        require_corp_dedicated=require_corp_dedicated,
+                        require_dedicated=require_dedicated,
                         use_new_parent=use_new_parent,
                         new_parent_offering=new_parent_offerings,
                         new_parent=new_parents,
                         keywords_excluded=keywords_excluded if not use_new_parent else "",
-                        use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
-                        service_type_lvl2=service_type if 'service_type' in locals() else "",
-                        support_groups_per_country=support_groups_per_country if use_per_country_groups else {},
-                        managed_by_groups_per_country=managed_by_groups_per_country if use_per_country_groups else {},
-                        schedule_settings_per_country=schedule_settings_per_country if use_per_country_schedules else {},
-                        use_custom_depend_on=use_custom_depend_on if 'use_custom_depend_on' in locals() else False,
-                        custom_depend_on_value=custom_depend_on_value if 'custom_depend_on_value' in locals() else "",
-                        selected_languages=selected_languages if 'selected_languages' in locals() else [],
+                        use_lvl2=use_lvl2,
+                        service_type_lvl2=service_type,
+                        support_groups_per_country=support_groups_per_country,
+                        managed_by_groups_per_country=managed_by_groups_per_country,
+                        schedule_settings_per_country=schedule_settings_per_country,
+                        use_custom_depend_on=use_custom_depend_on,
+                        custom_depend_on_value=custom_depend_on_value,
+                        selected_languages=selected_languages,
                         business_criticality=business_criticality,
                         approval_required=approval_required,
-                        approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
-                        approval_groups_per_app=approval_groups_per_app if 'approval_groups_per_app' in locals() else {},
+                        approval_required_value=approval_required_value,
+                        approval_groups_per_app=approval_groups_per_app,
                         change_subscribed_location=change_subscribed_location,
                         custom_subscribed_location=custom_subscribed_location,
-                        add_prod=add_prod  # Add this parameter
+                        add_prod=add_prod
                     )
                 
-                st.success("✅ Service offerings generated successfully!")
-                
-                with open(result_file, "rb") as f:
-                    st.download_button(
-                        label="📥 Download generated file",
-                        data=f.read(),
-                        file_name=str(result_file),
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        use_container_width=True
-                    )
-                
-                st.info(f"Generated file: {str(result_file)}")
-                
+                # Check if file was generated successfully
+                if result_file is not None and isinstance(result_file, Path) and result_file.exists():
+                    # Read the generated file
+                    with open(result_file, "rb") as f:
+                        file_data = f.read()
+                    
+                    if len(file_data) > 0:
+                        # Get filename safely
+                        file_name = result_file.name if hasattr(result_file, 'name') else "service_offerings_generated.xlsx"
+                        
+                        st.success("✅ Service offerings generated successfully!")
+                        st.download_button(
+                            label="📥 Download generated file",
+                            data=file_data,
+                            file_name=file_name,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                        st.info(f"Generated file: {file_name} ({len(file_data):,} bytes)")
+                    else:
+                        st.error("❌ Generated file is empty")
+                else:
+                    st.error("❌ Failed to generate file. Please check your configuration.")
+                    
         except ValueError as e:
-            if "duplicate offering" in str(e).lower():
-                st.error(f"❌ {str(e)}")
+            error_msg = str(e)
+            if "duplicate offering" in error_msg.lower():
+                st.error(f"❌ {error_msg}")
             else:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(f"❌ Error: {error_msg}")
         except Exception as e:
-            st.error(f"❌ Error: {str(e)}")
+            st.error(f"❌ Unexpected error: {str(e)}")
             st.exception(e)
 
 st.markdown("---")

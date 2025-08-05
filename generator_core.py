@@ -1185,7 +1185,7 @@ def run_generator(
                     return False  # FAIL if child doesn't match
 
     # STEP 3: Both passed (or no keywords provided)
-    return True  # ✅ PRZENIE TO DO ŚRODKA FUNKCJI!
+    return True  # ✅ MOVE THIS INSIDE THE FUNCTION!
 
     def row_excluded_keywords_ok(row):
         """Check if row should be excluded based on excluded keywords"""

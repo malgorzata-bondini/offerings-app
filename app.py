@@ -744,107 +744,137 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
         st.error("⚠️ When using specific parent offering, please add at least one Parent Offering")
     elif not use_new_parent and not keywords_parent and not keywords_child:
         st.error("⚠️ Please enter at least one keyword in either Parent Offering or Child Service Offering")
-    elif not schedule_suffixes or not any(schedule_suffixes):
+    elif 'schedule_suffixes' not in locals() or not schedule_suffixes or not any(schedule_suffixes):
         st.error("⚠️ Please configure at least one schedule")
     elif all_selected > 1:
         st.error("⚠️ Please select only one naming type")
     else:
         try:
+            # Debug info
+            st.info("🔍 Starting generation process...")
+            
             with tempfile.TemporaryDirectory() as temp_dir:
                 src_dir = Path(temp_dir) / "input"
                 out_dir = Path(temp_dir) / "output"
                 src_dir.mkdir(exist_ok=True)
                 out_dir.mkdir(exist_ok=True)
                 
+                st.info(f"📁 Created directories: {src_dir}, {out_dir}")
+                
                 # Save uploaded files
                 for uploaded_file in uploaded_files:
                     file_path = src_dir / uploaded_file.name
                     with open(file_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
+                    st.info(f"📄 Saved: {uploaded_file.name} ({len(uploaded_file.getbuffer())} bytes)")
                 
                 with st.spinner("🔄 Generating service offerings..."):
-                    result_file = run_generator(
-                        keywords_parent=keywords_parent if not use_new_parent else "",
-                        keywords_child=keywords_child if not use_new_parent else "",
-                        new_apps=new_apps,
-                        schedule_suffixes=schedule_suffixes,
-                        delivery_manager=delivery_manager,
-                        global_prod=global_prod,
-                        use_pluralization=use_pluralization,
-                        rsp_duration=rsp_duration,
-                        rsl_duration=rsl_duration,
-                        sr_or_im=sr_or_im,
-                        require_corp=require_corp,
-                        require_recp=require_recp,
-                        delivering_tag=delivering_tag,
-                        support_group=support_group,
-                        managed_by_group=managed_by_group,
-                        aliases_on=aliases_on,
-                        aliases_value=aliases_value,
-                        aliases_per_country=aliases_per_country,
-                        src_dir=src_dir,
-                        out_dir=out_dir,
-                        special_it=special_it,
-                        special_hr=special_hr,
-                        special_medical=special_medical,
-                        special_dak=special_dak,
-                        use_custom_commitments=use_custom_commitments,
-                        custom_commitments_str=custom_commitments_str,
-                        commitment_country=commitment_country,
-                        require_corp_it=require_corp_it,
-                        require_corp_dedicated=require_corp_dedicated,
-                        require_dedicated=require_dedicated,
-                        use_new_parent=use_new_parent,
-                        new_parent_offering=new_parent_offerings,
-                        new_parent=new_parents,
-                        keywords_excluded=keywords_excluded if not use_new_parent else "",
-                        use_lvl2=use_lvl2,
-                        service_type_lvl2=service_type,
-                        support_groups_per_country=support_groups_per_country,
-                        managed_by_groups_per_country=managed_by_groups_per_country,
-                        schedule_settings_per_country=schedule_settings_per_country,
-                        use_custom_depend_on=use_custom_depend_on,
-                        custom_depend_on_value=custom_depend_on_value,
-                        selected_languages=selected_languages,
-                        business_criticality=business_criticality,
-                        approval_required=approval_required,
-                        approval_required_value=approval_required_value,
-                        approval_groups_per_app=approval_groups_per_app,
-                        change_subscribed_location=change_subscribed_location,
-                        custom_subscribed_location=custom_subscribed_location,
-                        add_prod=add_prod
-                    )
+                    st.info("🚀 Calling run_generator...")
+                    
+                    try:
+                        result_file = run_generator(
+                            keywords_parent=keywords_parent if not use_new_parent else "",
+                            keywords_child=keywords_child if not use_new_parent else "",
+                            new_apps=new_apps,
+                            schedule_suffixes=schedule_suffixes,
+                            delivery_manager=delivery_manager,
+                            global_prod=global_prod,
+                            use_pluralization=use_pluralization,
+                            rsp_duration=rsp_duration,
+                            rsl_duration=rsl_duration,
+                            sr_or_im=sr_or_im,
+                            require_corp=require_corp,
+                            require_recp=require_recp if 'require_recp' in locals() else False,
+                            delivering_tag=delivering_tag,
+                            support_group=support_group,
+                            managed_by_group=managed_by_group,
+                            aliases_on=aliases_on,
+                            aliases_value=aliases_value,
+                            aliases_per_country=aliases_per_country if 'aliases_per_country' in locals() else {},
+                            src_dir=src_dir,
+                            out_dir=out_dir,
+                            special_it=special_it,
+                            special_hr=special_hr,
+                            special_medical=special_medical,
+                            special_dak=special_dak,
+                            use_custom_commitments=use_custom_commitments if 'use_custom_commitments' in locals() else False,
+                            custom_commitments_str=custom_commitments_str if 'custom_commitments_str' in locals() else "",
+                            commitment_country=commitment_country if 'commitment_country' in locals() else None,
+                            require_corp_it=require_corp_it if 'require_corp_it' in locals() else False,
+                            require_corp_dedicated=require_corp_dedicated if 'require_corp_dedicated' in locals() else False,
+                            require_dedicated=require_dedicated if 'require_dedicated' in locals() else False,
+                            use_new_parent=use_new_parent,
+                            new_parent_offering=new_parent_offerings,
+                            new_parent=new_parents,
+                            keywords_excluded=keywords_excluded if not use_new_parent else "",
+                            use_lvl2=use_lvl2 if 'use_lvl2' in locals() else False,
+                            service_type_lvl2=service_type if 'service_type' in locals() else "",
+                            support_groups_per_country=support_groups_per_country if 'support_groups_per_country' in locals() else {},
+                            managed_by_groups_per_country=managed_by_groups_per_country if 'managed_by_groups_per_country' in locals() else {},
+                            schedule_settings_per_country=schedule_settings_per_country if 'schedule_settings_per_country' in locals() else {},
+                            use_custom_depend_on=use_custom_depend_on if 'use_custom_depend_on' in locals() else False,
+                            custom_depend_on_value=custom_depend_on_value if 'custom_depend_on_value' in locals() else "",
+                            selected_languages=selected_languages if 'selected_languages' in locals() else [],
+                            business_criticality=business_criticality,
+                            approval_required=approval_required,
+                            approval_required_value=approval_required_value if 'approval_required_value' in locals() else "empty",
+                            approval_groups_per_app=approval_groups_per_app if 'approval_groups_per_app' in locals() else {},
+                            change_subscribed_location=change_subscribed_location,
+                            custom_subscribed_location=custom_subscribed_location,
+                            add_prod=add_prod
+                        )
+                        
+                        st.info(f"✅ run_generator returned: {result_file}")
+                        
+                    except Exception as gen_error:
+                        st.error(f"❌ Error in run_generator: {str(gen_error)}")
+                        st.exception(gen_error)
+                        result_file = None
                 
                 # Check if file was generated successfully
-                if result_file is not None and isinstance(result_file, Path) and result_file.exists():
-                    # Read the generated file
-                    with open(result_file, "rb") as f:
-                        file_data = f.read()
-                    
-                    if len(file_data) > 0:
-                        # Get filename safely
-                        file_name = result_file.name if hasattr(result_file, 'name') else "service_offerings_generated.xlsx"
-                        
-                        st.success("✅ Service offerings generated successfully!")
-                        st.download_button(
-                            label="📥 Download generated file",
-                            data=file_data,
-                            file_name=file_name,
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
-                        st.info(f"Generated file: {file_name} ({len(file_data):,} bytes)")
-                    else:
-                        st.error("❌ Generated file is empty")
+                if result_file is None:
+                    st.error("❌ run_generator returned None")
+                elif not isinstance(result_file, Path):
+                    st.error(f"❌ run_generator returned wrong type: {type(result_file)}")
+                elif not result_file.exists():
+                    st.error(f"❌ Generated file does not exist: {result_file}")
+                    # List what files ARE in the output directory
+                    try:
+                        output_files = list(out_dir.glob("*"))
+                        if output_files:
+                            st.info(f"📁 Files in output directory: {[f.name for f in output_files]}")
+                        else:
+                            st.info("📁 Output directory is empty")
+                    except Exception as e:
+                        st.error(f"Cannot check output directory: {e}")
                 else:
-                    st.error("❌ Failed to generate file. Please check your configuration.")
+                    try:
+                        # Read the file content
+                        with open(result_file, "rb") as f:
+                            file_data = f.read()
+                        
+                        if len(file_data) == 0:
+                            st.error("❌ Generated file is empty")
+                        else:
+                            st.success("✅ Service offerings generated successfully!")
+                            st.download_button(
+                                label="📥 Download generated file",
+                                data=file_data,
+                                file_name=result_file.name,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True
+                            )
+                            st.info(f"Generated file: {result_file.name} ({len(file_data):,} bytes)")
+                            
+                    except Exception as read_error:
+                        st.error(f"❌ Error reading generated file: {str(read_error)}")
+                        st.exception(read_error)
                     
         except ValueError as e:
-            error_msg = str(e)
-            if "duplicate offering" in error_msg.lower():
-                st.error(f"❌ {error_msg}")
+            if "duplicate offering" in str(e).lower():
+                st.error(f"❌ {str(e)}")
             else:
-                st.error(f"❌ Error: {error_msg}")
+                st.error(f"❌ Value Error: {str(e)}")
         except Exception as e:
             st.error(f"❌ Unexpected error: {str(e)}")
             st.exception(e)

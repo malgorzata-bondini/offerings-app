@@ -768,6 +768,53 @@ def build_corp_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, d
     
     return ensure_incident_naming(final_name)
 
+def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, add_prod=True):
+    """Build name for Dedicated Services offerings (without CORP)"""
+    parent_content = extract_parent_info(parent_offering)
+    catalog_name = extract_catalog_name(parent_offering)
+    
+    # Check for forbidden keywords that should never have "Prod"
+    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security", "onboarding", "offboarding", "generic request", "restore from backup", "change employee information"]
+    parent_lower = parent_offering.lower()
+    catalog_lower = catalog_name.lower()
+    parent_content_lower = parent_content.lower()
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                      for keyword in no_prod_keywords)
+    
+    parts = parent_content.split()
+    country = ""
+    topic = ""
+    for part in parts:
+        if len(part) == 2 and part.isupper() and part not in ["HS", "DS"]:
+            country = part
+        elif part not in ["HS", "DS", "Parent", "RecP"] and not (len(part) == 2 and part.isupper()):
+            topic = part
+            break
+    prefix_parts = [sr_or_im]
+    division, country_code = get_division_and_country(parent_content, country, delivering_tag)
+    if delivering_tag:
+        delivering_parts = delivering_tag.split()
+        if country in ["UA", "MD", "RO", "TR"]:
+            prefix_parts.extend(["DS", country])
+        else:
+            prefix_parts.extend(delivering_parts)
+    else:
+        prefix_parts.extend([division, country])
+    # NO CORP here!
+    prefix_parts.append("Dedicated Services")
+    name_prefix = f"[{' '.join(prefix_parts)}]"
+    name_parts = [name_prefix, catalog_name]
+    if app:
+        name_parts.append(app)
+    if sr_or_im == "IM":
+        name_parts.append("solving")
+    # Add Prod only if user wants it AND no forbidden keywords
+    if add_prod and not exclude_prod:
+        name_parts.append("Prod")
+    name_parts.append(schedule_suffix)
+    final_name = " ".join(name_parts)
+    return ensure_incident_naming(final_name)
+
 def commit_block(cc, schedule_suffix, rsp_duration, rsl_duration, sr_or_im):
     """Create commitment block with OLA for all countries"""
     if sr_or_im == "IM":
@@ -1184,8 +1231,8 @@ def run_generator(
                 if not found:
                     return False  # FAIL if child doesn't match
 
-    # STEP 3: Both passed (or no keywords provided)
-    return True  # ✅ MOVE THIS INSIDE THE FUNCTION!
+        # STEP 3: Both passed (or no keywords provided)
+        return True
 
     def row_excluded_keywords_ok(row):
         """Check if row should be excluded based on excluded keywords"""
@@ -1213,7 +1260,7 @@ def run_generator(
             # Exclude if either parent or child has any excluded keyword
             if parent_has_any or child_has_any:
                 return False
-        
+            
         return True  # Row is OK (not excluded)
 
     def lc_ok(row):
@@ -1301,7 +1348,7 @@ def run_generator(
     # Process the files
     total_files = len(list(src_dir.glob("ALL_Service_Offering_*.xlsx")))
     processed_files = 0
-    
+
     for wb in src_dir.glob("ALL_Service_Offering_*.xlsx"):
         processed_files += 1
         country = wb.stem.split("_")[-1].upper()
@@ -1369,10 +1416,6 @@ def run_generator(
                     for col in need_cols:
                         if col not in df.columns:
                             df[col] = ""
-
-                    # Remove the "Ensure Visibility group column exists" section
-                    # if "Visibility group" not in df.columns:
-                    #     df["Visibility group"] = ""
 
                     # Add LDAP columns if they don't exist
                     ldap_cols = [col for col in df.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
@@ -1528,7 +1571,7 @@ def run_generator(
                                         base_row = base_pool[recv_mask].iloc[0]
                                         base_row_df = base_row.to_frame().T.copy()
                                         original_depend_on = str(base_row.get("Service Offerings | Depend On (Application Service)", "")).strip()
-                        
+                                
                                 # Build name based on type
                                 if is_lvl2:
                                     new_name = build_lvl2_name(
@@ -1585,7 +1628,7 @@ def run_generator(
                                         else:
                                             # Default to HS if cannot determine
                                             division = "HS"
-                                
+                            
                                 # Get support groups list
                                 if country == "PL":
                                     # For PL, directly use the receiver-specific support group
@@ -1637,41 +1680,11 @@ def run_generator(
                                     # Update the name
                                     row.loc[:, "Name (Child Service Offering lvl 1)"] = new_name
                                     
-                                    # UPROSZCZONA LOGIKA DLA KOLUMNY PARENT
+                                    # Handle Parent column properly
                                     if use_new_parent:
-                                        # W trybie "New Parent", base_row jest syntetyczny i zawiera nowego parenta z UI.
-                                        # Musimy jawnie ustawić tę wartość w generowanym wierszu.
+                                        # In new parent mode, base_row is synthetic and contains the new parent value
                                         row.loc[:, "Parent"] = base_row.get("Parent", "")
-                                    # W trybie standardowym, `row` jest już kopią `base_row` i zawiera
-                                    # prawidłową wartość "Parent". Nie ma potrzeby jej ponownie przypisywać.
-
-                                    row.loc[:, "Delivery Manager"] = delivery_manager
-                                    
-                                    # Apply business criticality if provided
-                                    if business_criticality:
-                                        row.loc[:, "Business Criticality"] = business_criticality
-                                    # Otherwise, keep the original value from source file
-                                    
-                                    # Set Record view based on SR/IM selection
-                                    if sr_or_im == "SR":
-                                        row.loc[:, "Record view"] = "Request Item"
-                                    elif sr_or_im == "IM":
-                                        row.loc[:, "Record view"] = "Incident, Major Incident"
-                                    
-                                    # Set Approval required with conditional value
-                                    if approval_required:
-                                        row.loc[:, "Approval required"] = "true"  # Always use "true" when checkbox is ticked
-                                        
-                                        # Use per-app approval group if configured, otherwise use global value
-                                        if approval_groups_per_app and app in approval_groups_per_app:
-                                            app_approval_group = approval_groups_per_app[app].strip()
-                                            # Keep empty if the user left it empty - don't force to "empty"
-                                    if use_new_parent:
-                                        # W trybie "New Parent", base_row jest syntetyczny i zawiera nowego parenta z UI.
-                                        # Musimy jawnie ustawić tę wartość w generowanym wierszu.
-                                        row.loc[:, "Parent"] = base_row.get("Parent", "")
-                                    # W trybie standardowym, `row` jest już kopią `base_row` i zawiera
-                                    # prawidłową wartość "Parent". Nie ma potrzeby jej ponownie przypisywać.
+                                    # In standard mode, row is already a copy of base_row and contains the correct Parent value
 
                                     row.loc[:, "Delivery Manager"] = delivery_manager
                                     
@@ -1727,15 +1740,16 @@ def run_generator(
                                     if aliases_on and aliases_value == "USE_APP_NAMES":
                                         row.loc[:, exact_column_name] = app if app else ""
                                     else:
-                                        # Kopiuj z oryginalnego pliku
+                                        # Copy from original file
                                         row.loc[:, exact_column_name] = base_row.get(exact_column_name, "")
-                                    # Handle DE special cases                                    if country == "DE":
+                                    
+                                    # Handle DE special cases
+                                    if country == "DE":
                                         ldap_cols = [col for col in row.columns if "LDAP" in col.upper() or "Ldap" in col or "ldap" in col]
                                         if ldap_cols:
                                             # Clear all LDAP columns first
                                             for ldap_col in ldap_cols:
                                                 row.loc[:, ldap_col] = ""
-                                            
 
                                     # Handle Subscribed by Company based on type and mode
                                     if use_new_parent:
@@ -1755,15 +1769,11 @@ def run_generator(
                                     elif country == "DE":
                                         # Existing DE logic for Germany
                                         company, _ = get_de_company_and_ldap(support_group_for_country, recv, base_row)
-
-
-
                                         row.loc[:, "Subscribed by Company"] = company
                                     elif require_corp or require_recp or require_corp_it or require_corp_dedicated:
                                         # For CORP offerings in normal mode, clear the field
                                         row.loc[:, "Subscribed by Company"] = ""
                                     # For standard offerings, keep original value from source file
-                                    
                                     
                                     orig_comm = str(row.iloc[0]["Service Commitments"]).strip()
                                     
@@ -1787,7 +1797,6 @@ def run_generator(
                                             # Use custom_commit_block function if country provided
                                             row.loc[:, "Service Commitments"] = custom_commit_block(
                                                 commitment_country,
-
                                                 sr_or_im, rsp_enabled, rsl_enabled,
                                                 rsp_schedule, rsl_schedule, rsp_priority, rsl_priority,
                                                 rsp_time, rsl_time
@@ -1807,8 +1816,6 @@ def run_generator(
                                     else:
                                         if country == "PL":
                                             # Regex-based PL Prod determination (case-insensitive)
-                                            if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
-                                                depend_tag = "HS PL Prod"
                                             if re.search(r'\bHS\s+PL\b', new_name, re.IGNORECASE):
                                                 depend_tag = "HS PL Prod"
                                             elif re.search(r'\bDS\s+PL\b', new_name, re.IGNORECASE):
@@ -1844,12 +1851,9 @@ def run_generator(
                                     else:
                                         # If custom depend on is not enabled, leave the column empty regardless of app
                                         row.loc[:, "Service Offerings | Depend On (Application Service)"] = ""
-                                
-
                                     
                                     # Create sheet key with level distinction
                                     sheet_key = f"{country} lvl{current_level}"
-                                    
                                     
                                     # Get the column order for this sheet
                                     column_key = f"{country}_{sheet_name}"
@@ -1864,7 +1868,6 @@ def run_generator(
                                     # Add missing schedule flag to the row dictionary
                                     if missing_schedule:
                                         row_dict["_missing_schedule"] = True
-                                   
                                     else:
                                         row_dict["_missing_schedule"] = False
                                     
@@ -1872,7 +1875,7 @@ def run_generator(
                                     row_dict["_column_order_key"] = column_key
                                     
                                     sheets_data[sheet_key].append(row_dict)
-                            
+                                
             except Exception as e:
                 # Skip if sheet doesn't exist or other error
                 if "Worksheet" not in str(e):  # Only skip worksheet not found errors silently
@@ -1980,12 +1983,6 @@ def run_generator(
                 
                 # Extract country code from sheet_key (e.g., "PL lvl1" -> "PL")
                 cc = sheet_key.split()[0]
-                
-                # Remove Visibility group column for PL only if it wasn't in the original
-                # if cc == "PL" and "Visibility group" in df.columns:
-                #     original_cols = column_order_cache.get(column_order_key, [])
-                #     if "Visibility group" not in original_cols:
-                #         df = df.drop(columns=["Visibility group"])
                 
                 # Clean data before writing to Excel - SAFER VERSION
                 df_final = df.copy()
@@ -2114,50 +2111,3 @@ def run_generator(
     
     # Return the output file path as Path object
     return outfile
-
-def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, add_prod=True):
-    """Build name for Dedicated Services offerings (without CORP)"""
-    parent_content = extract_parent_info(parent_offering)
-    catalog_name = extract_catalog_name(parent_offering)
-    
-    # Check for forbidden keywords that should never have "Prod"
-    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security", "onboarding", "offboarding", "generic request", "restore from backup", "change employee information"]
-    parent_lower = parent_offering.lower()
-    catalog_lower = catalog_name.lower()
-    parent_content_lower = parent_content.lower()
-    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
-                      for keyword in no_prod_keywords)
-    
-    parts = parent_content.split()
-    country = ""
-    topic = ""
-    for part in parts:
-        if len(part) == 2 and part.isupper() and part not in ["HS", "DS"]:
-            country = part
-        elif part not in ["HS", "DS", "Parent", "RecP"] and not (len(part) == 2 and part.isupper()):
-            topic = part
-            break
-    prefix_parts = [sr_or_im]
-    division, country_code = get_division_and_country(parent_content, country, delivering_tag)
-    if delivering_tag:
-        delivering_parts = delivering_tag.split()
-        if country in ["UA", "MD", "RO", "TR"]:
-            prefix_parts.extend(["DS", country])
-        else:
-            prefix_parts.extend(delivering_parts)
-    else:
-        prefix_parts.extend([division, country])
-    # NO CORP here!
-    prefix_parts.append("Dedicated Services")
-    name_prefix = f"[{' '.join(prefix_parts)}]"
-    name_parts = [name_prefix, catalog_name]
-    if app:
-        name_parts.append(app)
-    if sr_or_im == "IM":
-        name_parts.append("solving")
-    # Add Prod only if user wants it AND no forbidden keywords
-    if add_prod and not exclude_prod:
-        name_parts.append("Prod")
-    name_parts.append(schedule_suffix)
-    final_name = " ".join(name_parts)
-    return ensure_incident_naming(final_name)

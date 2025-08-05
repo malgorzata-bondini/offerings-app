@@ -1111,11 +1111,25 @@ def run_generator(
         
         # Check if it contains commas (AND logic)
         if ',' in keyword_string:
-            keywords = [k.strip() for k in keyword_string.split(',') if k.strip()]
+            keywords = []
+            for k in keyword_string.split(','):
+                k = k.strip()
+                if k:
+                    # Remove quotes if present
+                    if k.startswith('"') and k.endswith('"'):
+                        k = k[1:-1]
+                    keywords.append(k)
             return keywords, True
         else:
             # Line separated (OR logic)
-            keywords = [k.strip() for k in keyword_string.split('\n') if k.strip()]
+            keywords = []
+            for k in keyword_string.split('\n'):
+                k = k.strip()
+                if k:
+                    # Remove quotes if present
+                    if k.startswith('"') and k.endswith('"'):
+                        k = k[1:-1]
+                    keywords.append(k)
             return keywords, False
 
     def row_keywords_ok(row):
@@ -1129,20 +1143,22 @@ def run_generator(
             p = ' '.join(p.split())
             
             if parent_use_and:
-                # AND logic - all keywords must match (case-insensitive substring search)
+                # AND logic - all keywords must match
                 for k in parent_keywords:
-                    if k.lower() not in p:
+                    k_lower = k.lower().strip()
+                    if k_lower not in p:
                         return False
             else:
-                # OR logic - any keyword must match (case-insensitive substring search)
+                # OR logic - any keyword must match
                 found = False
                 for k in parent_keywords:
-                    if k.lower() in p:
+                    k_lower = k.lower().strip()
+                    if k_lower in p:
                         found = True
                         break
                 if not found:
                     return False
-        
+
         # Parse child keywords
         child_keywords, child_use_and = parse_keywords(keywords_child)
         
@@ -1153,20 +1169,22 @@ def run_generator(
             n = ' '.join(n.split())
             
             if child_use_and:
-                # AND logic - all keywords must match (case-insensitive substring search)
+                # AND logic - all keywords must match
                 for k in child_keywords:
-                    if k.lower() not in n:
+                    k_lower = k.lower().strip()
+                    if k_lower not in n:
                         return False
             else:
-                # OR logic - any keyword must match (case-insensitive substring search)
+                # OR logic - any keyword must match
                 found = False
                 for k in child_keywords:
-                    if k.lower() in n:
+                    k_lower = k.lower().strip()
+                    if k_lower in n:
                         found = True
                         break
                 if not found:
                     return False
-        
+
         return True
 
     def row_excluded_keywords_ok(row):
@@ -2097,6 +2115,15 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
     """Build name for Dedicated Services offerings (without CORP)"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
+    
+    # Check for forbidden keywords that should never have "Prod"
+    no_prod_keywords = ["hardware", "mailbox", "network", "mobile", "security", "onboarding", "offboarding", "generic request", "restore from backup", "change employee information"]
+    parent_lower = parent_offering.lower()
+    catalog_lower = catalog_name.lower()
+    parent_content_lower = parent_content.lower()
+    exclude_prod = any(keyword in parent_lower or keyword in catalog_lower or keyword in parent_content_lower 
+                      for keyword in no_prod_keywords)
+    
     parts = parent_content.split()
     country = ""
     topic = ""
@@ -2124,8 +2151,8 @@ def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiv
         name_parts.append(app)
     if sr_or_im == "IM":
         name_parts.append("solving")
-    # Add Prod only if user wants it
-    if add_prod:
+    # Add Prod only if user wants it AND no forbidden keywords
+    if add_prod and not exclude_prod:
         name_parts.append("Prod")
     name_parts.append(schedule_suffix)
     final_name = " ".join(name_parts)

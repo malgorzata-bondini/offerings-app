@@ -1539,35 +1539,30 @@ def run_generator(
                                 # Check if schedule exists in the source data
                                 missing_schedule = False
                                 
+                                # Only check schedules if we have data to check against
+                                if len(all_country_names_for_schedules) > 0:
+                                    # Normalize schedule for comparison
+                                    schedule_pattern = schedule_suffix.strip().upper()
+                                    
+                                    # Check in ALL offerings, not just CORP or non-CORP subsets
+                                    schedule_found = any(schedule_pattern in name.upper() for name in all_country_names_for_schedules)
+                                    
+                                    if not schedule_found:
+                                        missing_schedule = True
+                                
                                 # Prepare search patterns based on whether it's CORP or not
                                 is_corp_type = (require_corp or require_recp or require_corp_it or require_corp_dedicated)
                                 
                                 # Only check schedules if we have data to check against
                                 if len(all_country_names_for_schedules) > 0:
                                     # Normalize schedule for comparison
-                                    schedule_pattern = schedule_suffix.strip()
+                                    schedule_pattern = schedule_suffix.strip().upper()
                                     
-                                    # Check based on CORP type
-                                    if is_corp_type:
-                                        # For CORP types, check only in CORP names
-                                        if len(corp_names_for_schedules) > 0:
-                                            # Look for exact schedule match in CORP offerings
-                                            schedule_found = any(schedule_pattern in name for name in corp_names_for_schedules)
-                                            if not schedule_found:
-                                                missing_schedule = True
-                                        else:
-                                            # No CORP offerings exist, so schedule is missing
-                                            missing_schedule = True
-                                    else:
-                                        # For non-CORP, check only in non-CORP names
-                                        if len(non_corp_names_for_schedules) > 0:
-                                            # Look for exact schedule match in non-CORP offerings
-                                            schedule_found = any(schedule_pattern in name for name in non_corp_names_for_schedules)
-                                            if not schedule_found:
-                                                missing_schedule = True
-                                        else:
-                                            # No non-CORP offerings exist, so schedule is missing
-                                            missing_schedule = True
+                                    # Check in ALL offerings, not just CORP or non-CORP subsets
+                                    schedule_found = any(schedule_pattern in name.upper() for name in all_country_names_for_schedules)
+                                    
+                                    if not schedule_found:
+                                        missing_schedule = True
                                 
                                 # For DE, find the matching row (DS DE or HS DE) in the original data
                                 if country == "DE" and not use_new_parent:

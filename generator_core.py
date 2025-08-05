@@ -1136,20 +1136,20 @@ def run_generator(
         # Parse parent keywords
         parent_keywords, parent_use_and = parse_keywords(keywords_parent)
         
-        # Check parent offering
+        # STEP 1: Check parent offering FIRST (if parent keywords provided)
         if parent_keywords:
             p = str(row["Parent Offering"]).lower()
             # Remove extra spaces and normalize
             p = ' '.join(p.split())
             
             if parent_use_and:
-                # AND logic - all keywords must match
+                # AND logic - all parent keywords must match
                 for k in parent_keywords:
                     k_lower = k.lower().strip()
                     if k_lower not in p:
-                        return False
+                        return False  # FAIL if parent doesn't match
             else:
-                # OR logic - any keyword must match
+                # OR logic - any parent keyword must match
                 found = False
                 for k in parent_keywords:
                     k_lower = k.lower().strip()
@@ -1157,25 +1157,24 @@ def run_generator(
                         found = True
                         break
                 if not found:
-                    return False
+                    return False  # FAIL if parent doesn't match
 
-        # Parse child keywords
+        # STEP 2: If parent passed (or no parent keywords), check child name
         child_keywords, child_use_and = parse_keywords(keywords_child)
         
-        # Check child name
         if child_keywords:
             n = str(row["Name (Child Service Offering lvl 1)"]).lower()
             # Remove extra spaces and normalize
             n = ' '.join(n.split())
             
             if child_use_and:
-                # AND logic - all keywords must match
+                # AND logic - all child keywords must match
                 for k in child_keywords:
                     k_lower = k.lower().strip()
                     if k_lower not in n:
-                        return False
+                        return False  # FAIL if child doesn't match
             else:
-                # OR logic - any keyword must match
+                # OR logic - any child keyword must match
                 found = False
                 for k in child_keywords:
                     k_lower = k.lower().strip()
@@ -1183,9 +1182,10 @@ def run_generator(
                         found = True
                         break
                 if not found:
-                    return False
+                    return False  # FAIL if child doesn't match
 
-        return True
+    # STEP 3: Both passed (or no keywords provided)
+    return True
 
     def row_excluded_keywords_ok(row):
         """Check if row should be excluded based on excluded keywords"""

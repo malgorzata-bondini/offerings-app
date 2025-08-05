@@ -1542,10 +1542,10 @@ def run_generator(
                                 # Only check schedules if we have data to check against
                                 if len(all_country_names_for_schedules) > 0:
                                     # Normalize schedule for comparison
-                                    schedule_pattern = schedule_suffix.strip().upper()
+                                    schedule_pattern = schedule_suffix.strip()
                                     
-                                    # Check in ALL offerings, not just CORP or non-CORP subsets
-                                    schedule_found = any(schedule_pattern in name.upper() for name in all_country_names_for_schedules)
+                                    # Check if this schedule exists at the END of any offering name
+                                    schedule_found = any(name.strip().endswith(schedule_pattern) for name in all_country_names_for_schedules)
                                     
                                     if not schedule_found:
                                         missing_schedule = True

@@ -2107,7 +2107,12 @@ def run_generator(
             pass
 
     print("Processing complete. Output saved to:", outfile)
-    # Return the output file path
+    
+    # Ensure the file exists before returning
+    if not outfile.exists():
+        raise FileNotFoundError(f"Generated file not found: {outfile}")
+    
+    # Return the output file path as Path object
     return outfile
 
 def build_dedicated_name(parent_offering, sr_or_im, app, schedule_suffix, receiver, delivering_tag, add_prod=True):

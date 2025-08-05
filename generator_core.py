@@ -1869,20 +1869,20 @@ def run_generator(
                                             else:
                                                 row.loc[:, "Service Offerings | Depend On (Application Service)"] = custom_depend_on_value
                                     else:
-                                        # Custom depend on is NOT enabled - preserve original and replace app name only
+                                        # Custom depend on is NOT enabled - preserve bracket content, replace the rest
                                         if original_depend_on and original_depend_on not in ["nan", "NaN", "", "None"]:
                                             if app:
-                                                # Split the original value to find and replace the last word (app name)
-                                                words = original_depend_on.split()
-                                                if len(words) > 0:
-                                                    # Apply pluralization to app name if enabled
-                                                    app_to_use = get_plural_form(app) if use_pluralization else app
-                                                    # Replace the last word with the new app
-                                                    words[-1] = app_to_use
-                                                    row.loc[:, "Service Offerings | Depend On (Application Service)"] = " ".join(words)
+                                                # Apply pluralization to app name if enabled
+                                                app_to_use = get_plural_form(app) if use_pluralization else app
+                                                
+                                                # Find the closing bracket
+                                                if ']' in original_depend_on:
+                                                    bracket_end = original_depend_on.index(']') + 1
+                                                    bracket_part = original_depend_on[:bracket_end]
+                                                    row.loc[:, "Service Offerings | Depend On (Application Service)"] = f"{bracket_part} {app_to_use}"
                                                 else:
-                                                    # If no words found, just use the new app
-                                                    row.loc[:, "Service Offerings | Depend On (Application Service)"] = app if app else ""
+                                                    # No bracket found, just use the app
+                                                    row.loc[:, "Service Offerings | Depend On (Application Service)"] = app_to_use
                                             else:
                                                 # No app specified, keep original value
                                                 row.loc[:, "Service Offerings | Depend On (Application Service)"] = original_depend_on

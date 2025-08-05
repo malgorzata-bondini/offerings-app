@@ -473,9 +473,16 @@ with col2:
                 value="",
                 help="Optional - if empty, Support Group value will be copied"
             )
-            # Store as single values for backward compatibility
+            # Instead of empty dicts, populate with all countries
             support_groups_per_country = {}
             managed_by_groups_per_country = {}
+            
+            # Populate dictionaries with global values for all countries
+            all_countries = ["HS PL", "DS PL", "DE", "UA", "MD", "CY", "RO", "TR"]
+            for country_key in all_countries:
+                if support_group:  # Only populate if there's a value
+                    support_groups_per_country[country_key] = support_group
+                    managed_by_groups_per_country[country_key] = managed_by_group if managed_by_group else support_group
         else:
             # Per-country support groups
             st.markdown("Support Groups by Country")

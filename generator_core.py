@@ -10,7 +10,7 @@ from openpyxl.utils import get_column_letter
 from openpyxl.comments import Comment
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Any
-import streamlit as st  # Add this import
+import streamlit as st
 
 warnings.filterwarnings("ignore", category=UserWarning, module="openpyxl")
 
@@ -20,7 +20,7 @@ need_cols = [
     "Delivery Manager", "Subscribed by Location", "Phase", "Status",
     "Life Cycle Stage", "Life Cycle Status", "Support group", "Managed by Group",
     "Subscribed by Company", "Business Criticality",
-    "Record view", "Approval required", "Approval group"  # Removed "Visibility group"
+    "Record view", "Approval required", "Approval group"
 ]
 
 discard_lc = {"retired", "retiring", "end of life", "end of support"}
@@ -30,59 +30,44 @@ def ensure_incident_naming(name):
     Ensure that if any keyword is 'incident', then 'solving' is right after 'incident' and then app name
     This function reorganizes the name to ensure proper order: incident solving [app] [other parts]
     """
-    # First, check if we already have "incident solving" in the correct order
     if re.search(r'\bincident\s+solving\b', name, re.IGNORECASE):
         return name
     
-    # Split the name into parts
     parts = name.split()
     new_parts = []
     i = 0
     
     while i < len(parts):
         if parts[i].lower() == "incident":
-            # Add "incident solving"
             new_parts.append(parts[i])
             new_parts.append("solving")
-            
-            # Skip if the next word was already "solving"
             if i + 1 < len(parts) and parts[i + 1].lower() == "solving":
                 i += 1
         elif parts[i].lower() == "solving":
-            # Skip standalone "solving" as we'll add it after "incident"
+ 
             pass
         else:
             new_parts.append(parts[i])
         i += 1
     
-    # Now we need to ensure app name comes AFTER "incident solving", not between
-    # Find if there's an app name that got placed between incident and solving
     final_parts = []
     i = 0
     
     while i < len(new_parts):
         if i > 0 and new_parts[i-1].lower() == "incident" and new_parts[i].lower() == "solving":
-            # We found "incident solving" - good
             final_parts.append(new_parts[i])
         elif new_parts[i].lower() == "incident":
-            # Check if there's something between incident and solving
             j = i + 1
             app_parts = []
-            
-            # Collect everything until we find "solving"
             while j < len(new_parts) and new_parts[j].lower() != "solving":
                 app_parts.append(new_parts[j])
                 j += 1
-            
-            # Add incident solving first
             final_parts.append(new_parts[i])
             if j < len(new_parts) and new_parts[j].lower() == "solving":
                 final_parts.append("solving")
-                # Then add the app parts that were in between
                 final_parts.extend(app_parts)
                 i = j
             else:
-                # No solving found, just add solving after incident
                 final_parts.append("solving")
                 final_parts.extend(app_parts)
                 i = j - 1
@@ -108,11 +93,9 @@ def extract_catalog_name(parent_offering):
 
 def get_division_and_country(parent_content, country, delivering_tag):
     """Get division and country with special handling for MD, UA, RO, and TR"""
-    # Special handling for UA, MD, RO, and TR - always use DS
     if country in ["UA", "MD", "RO", "TR"]:
         return "DS", country
-    
-    # Extract parts from parent content
+        
     parts = parent_content.split()
     division = ""
     
@@ -120,14 +103,10 @@ def get_division_and_country(parent_content, country, delivering_tag):
         if part in ["HS", "DS"]:
             division = part
             break
-    
-    # If no division found in parent and we have delivering_tag, use it
     if not division and delivering_tag:
         delivering_parts = delivering_tag.split()
         if delivering_parts and delivering_parts[0] in ["HS", "DS"]:
             division = delivering_parts[0]
-    
-    # Default to HS if still no division
     if not division:
         division = "HS"
     
@@ -137,8 +116,6 @@ def build_lvl2_name(parent_offering, sr_or_im, app, schedule_suffix, service_typ
     """Build name for Lvl2 entries - SR/IM is added to both Parent Offering parsing and final name"""
     parent_content = extract_parent_info(parent_offering)
     catalog_name = extract_catalog_name(parent_offering)
-    
-    # Check if SR/IM already exists in parent content
     parts = parent_content.split()
     has_sr_im = "SR" in parts or "IM" in parts
     

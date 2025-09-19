@@ -5,7 +5,6 @@ import shutil
 import tempfile
 from generator_core import run_generator
 
-# Add pluralization function AFTER imports
 def get_plural_form_preview(word):
     """Get plural form for preview"""
     plural_map = {
@@ -82,13 +81,10 @@ with col2:
         
         sr_or_im = st.radio("Service Type", ["SR", "IM"], horizontal=True)
         
-        # Add Prod checkbox right after Service Type
         add_prod = st.checkbox("Add 'Prod' to naming convention", value=True, help="Decide whether to include 'Prod' in generated service offering names")
         
-        # Move Delivery Manager here - right after Service Type
         delivery_manager = st.text_input("Delivery Manager", value="")
-    
-        # Add Business Criticality control
+
         st.markdown("---")
         business_criticality = st.selectbox(
             "Business Criticality",
@@ -96,21 +92,18 @@ with col2:
             index=0,
             help="Set Business Criticality for all generated offerings. If empty, original values from source files will be used."
         )
-        
-        # Add Approval Required control
+
         approval_required = st.checkbox(
             "Approval Required",
             value=False,
             help="Set Approval Required to true for all generated offerings. Default is always false."
         )
         
-        # Add conditional controls for approval required details
         if approval_required:
-            # Option to use same group for all apps or different per app
+
             use_per_app_approval = st.checkbox("Use different approval groups per application", value=False)
             
             if not use_per_app_approval:
-                # Single approval group for all apps
                 approval_required_value = st.text_input(
                     "Approval Details",
                     value="",
@@ -119,7 +112,6 @@ with col2:
                 )
                 approval_groups_per_app = {}
             else:
-                # Per-app approval groups
                 st.markdown("#### Approval Groups by Application")
                 st.info("Configure specific approval groups for each application. Leave empty if no approval group is known.")
                 
@@ -140,14 +132,11 @@ with col2:
                             )
                 else:
                     st.warning("No applications defined. Add applications in Basic tab first.")
-                
-                # Set global approval value to empty for per-app mode
                 approval_required_value = "PER_APP"
         else:
             approval_required_value = "empty"
             approval_groups_per_app = {}
         
-        # Add Subscribed by Location control
         st.markdown("---")
         change_subscribed_location = st.checkbox(
             "Change Subscribed by Location",
@@ -165,7 +154,6 @@ with col2:
         else:
             custom_subscribed_location = "Global"
         
-        # Add Lvl2 checkbox
         st.markdown("---")
         use_lvl2 = st.checkbox(
             "Include Level 2 (Child SO lvl2)",
@@ -192,14 +180,11 @@ with col2:
         
         if use_new_parent:
             st.info("📝 Enter the exact Parent Offering and Parent values to use")
-            
-            # Initialize session state for dynamic parent offerings
             if 'parent_offerings' not in st.session_state:
                 st.session_state.parent_offerings = [{"offering": "", "parent": ""}]
             
             st.markdown("### Parent Offering")
-            
-            # Display existing pairs
+
             for i, pair in enumerate(st.session_state.parent_offerings):
                 col1, col2, col3 = st.columns([2, 2, 1])
                 
@@ -225,7 +210,6 @@ with col2:
                             st.session_state.parent_offerings.pop(i)
                             st.rerun()
             
-            # Add/Remove buttons
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("➕ Add Parent Offering", use_container_width=True):
@@ -238,11 +222,9 @@ with col2:
                         st.session_state.parent_offerings.pop()
                         st.rerun()
             
-            # Convert to the format expected by the backend
             new_parent_offerings = "\n".join([pair["offering"] for pair in st.session_state.parent_offerings if pair["offering"]])
             new_parents = "\n".join([pair["parent"] for pair in st.session_state.parent_offerings if pair["parent"]])
-            
-            # Show preview
+    
             if new_parent_offerings and new_parents:
                 st.success("✅ **Preview of Parent Offering pairs:**")
                 for i, pair in enumerate(st.session_state.parent_offerings):
@@ -251,7 +233,6 @@ with col2:
         else:
             new_parent_offerings = ""
             new_parents = ""
-            # Clear session state when not using new parent
             if 'parent_offerings' in st.session_state:
                 del st.session_state.parent_offerings
     
@@ -261,7 +242,6 @@ with col2:
         schedule_type = st.checkbox("Custom schedule per period")
         create_multiple_schedules = st.checkbox("Create multiple schedules", help="Generate the same offerings with different schedules")
         
-        # Initialize schedule_suffixes
         schedule_suffixes = []
         
         if not schedule_type and create_multiple_schedules:
@@ -273,7 +253,6 @@ with col2:
             )
             schedule_suffixes = [s.strip() for s in schedule_simple.split('\n') if s.strip()]
         elif schedule_type and not create_multiple_schedules:
-            # Allow up to 5 schedule periods
             schedule_parts = []
             num_periods = st.number_input("Number of periods", min_value=1, max_value=5, value=2)
             
@@ -343,17 +322,12 @@ with col2:
         
         st.markdown("---")
         
-        # Schedule Settings per Country
         use_per_country_schedules = st.checkbox("Use different schedules per country", help="Define specific schedules for different countries")
         schedule_settings_per_country = {}
         
         if use_per_country_schedules:
             st.markdown("Schedule Settings per Country")
-            
-            # Define available countries/divisions - UPDATED with new countries
             available_countries = ["HS PL", "DS PL", "DE", "MD", "UA", "DS CY", "DS RO", "DS TR"]
-            
-            # Create tabs or columns for different countries
             country_tabs = st.tabs(available_countries)
             
             for idx, country in enumerate(available_countries):
@@ -369,7 +343,6 @@ with col2:
                     )
                     
                     if country_schedules.strip():
-                        # Map DS CY to CY, DS RO to RO, DS TR to TR for backend compatibility
                         if country == "DS CY":
                             schedule_settings_per_country["CY"] = country_schedules.strip()
                         elif country == "DS RO":
@@ -392,15 +365,10 @@ with col2:
         use_custom_commitments = st.checkbox("Define custom Service Commitments", help="If unchecked, commitments will be copied from the source files")
         
         if use_custom_commitments:
-            # UPDATED country list with RO and TR
             commitment_country = st.selectbox("Country", ["CY", "DE", "MD", "PL", "RO", "TR", "UA"])
             
             st.markdown("Service Commitments Configuration")
-            
-            # Initialize commitment lines list
             commitment_lines = []
-            
-            # Create multiple commitment entries
             num_commitments = st.number_input("Number of commitment", min_value=1, max_value=10, value=2)
             
             for i in range(num_commitments):
@@ -420,7 +388,6 @@ with col2:
                     time = st.text_input(f"Time", placeholder="e.g. 2h, 1d", key=f"commit_time_{i}")
                 
                 if schedule and time:
-                    # Check if we should use custom prefix from Advanced tab
                     if st.session_state.get('use_custom_depend_on', False) and st.session_state.get('depend_on_prefix'):
                         prefix_to_use = st.session_state.get('depend_on_prefix')
                         if prefix_to_use == "Global":
@@ -441,18 +408,13 @@ with col2:
                     
                     line = f"[{prefix_to_use}] SLA {sr_or_im} {line_type} {schedule} {priority} {time}"
                     commitment_lines.append(line)
-                    
-                    # Add OLA for SR and RSL
                     if sr_or_im == "SR" and line_type == "RSL":
                         ola_line = f"[{prefix_to_use}] OLA {sr_or_im} RSL {schedule} {priority} {time}"
                         commitment_lines.append(ola_line)
-            
-            # Show preview
             if commitment_lines:
                 st.markdown("### Preview")
                 st.code("\n".join(commitment_lines))
                 
-            # Store the custom commitments string
             custom_commitments_str = "\n".join(commitment_lines) if commitment_lines else ""
         else:
             custom_commitments_str = ""
@@ -460,12 +422,9 @@ with col2:
     
     with tab5:
         st.subheader("Support Groups")
-        
-        # Option to use same group for all countries or different per country
         use_per_country_groups = st.checkbox("Use different support groups per country", value=False)
         
         if not use_per_country_groups:
-            # Single support group for all countries
             st.markdown("#### Global Support Groups")
             support_group = st.text_input("Support Group", value="", help="Same support group for all countries")
             managed_by_group = st.text_input(
@@ -473,27 +432,19 @@ with col2:
                 value="",
                 help="Optional - if empty, Support Group value will be copied"
             )
-            # Instead of empty dicts, populate with all countries
             support_groups_per_country = {}
             managed_by_groups_per_country = {}
-            
-            # Populate dictionaries with global values for all countries
             all_countries = ["HS PL", "DS PL", "DE", "UA", "MD", "CY", "RO", "TR"]
             for country_key in all_countries:
                 if support_group:  # Only populate if there's a value
                     support_groups_per_country[country_key] = support_group
                     managed_by_groups_per_country[country_key] = managed_by_group if managed_by_group else support_group
         else:
-            # Per-country support groups
             st.markdown("Support Groups by Country")
             st.info("Select countries to configure.")
-            
-            # UPDATED countries list with new DS-only countries
             countries = ["HS PL", "DS PL", "DE", "UA", "MD", "DS CY", "DS RO", "DS TR"]
             support_groups_per_country = {}
             managed_by_groups_per_country = {}
-            
-            # Create columns for better layout
             cols = st.columns(2)
             
             for i, country in enumerate(countries):
@@ -502,7 +453,6 @@ with col2:
                     country_enabled = st.checkbox(f"Configure {country}", key=f"enable_{country}")
                     
                     if country_enabled:
-                        # Special handling for DE - multiple support groups
                         if country == "DE":
                             num_de_groups = st.number_input(
                                 f"Number of Support Groups for DE", 
@@ -536,12 +486,9 @@ with col2:
                                     de_support_groups.append(de_support_group)
                                     de_managed_groups.append(de_managed_group if de_managed_group else de_support_group)
                             
-                            # Join multiple groups with newlines
                             support_groups_per_country[country] = "\n".join(de_support_groups) if de_support_groups else ""
                             managed_by_groups_per_country[country] = "\n".join(de_managed_groups) if de_managed_groups else ""
                         else:
-                            # Standard single support group for other countries
-                            # Map display names to backend keys
                             backend_key = country
                             if country == "DS CY":
                                 backend_key = "CY"
@@ -564,7 +511,6 @@ with col2:
                                 help="If empty, will use the Support Group value"
                             )
                     else:
-                        # Map display names to backend keys for empty values too
                         backend_key = country
                         if country == "DS CY":
                             backend_key = "CY"
@@ -575,18 +521,13 @@ with col2:
                         
                         support_groups_per_country[backend_key] = ""
                         managed_by_groups_per_country[backend_key] = ""
-            
-            # Set global variables to empty for backward compatibility
             support_group = ""
             managed_by_group = ""
     
     with tab6:
         st.subheader("Select proper naming convention:")
-        
-        # Create a column to ensure vertical layout - ALPHABETICAL ORDER
         col = st.container()
         with col:
-            # List in alphabetical order
             require_corp = st.checkbox("CORP")
             require_recp = st.checkbox("CORP RecP")
             require_corp_dedicated = st.checkbox("CORP Dedicated Services")
@@ -597,11 +538,9 @@ with col2:
             special_it = st.checkbox("IT")
             special_medical = st.checkbox("Medical")
         
-        # Ensure only one is selected
         all_selected = sum([require_corp, require_recp, special_it, special_hr, special_medical, special_dak, require_corp_it, require_corp_dedicated, require_dedicated])
         if all_selected > 1:
             st.error("⚠️ Please select only one naming type")
-            # Reset all to handle multiple selection
             require_corp = require_recp = special_it = special_hr = special_medical = special_dak = require_corp_it = require_corp_dedicated = require_dedicated = False
         elif all_selected == 0:
             st.info("Standard naming will be used if nothing is selected")
@@ -614,22 +553,13 @@ with col2:
             )
         else:
             delivering_tag = ""
-        
-        # Save IT checkbox to session state
         st.session_state['special_it'] = special_it
     
     with tab7:
-        # Global settings - MOVED TO TOP
         st.markdown("### Global")
         global_prod = st.checkbox("Global Prod value for Service Offerings column", value=False, key="global_prod_checkbox")
-        
-        # Store in session state for use in other tabs
         st.session_state['global_prod'] = global_prod
-        
-        # Remove pluralization checkbox - always use pluralization
-        use_pluralization = True  # Always enabled
-        
-        # Custom Depend On setting - NOW AFTER GLOBAL SETTINGS
+        use_pluralization = True
         st.markdown("### Service Offerings | Depend On")
         use_custom_depend_on = st.checkbox("Use custom value for column 'Service Offerings | Depend On'", value=False, 
                                           help="Overrides automatic value based on selected prefix and applications")
@@ -637,23 +567,18 @@ with col2:
         if use_custom_depend_on:
             col1, col2 = st.columns([1, 2])
             with col1:
-                # UPDATED options with DS-only countries
                 depend_on_prefix = st.selectbox(
                     "Select Prefix",
                     options=["HS PL", "DS PL", "HS DE", "DS DE", "DS UA", "DS MD", "DS CY", "DS RO", "DS TR", "Global"],
                     index=0,
                     help="Choose the service prefix"
                 )
-                # Store in session state
                 st.session_state['depend_on_prefix'] = depend_on_prefix
                 st.session_state['use_custom_depend_on'] = True
             
             with col2:
-                # Show which apps will be used automatically
                 if new_apps:
-                    # Calculate dynamic height based on number of apps
                     num_apps = len(new_apps)
-                    # Base height of 60px + 25px per additional app, with minimum 80px and maximum 300px
                     dynamic_height = max(80, min(300, 60 + (num_apps * 25)))
                     
                     if len(new_apps) == 1:
@@ -680,22 +605,15 @@ with col2:
                         help="Add applications in Basic tab to see them"
                     )
                     app_names_display = ["(no app)"]
-            
-            # Construct the custom depend on value
             current_special_it = st.session_state.get('special_it', False)
-            
-            # PREFIX FOR SERVICE OFFERINGS | DEPEND ON - WITHOUT PROD (backend will add if needed)
             depend_on_prefix_tag = depend_on_prefix
-            
-            # Show preview(s) - WITH PROD FOR DISPLAY ONLY
+
             if new_apps:
                 if len(new_apps) == 1:
                     app_name = get_plural_form_preview(new_apps[0]) if use_pluralization else new_apps[0]
-                    # PREVIEW with Prod if Global Prod is checked
                     preview_prefix = f"{depend_on_prefix_tag} Prod" if global_prod else depend_on_prefix_tag
                     preview_value = f"[{preview_prefix}] {app_name}"
                     st.info(f"Preview: `{preview_value}` (IT: {current_special_it}, Global Prod: {global_prod})")
-                    # But send to backend without Prod
                     custom_depend_on_value = f"[{depend_on_prefix_tag}] {app_name}"
                 else:
                     preview_prefix = f"{depend_on_prefix_tag} Prod" if global_prod else depend_on_prefix_tag
@@ -713,37 +631,30 @@ with col2:
             custom_depend_on_value = ""
             st.session_state['use_custom_depend_on'] = False
         
-        # Aliases - SIMPLIFIED VERSION
         st.markdown("### Aliases")
-
-        # Option to use same values as app names - MAIN CHECKBOX
         use_same_as_apps = st.checkbox("Use same values as Application Names", 
                                       value=False,
                                       help="When checked, aliases will automatically use the same values as the application names but for English names ONLY")
 
         if use_same_as_apps:
-            # Auto-enable aliases and set to use app names
             aliases_on = True
             aliases_value = "USE_APP_NAMES"
-            selected_languages = ["ENG"]  # Automatically set to ENG only
+            selected_languages = ["ENG"]
             
             if new_apps:
                 st.success(f"✅ **Aliases will use:** {', '.join(new_apps)} **in ENG column**")
             else:
                 st.warning("⚠️ No application names defined. Add applications in Basic tab first.")
         else:
-            # When aliases are disabled
             aliases_on = False
             aliases_value = ""
             selected_languages = []
 
-        # Remove per-country aliases variables for backend compatibility
         use_per_country_aliases = False
         aliases_per_country = {}
 
 st.markdown("---")
 
-# GENERATE BUTTON AND VALIDATION
 if st.button("🚀 Generate Service Offerings", type="primary", use_container_width=True):
     if not uploaded_files:
         st.error("⚠️ Please upload at least one Excel file")
@@ -823,20 +734,14 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                             add_prod=add_prod
                         )
                         
-                        # FIXED HANDLING FOR BOTH True AND Path RETURNS
                         if result_file is True:
-                            # Legacy behavior - search for the file
                             import time
-                            time.sleep(0.5)  # Give file system time to sync
-                            
-                            # Search for generated files
+                            time.sleep(0.5)
                             excel_files = list(out_dir.glob("Generated_Service_Offerings_*.xlsx"))
                             if excel_files:
-                                # Use the most recent file
                                 result_file = max(excel_files, key=lambda p: p.stat().st_mtime)
                                 st.info(f"Found generated file: {result_file.name}")
                             else:
-                                # Try alternative pattern
                                 all_xlsx = list(out_dir.glob("*.xlsx"))
                                 if all_xlsx:
                                     result_file = max(all_xlsx, key=lambda p: p.stat().st_mtime)
@@ -845,11 +750,8 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                                     st.error("❌ No Excel files found in output directory")
                                     result_file = None
                         
-                        # Convert string path to Path object
                         elif isinstance(result_file, str):
                             result_file = Path(result_file)
-                            
-                        # Validate it's a Path object
                         elif result_file and not isinstance(result_file, Path):
                             st.error(f"❌ Invalid result type: {type(result_file)}")
                             result_file = None
@@ -859,9 +761,7 @@ if st.button("🚀 Generate Service Offerings", type="primary", use_container_wi
                         st.exception(gen_error)
                         result_file = None
                 
-                # Check if file exists and download
                 if result_file and isinstance(result_file, Path) and result_file.exists():
-                    # Read the file
                     with open(result_file, "rb") as f:
                         file_data = f.read()
                     
